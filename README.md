@@ -44,3 +44,7 @@ See `docs/api-v1.md`.
 - Parser:
 - AI:
 - Docs / QA:
+
+## Backend Tasks
+
+See [backend/TASKS.md](backend/TASKS.md).
