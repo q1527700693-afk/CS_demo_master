@@ -16,7 +16,7 @@ deploy/     Deployment configuration
 ## Tech Stack
 
 - Frontend: Vue 3 + Vite
-- Backend: FastAPI + SQLAlchemy
+- Backend: Node.js + Express
 - Database: SQLite (MVP) / PostgreSQL
 - Demo Parser: Python + awpy
 - AI: LLM API for demo log analysis
@@ -44,3 +44,7 @@ See `docs/api-v1.md`.
 - Parser:
 - AI:
 - Docs / QA:
+
+## Backend Tasks
+
+See [backend/TASKS.md](backend/TASKS.md).
