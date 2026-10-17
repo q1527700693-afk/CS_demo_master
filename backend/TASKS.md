@@ -130,11 +130,11 @@ Authorization: Bearer <token>
 
 | 接口 | 文件 | 要求 | 状态 |
 |---|---|---|---|
-| GET `/api/v1/users/me/profile` | `src/routes/users.js` | 返回自己的名片 | DONE |
-| PATCH `/api/v1/users/me/profile` | `src/routes/users.js` | 编辑个性签名、Steam ID、完美 ID、5E ID、其他游戏 ID、水平、想找队友 | DONE |
-| GET `/api/v1/users/:userId/profile` | `src/routes/users.js` | 查看公开名片 | DONE |
-| POST `/api/v1/users/me/avatar` | `src/routes/users.js` | 上传头像，JPG/PNG/WebP，最大 2MB，压缩到 512x512 | DONE |
-| DELETE `/api/v1/users/me/avatar` | `src/routes/users.js` | 删除头像 | DONE |
+| GET `/api/v1/users/me/profile` | `src/routes/users.js` | 返回自己的名片 | DOING |
+| PATCH `/api/v1/users/me/profile` | `src/routes/users.js` | 编辑个性签名、Steam ID、完美 ID、5E ID、其他游戏 ID、水平、想找队友 | DOING |
+| GET `/api/v1/users/:userId/profile` | `src/routes/users.js` | 查看公开名片 | DOING |
+| POST `/api/v1/users/me/avatar` | `src/routes/users.js` | 上传头像，JPG/PNG/WebP，最大 2MB，压缩到 512x512 | DOING |
+| DELETE `/api/v1/users/me/avatar` | `src/routes/users.js` | 删除头像 | DOING |
 
 > 实现位置：`src/routes/users.js` + `src/services/profileService.js`，
 > 测试在 `tests/profile.test.js`（`npm test`）。
