@@ -1,4 +1,4 @@
-# Python
+﻿# Python
 __pycache__/
 *.py[cod]
 .venv/
@@ -18,11 +18,23 @@ dist/
 *.sqlite
 *.sqlite3
 
-# Uploads and runtime files
-uploads/
+# Uploads and runtime files.
+# The two folders from TASKS.md 2 are kept in the repo, their contents are not.
+uploads/*
+!uploads/avatars/
+!uploads/demo-logs/
+uploads/avatars/*
+!uploads/avatars/.gitkeep
+uploads/demo-logs/*
+!uploads/demo-logs/.gitkeep
+
 storage/
 data/logs/
 *.log
+
+# Test leftovers
+tests/_tmp/
+package-lock.json.bak
 
 # IDE
 .idea/

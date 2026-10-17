@@ -12,6 +12,7 @@
 | jsonwebtoken | JWT 登录令牌 |
 | bcryptjs | 密码哈希 |
 | multer | 文件和头像上传 |
+| sharp | 头像格式校验与压缩到 512×512（JPG/PNG/WebP） |
 | cors | 前后端跨域 |
 | dotenv | 环境变量配置 |
 | PM2 | 服务器后台运行 |
@@ -129,11 +130,12 @@ Authorization: Bearer <token>
 
 | 接口 | 文件 | 要求 | 状态 |
 |---|---|---|---|
-| GET `/api/v1/users/me/profile` | `src/routes/users.js` | 返回自己的名片 | TODO |
-| PATCH `/api/v1/users/me/profile` | `src/routes/users.js` | 编辑个性签名、Steam ID、完美 ID、5E ID、其他游戏 ID、水平、想找队友 | TODO |
-| GET `/api/v1/users/:userId/profile` | `src/routes/users.js` | 查看公开名片 | TODO |
-| POST `/api/v1/users/me/avatar` | `src/routes/users.js` | 上传头像，JPG/PNG/WebP，最大 2MB，压缩到 512x512 | TODO |
-| DELETE `/api/v1/users/me/avatar` | `src/routes/users.js` | 删除头像 | TODO |
+| GET `/api/v1/users/me/profile` | `src/routes/users.js` | 返回自己的名片 | DONE |
+| PATCH `/api/v1/users/me/profile` | `src/routes/users.js` | 编辑个性签名、Steam ID、完美 ID、5E ID、其他游戏 ID、水平、想找队友 | DONE |
+| GET `/api/v1/users/:userId/profile` | `src/routes/users.js` | 查看公开名片 | DOING |
+| POST `/api/v1/users/me/avatar` | `src/routes/users.js` | 上传头像，JPG/PNG/WebP，最大 2MB，压缩到 512x512 | DONE |
+| DELETE `/api/v1/users/me/avatar` | `src/routes/users.js` | 删除头像 | DONE |
+
 
 ### 4.5 组队大厅模块
 
