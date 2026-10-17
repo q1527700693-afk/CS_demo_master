@@ -136,15 +136,6 @@ Authorization: Bearer <token>
 | POST `/api/v1/users/me/avatar` | `src/routes/users.js` | 上传头像，JPG/PNG/WebP，最大 2MB，压缩到 512x512 | DOING |
 | DELETE `/api/v1/users/me/avatar` | `src/routes/users.js` | 删除头像 | DOING |
 
-> 实现位置：`src/routes/users.js` + `src/services/profileService.js`，
-> 测试在 `tests/profile.test.js`（`npm test`）。
-> 随 4.4 一起提供的最小依赖：`src/config/database.js`（users / user_profiles
-> 建表）、`src/utils/response.js`、`src/middlewares/auth.js`、
-> `src/services/authService.js` 与 register / login / me。4.1–4.3 的负责人可以
-> 直接在此基础上继续或替换。
-> 字段命名：接口用平台自己的叫法 `wanmei_id` / `5E_id`（5E 以数字开头，数据库列
-> 与内部属性为 `five_e_id`，请求两种写法都接受）。个性签名存在 4.2 规划的 `bio`
-> 列里，接口字段名为 `signature`，入参也接受 `bio`。
 
 ### 4.5 组队大厅模块
 
