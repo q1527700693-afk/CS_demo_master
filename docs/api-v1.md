@@ -1,6 +1,8 @@
 # CS Demo Master API Documentation v1
 
-Base URL: `/api/v1`
+Local base URL: `http://localhost:8000/api/v1`
+
+All requests go through the `/api/v1` prefix. CORS is enabled on the backend.
 
 ## 1. Common Conventions
 
@@ -104,6 +106,27 @@ any time.
 Requires authentication. Returns the account object shown above.
 
 Errors: `40002` missing or invalid token.
+
+## Frontend Quick Start
+
+1. Register or log in.
+2. Read `data.access_token`.
+3. Store it in memory, Pinia, or localStorage.
+4. Add `Authorization: Bearer <token>` for protected requests.
+5. Prefix avatar URLs returned by the API with the backend origin.
+
+```js
+const API_BASE = "http://localhost:8000";
+
+const res = await fetch(API_BASE + "/api/v1/auth/login", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ username, password })
+});
+
+const json = await res.json();
+const token = json.data.access_token;
+```
 
 ## 3. User Profile (Personal Card / 个人名片)
 
