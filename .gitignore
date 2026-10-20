@@ -12,11 +12,17 @@ env/
 node_modules/
 dist/
 .vite/
+npm-cache/
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
+# SQLite WAL / SHM sidecar files
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
 
 # Uploads and runtime files
 uploads/
