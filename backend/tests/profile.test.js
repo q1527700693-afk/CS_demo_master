@@ -125,6 +125,24 @@ test('register returns a token and the account', async () => {
     assert.equal(me.body.data.username, 'alice');
 });
 
+test('register stores the nickname', async () => {
+    const response = await fetch(`${base}/api/v1/auth/register`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+            username: 'nicktest',
+            password: PASSWORD,
+            nickname: 'Shiyu',
+        }),
+    });
+    const body = await response.json();
+    assert.equal(response.status, 201, JSON.stringify(body));
+    assert.equal(body.data.user.nickname, 'Shiyu');
+
+    const me = await request('GET', '/api/v1/users/me', { token: body.data.access_token });
+    assert.equal(me.body.data.nickname, 'Shiyu');
+});
+
 test('register rejects a duplicate username', async () => {
     await register('alice');
     const { status, body } = await request('POST', '/api/v1/auth/register', {

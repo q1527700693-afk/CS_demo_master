@@ -28,7 +28,7 @@ function publicUser(user) {
  * Note: registration/login belong to TASKS.md 4.3; they are implemented here
  * because every personal card endpoint is "me" based and needs a token.
  */
-function register({ username, password } = {}) {
+function register({ username, password, nickname } = {}) {
     const name = String(username ?? '').trim();
 
     if (!USERNAME_RE.test(name)) {
@@ -46,9 +46,23 @@ function register({ username, password } = {}) {
         throw errors.conflict('Username is already taken');
     }
 
+    const displayName = nickname === null || nickname === undefined
+        ? null
+        : String(nickname).trim();
+    if (displayName && displayName.length > 32) {
+        throw errors.invalidParameter('nickname must be at most 32 characters');
+    }
+
     const info = db
-        .prepare('INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)')
-        .run(name, bcrypt.hashSync(password, BCRYPT_ROUNDS), new Date().toISOString());
+        .prepare(
+            'INSERT INTO users (username, password_hash, nickname, created_at) VALUES (?, ?, ?, ?)'
+        )
+        .run(
+            name,
+            bcrypt.hashSync(password, BCRYPT_ROUNDS),
+            displayName || null,
+            new Date().toISOString()
+        );
 
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(info.lastInsertRowid));
     return { token: signToken(user), user: publicUser(user) };
