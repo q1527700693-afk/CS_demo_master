@@ -124,9 +124,9 @@ Content-Type: application/json
 
 ```json
 {
-  "username": "qianshiyu",
+  "username": "player_one",
   "password": "12345678",
-  "nickname": "钱施宇"
+  "nickname": "Player One"
 }
 ```
 
@@ -139,7 +139,7 @@ Content-Type: application/json
 
 ```json
 {
-  "username": "qianshiyu",
+  "username": "player_one",
   "password": "12345678"
 }
 ```
@@ -155,8 +155,8 @@ Both return:
     "token_type": "bearer",
     "user": {
       "id": 1,
-      "username": "qianshiyu",
-      "nickname": "钱施宇",
+      "username": "player_one",
+      "nickname": "Player One",
       "avatar_url": null,
       "created_at": "2026-10-17T12:30:27.000Z"
     }
@@ -244,7 +244,7 @@ Full API details:
 
 ## Team
 
-- Backend Lead: Shiyu Qian
+- Backend Team
 - Frontend:
 - Parser:
 - AI:

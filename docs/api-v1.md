@@ -311,6 +311,6 @@ succeeds.
 
 | Version | Date | Author | Description |
 |---|---|---|---|
-| v1.0 | 2026-10-01 | Shiyu Qian | Initial API document |
-| v1.1 | 2026-10-17 | Shiyu Qian | Documented authentication and the personal card (TASKS.md 4.4): platform ids, signature, extra fields, avatar upload/resize rules |
-| v1.2 | 2026-10-17 | Shiyu Qian | Added `steam_friend_code` and removed the at-least-one-platform-id restriction |
+| v1.0 | 2026-10-01 | CS Demo Master Team | Initial API document |
+| v1.1 | 2026-10-17 | CS Demo Master Team | Documented authentication and the personal card (TASKS.md 4.4): platform ids, signature, extra fields, avatar upload/resize rules |
+| v1.2 | 2026-10-17 | CS Demo Master Team | Added `steam_friend_code` and removed the at-least-one-platform-id restriction |
