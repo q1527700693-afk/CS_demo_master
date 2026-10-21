@@ -19,6 +19,20 @@ const DEFAULT_DB_PATH = path.join(__dirname, '..', '..', 'data', 'app.db');
  * - `other_game_ids` is stored as a JSON array because it is only ever read as
  *   a whole, never filtered on.
  */
+/**
+ * Lightweight schema migration for databases created before a column existed.
+ */
+function ensureColumns(database) {
+    const columns = database
+        .prepare('PRAGMA table_info(user_profiles)')
+        .all()
+        .map((column) => column.name);
+
+    if (!columns.includes('steam_friend_code')) {
+        database.exec('ALTER TABLE user_profiles ADD COLUMN steam_friend_code TEXT');
+    }
+}
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,9 +47,10 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id        INTEGER NOT NULL UNIQUE REFERENCES users (id) ON DELETE CASCADE,
     bio            TEXT,
-    steam_id       TEXT UNIQUE,
-    wanmei_id      TEXT UNIQUE,
-    five_e_id      TEXT UNIQUE,
+    steam_id           TEXT UNIQUE,
+    steam_friend_code  TEXT,
+    wanmei_id          TEXT UNIQUE,
+    five_e_id          TEXT UNIQUE,
     other_game_ids TEXT,
     skill_level    TEXT,
     looking_for    TEXT,
@@ -55,6 +70,7 @@ function createDatabase(file = process.env.DB_PATH || DEFAULT_DB_PATH) {
     const database = new DatabaseSync(file);
     database.exec('PRAGMA foreign_keys = ON');
     database.exec(SCHEMA);
+    ensureColumns(database);
     return database;
 }
 

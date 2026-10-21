@@ -132,10 +132,9 @@ const token = json.data.access_token;
 
 The card of a user, used by the lobby and by shareable card pages. It is made of:
 
-1. **Platform ids** - `steam_id`, `wanmei_id` (完美世界) and `5E_id` (5E).
-   At least **one** must be bound; a `PATCH` that would leave the card without
-   any platform id is rejected with `40000`. Each id can belong to one account
-   only (`40900` on a duplicate).
+1. **Platform fields** - `steam_id`, `steam_friend_code`, `wanmei_id` (完美世界)
+   and `5E_id` (5E). All of these fields are optional. Each platform id can
+   belong to one account only (`40900` on a duplicate).
 2. **Signature** - free text, at most 200 characters.
 3. **Avatar** - JPEG/PNG/WebP up to **2 MB**; the server resizes it to
    **512x512** JPEG and stores it under `uploads/avatars/<userId>/`. Only the
@@ -156,6 +155,7 @@ The card of a user, used by the lobby and by shareable card pages. It is made of
   "nickname": null,
   "signature": "AWP main, entry fragger. Let's queue!",
   "steam_id": "76561197960287930",
+  "steam_friend_code": "12345678",
   "wanmei_id": "PW_10086",
   "5E_id": "8899",
   "other_game_ids": [{ "game": "Faceit", "account": "s1mple_f" }],
@@ -183,6 +183,7 @@ explicit `null` clears a field.
 ```json
 {
   "steam_id": "[U:1:12345]",
+  "steam_friend_code": "12345678",
   "wanmei_id": "PW_10086",
   "5E_id": "8899",
   "signature": "AWP main, entry fragger.",
@@ -195,6 +196,7 @@ explicit `null` clears a field.
 | Field | Type | Rules |
 |---|---|---|
 | `steam_id` | string \| null | SteamID64 (17 digits), SteamID3 `[U:1:...]`, SteamID2 `STEAM_0:1:...` or a `steamcommunity.com/profiles/<SteamID64>` link. Always stored normalised to SteamID64. Vanity links cannot be resolved without the Steam Web API and are rejected. |
+| `steam_friend_code` | string \| null | Steam friend code, 6-12 digits, optional |
 | `wanmei_id` | string \| null | 完美世界 id, 2-32 characters of `A-Z a-z 0-9 _ -` |
 | `5E_id` | string \| null | 5E id, 2-32 characters of `A-Z a-z 0-9 _ -`. `five_e_id` is accepted as an alias |
 | `signature` | string \| null | At most 200 characters, trimmed. Stored in the `bio` column of `user_profiles` (TASKS.md 4.2); `bio` is accepted as an input alias |
@@ -208,7 +210,7 @@ Errors:
 
 | Code | HTTP | When |
 |---:|---:|---|
-| 40000 | 400 | Empty payload, unknown field, invalid id/format, too long text, or the update would leave no platform id |
+| 40000 | 400 | Empty payload, unknown field, invalid id/format, or too long text |
 | 40002 | 401 | Missing / invalid token |
 | 40900 | 409 | The platform id is already bound to another account |
 
@@ -311,3 +313,4 @@ succeeds.
 |---|---|---|---|
 | v1.0 | 2026-10-01 | Shiyu Qian | Initial API document |
 | v1.1 | 2026-10-17 | Shiyu Qian | Documented authentication and the personal card (TASKS.md 4.4): platform ids, signature, extra fields, avatar upload/resize rules |
+| v1.2 | 2026-10-17 | Shiyu Qian | Added `steam_friend_code` and removed the at-least-one-platform-id restriction |

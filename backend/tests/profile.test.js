@@ -170,21 +170,23 @@ test('a fresh account has an empty card', async () => {
     assert.equal(body.data.username, 'alice');
     assert.equal(body.data.has_platform_id, false);
     assert.equal(body.data.steam_id, null);
+    assert.equal(body.data.steam_friend_code, null);
     assert.equal(body.data.wanmei_id, null);
     assert.equal(body.data['5E_id'], null);
     assert.equal(body.data.signature, null);
     assert.equal(body.data.avatar_url, null);
 });
 
-test('updating only the signature is rejected', async () => {
+test('updating only the signature is allowed', async () => {
     const { access_token: token } = await register('alice');
     const { status, body } = await request('PATCH', '/api/v1/users/me/profile', {
         token,
         body: { signature: 'hello' },
     });
-    assert.equal(status, 400);
-    assert.equal(body.code, 40000);
-    assert.match(body.message, /at least one platform id/);
+    assert.equal(status, 200);
+    assert.equal(body.code, 0);
+    assert.equal(body.data.signature, 'hello');
+    assert.equal(body.data.has_platform_id, false);
 });
 
 test('steam ids are normalised to SteamID64', async () => {
@@ -204,6 +206,7 @@ test('the whole card can be filled at once', async () => {
         token,
         body: {
             steam_id: STEAM_ID,
+            steam_friend_code: '12345678',
             wanmei_id: 'PW_10086',
             '5E_id': '8899',
             signature: '主玩狙击，周末开黑',
@@ -214,6 +217,7 @@ test('the whole card can be filled at once', async () => {
     });
 
     assert.equal(body.data.steam_id, STEAM_ID);
+    assert.equal(body.data.steam_friend_code, '12345678');
     assert.equal(body.data.wanmei_id, 'PW_10086');
     assert.equal(body.data['5E_id'], '8899');
     assert.equal(body.data.signature, '主玩狙击，周末开黑');
@@ -251,6 +255,7 @@ test('the table follows the TASKS.md 4.2 column names', () => {
     for (const name of [
         'bio',
         'steam_id',
+        'steam_friend_code',
         'wanmei_id',
         'five_e_id',
         'other_game_ids',
@@ -269,6 +274,7 @@ test('invalid input is rejected with 40000', async () => {
         { steam_id: 'not-a-steam-id' },
         { steam_id: STEAM_ID, wanmei_id: 'a' },
         { steam_id: STEAM_ID, '5E_id': 'bad id' },
+        { steam_friend_code: 'abc123' },
         { steam_id: STEAM_ID, skill_level: 'x'.repeat(33) },
         { steam_id: STEAM_ID, other_game_ids: 'nope' },
         { steam_id: STEAM_ID, unknown_field: true },
@@ -299,23 +305,37 @@ test('a platform id belongs to a single account', async () => {
     assert.equal(body.code, 40900);
 });
 
-test('clearing every platform id leaves the card untouched', async () => {
+test('clearing every platform id is allowed', async () => {
     const { access_token: token } = await register('alice');
-    await request('PATCH', '/api/v1/users/me/profile', {
+    const filled = await request('PATCH', '/api/v1/users/me/profile', {
         token,
-        body: { steam_id: STEAM_ID, signature: 'keep me' },
+        body: { steam_id: STEAM_ID, steam_friend_code: '12345678', signature: 'keep me' },
     });
+    assert.equal(filled.status, 200);
 
     const cleared = await request('PATCH', '/api/v1/users/me/profile', {
         token,
-        body: { steam_id: null },
+        body: { steam_id: null, steam_friend_code: null },
     });
-    assert.equal(cleared.status, 400);
-    assert.equal(cleared.body.code, 40000);
+    assert.equal(cleared.status, 200);
+    assert.equal(cleared.body.data.steam_id, null);
+    assert.equal(cleared.body.data.steam_friend_code, null);
+    assert.equal(cleared.body.data.has_platform_id, false);
 
     const card = await request('GET', '/api/v1/users/me/profile', { token });
-    assert.equal(card.body.data.steam_id, STEAM_ID);
+    assert.equal(card.body.data.steam_id, null);
     assert.equal(card.body.data.signature, 'keep me');
+});
+
+test('steam_friend_code can be updated independently', async () => {
+    const { access_token: token } = await register('alice');
+    const updated = await request('PATCH', '/api/v1/users/me/profile', {
+        token,
+        body: { steam_friend_code: '98765432' },
+    });
+    assert.equal(updated.status, 200);
+    assert.equal(updated.body.data.steam_friend_code, '98765432');
+    assert.equal(updated.body.data.has_platform_id, false);
 });
 
 test('the public card is readable without a token', async () => {

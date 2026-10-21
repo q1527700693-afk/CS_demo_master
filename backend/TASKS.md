@@ -112,7 +112,7 @@ Authorization: Bearer <token>
 |---|---|---|---|
 | SQLite 连接 | `src/config/database.js` | 使用 `node:sqlite` | TODO |
 | users 表 | `src/config/database.js` | id, username, password_hash, nickname, avatar_url | TODO |
-| user_profiles 表 | `src/config/database.js` | bio, steam_id, perfect_world_id, five_e_id, other_game_ids | TODO |
+| user_profiles 表 | `src/config/database.js` | bio, steam_id, steam_friend_code, wanmei_id, five_e_id, other_game_ids | TODO |
 | lobbies 表 | `src/config/database.js` | 组队大厅 | TODO |
 | lobby_members 表 | `src/config/database.js` | 队伍成员和准备状态 | TODO |
 | demo_analyses 表 | `src/config/database.js` | Demo 日志和分析报告 | TODO |
@@ -131,7 +131,7 @@ Authorization: Bearer <token>
 | 接口 | 文件 | 要求 | 状态 |
 |---|---|---|---|
 | GET `/api/v1/users/me/profile` | `src/routes/users.js` | 返回自己的名片 | DONE |
-| PATCH `/api/v1/users/me/profile` | `src/routes/users.js` | 编辑个性签名、Steam ID、完美 ID、5E ID、其他游戏 ID、水平、想找队友 | DONE |
+| PATCH `/api/v1/users/me/profile` | `src/routes/users.js` | 编辑个性签名、Steam ID、Steam 好友码、完美 ID、5E ID、其他游戏 ID、水平、想找队友 | DONE |
 | GET `/api/v1/users/:userId/profile` | `src/routes/users.js` | 查看公开名片 | DOING |
 | POST `/api/v1/users/me/avatar` | `src/routes/users.js` | 上传头像，JPG/PNG/WebP，最大 2MB，压缩到 512x512 | DONE |
 | DELETE `/api/v1/users/me/avatar` | `src/routes/users.js` | 删除头像 | DONE |

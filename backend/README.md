@@ -42,7 +42,7 @@ Copy `.env.example` to `.env` to override `PORT`, `JWT_SECRET`, `DB_PATH` and
 | POST | `/api/v1/auth/login` | - | Log in, returns a JWT |
 | GET | `/api/v1/users/me` | yes | Current account |
 | GET | `/api/v1/users/me/profile` | yes | My personal card |
-| PATCH | `/api/v1/users/me/profile` | yes | Update platform ids / signature / extra fields |
+| PATCH | `/api/v1/users/me/profile` | yes | Update platform ids / Steam friend code / signature / extra fields |
 | GET | `/api/v1/users/:userId/profile` | - | Public card |
 | POST | `/api/v1/users/me/avatar` | yes | Upload avatar (multipart `file`) |
 | DELETE | `/api/v1/users/me/avatar` | yes | Remove avatar |
@@ -54,9 +54,8 @@ Design notes:
 - The signature lives in the `bio` column (TASKS.md 4.2) and is exposed as
   `signature`; requests may also send `bio`.
 - `steam_id` / `wanmei_id` / `five_e_id` are NULL when unbound and carry UNIQUE
-  indexes, so one platform account can belong to one user only. "At least one
-  platform id" is checked against the **resulting** card, so a rejected update
-  changes nothing.
+  indexes, so one platform account can belong to one user only. These platform
+  fields, plus `steam_friend_code`, are all optional.
 - `5E_id` starts with a digit: the JSON/API name is `5E_id`, the column and
   attribute are `five_e_id`, and requests may use either spelling.
 - Avatars are validated with sharp (real JPEG/PNG/WebP), resized to 512x512

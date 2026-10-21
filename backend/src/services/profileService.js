@@ -19,6 +19,7 @@ const AVATAR_SIZE = 512;
 const AVATAR_FORMATS = new Set(['jpeg', 'png', 'webp']);
 
 const PLATFORM_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{1,31}$/;
+const STEAM_FRIEND_CODE_RE = /^\d{6,12}$/;
 const PLATFORM_FIELDS = ['steam_id', 'wanmei_id', 'five_e_id'];
 const PLATFORM_LABELS = {
     steam_id: 'Steam',
@@ -30,6 +31,7 @@ const PLATFORM_LABELS = {
 const FIVE_E_ALIASES = ['5E_id', 'five_e_id'];
 const UPDATABLE_FIELDS = new Set([
     'steam_id',
+    'steam_friend_code',
     'wanmei_id',
     'signature',
     'bio',
@@ -102,6 +104,20 @@ function normalizeSteamId(raw) {
         'steam_id must be a SteamID64 (17 digits), SteamID3 ([U:1:...]), ' +
             'SteamID2 (STEAM_0:1:...) or a steamcommunity.com/profiles/<SteamID64> link'
     );
+}
+
+function normalizeSteamFriendCode(value) {
+    if (value === null || value === undefined) {
+        return null;
+    }
+    const text = String(value).trim();
+    if (!text) {
+        return null;
+    }
+    if (!STEAM_FRIEND_CODE_RE.test(text)) {
+        throw errors.invalidParameter('steam_friend_code must be 6-12 digits');
+    }
+    return text;
 }
 
 function normalizePlatformId(value, label) {
@@ -217,6 +233,7 @@ function serialize(user, profile) {
         // DB column is `bio` (TASKS.md 4.2), the API calls it `signature`.
         signature: profile ? profile.bio : null,
         steam_id: profile ? profile.steam_id : null,
+        steam_friend_code: profile ? profile.steam_friend_code : null,
         wanmei_id: profile ? profile.wanmei_id : null,
         '5E_id': profile ? profile.five_e_id : null,
         other_game_ids: parseJson(profile && profile.other_game_ids, []),
@@ -253,8 +270,8 @@ function getPublicCard(userId) {
 /**
  * Apply a partial update to the card.
  *
- * Omitted fields stay unchanged, an explicit null clears a field. At least one
- * platform id must remain bound after the update.
+ * Omitted fields stay unchanged, an explicit null clears a field. All platform
+ * fields are optional.
  */
 function updateMyCard(user, payload) {
     const body = payload && typeof payload === 'object' ? payload : {};
@@ -270,6 +287,9 @@ function updateMyCard(user, payload) {
     if ('steam_id' in body) {
         changes.steam_id =
             body.steam_id === null || body.steam_id === '' ? null : normalizeSteamId(body.steam_id);
+    }
+    if ('steam_friend_code' in body) {
+        changes.steam_friend_code = normalizeSteamFriendCode(body.steam_friend_code);
     }
     if ('wanmei_id' in body) {
         changes.wanmei_id = normalizePlatformId(body.wanmei_id, PLATFORM_LABELS.wanmei_id);
@@ -306,12 +326,6 @@ function updateMyCard(user, payload) {
         wanmei_id: 'wanmei_id' in changes ? changes.wanmei_id : profile.wanmei_id,
         five_e_id: 'five_e_id' in changes ? changes.five_e_id : profile.five_e_id,
     };
-    if (!candidate.steam_id && !candidate.wanmei_id && !candidate.five_e_id) {
-        throw errors.invalidParameter(
-            'Bind at least one platform id: steam_id, wanmei_id or 5E_id'
-        );
-    }
-
     for (const field of PLATFORM_FIELDS) {
         const value = candidate[field];
         if (!value) {

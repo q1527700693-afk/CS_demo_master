@@ -199,6 +199,7 @@ Profile update example:
 {
   "signature": "AWP main, want a team for Mirage.",
   "steam_id": "76561197960287930",
+  "steam_friend_code": "12345678",
   "wanmei_id": "PW_10086",
   "5E_id": "8899",
   "skill_level": "完美 C+",
@@ -206,7 +207,7 @@ Profile update example:
 }
 ```
 
-At least one of `steam_id`, `wanmei_id`, or `5E_id` must be present.
+All platform fields (`steam_id`, `steam_friend_code`, `wanmei_id`, `5E_id`) are optional.
 
 ### Avatar URL
 
