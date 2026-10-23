@@ -31,8 +31,9 @@ Health check:
 GET /api/v1/health
 ```
 
-Copy `.env.example` to `.env` to override `PORT`, `JWT_SECRET`, `DB_PATH` and
-`UPLOAD_DIR`. The SQLite file and the upload folder are created automatically.
+Copy `.env.example` to `.env` to override `PORT`, `JWT_SECRET`, `DB_PATH`,
+`UPLOAD_DIR` and `LOBBY_TTL_HOURS`. The SQLite file and the upload folder are
+created automatically.
 
 ## Implemented: Personal Card (TASKS.md 4.4)
 
@@ -64,17 +65,73 @@ Design notes:
 - The card row is created lazily on the first write, so reading a fresh account
   returns an empty card without touching the database.
 
+## Implemented: Lobby Hall (TASKS.md 4.5)
+
+The hall is a team-code sharing board, not a roster manager. The owner declares
+`team_size` and `current_players` (a 5-player team with `current_players: 4` is
+4缺1) and publishes the in-game `team_code`. Claiming reveals the code and
+records a **virtual claimant**; it does not change the declared roster.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/v1/lobbies` | optional | Short-handed, unexpired hall |
+| POST | `/api/v1/lobbies` | yes | Publish a team and its code |
+| GET | `/api/v1/lobbies/:lobbyId` | optional | Detail and virtual claimants |
+| POST | `/api/v1/lobbies/:lobbyId/claim` | yes | Reveal the code (alias: `/join`) |
+| DELETE | `/api/v1/lobbies/:lobbyId/claim` | yes | Cancel my claim (alias: `/leave`) |
+| POST | `/api/v1/lobbies/:lobbyId/depart` | yes | Owner发车: hide the post and stop claims |
+| DELETE | `/api/v1/lobbies/:lobbyId/claimants/:userId` | yes | Owner kicks a virtual claimant |
+| DELETE | `/api/v1/lobbies/:lobbyId` | yes | Owner deletes the post |
+
+Design notes:
+
+- `lobbies` keeps the declared roster (`team_size`, `current_players`), the
+  code and `expires_at`. `lobby_claims` stores only users who revealed the code;
+  there is no real-membership table.
+- `current_players` is declared by the owner and includes the owner/existing
+  teammates. The API refuses to publish an already-full team.
+- The list only returns unexpired posts where `current_players < team_size`.
+  `page`, `pageSize` (max 50) and `mode` are supported; results are newest
+  first.
+- Create accepts `title` (required, 1-60), `description` (max 300), `mode`
+  (`competitive` / `premier` / `wingman`), `map`, `region`, `skill_level`
+  (max 32 each), `team_size` (2-10), `current_players` (1 to `team_size - 1`)
+  and `team_code` (4-64 chars, no control characters). Unknown fields are
+  rejected.
+- `team_code` is only serialized for the owner and for users with a claim. The
+  claim response returns it explicitly; public list/detail responses get `null`.
+- Claiming is idempotent and does not fill a slot. The post stays in the hall,
+  and `claimants` is the virtual-player list. Multiple users may claim the same
+  code.
+- `depart` sets `status: "departed"`/`departed_at`: the post is removed from the
+  hall and its detail/claim endpoints return `404` to everyone except the owner.
+  Existing claimants lose access too.
+- Kicking sets a claim's status to `kicked` and records `kicked_at`. The user is
+  removed from `claimants`/`claim_count`, loses the code in later reads, and gets
+  `403` if they try to claim again. The row is kept to enforce that block.
+- The list/detail routes are public. An `Authorization` header is optional but,
+  when supplied, must be valid; it adds `is_owner` / `is_claimed`.
+- `LOBBY_TTL_HOURS` controls expiry (default 24, max 8760). Expired posts are
+  deleted lazily on reads/claims. The owner deletes the post once the team is
+  formed; there is no chat module.
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-`tests/profile.test.js` runs against an in-memory SQLite database and a
-temporary upload folder; it covers registration/JWT errors, the at-least-one
-platform rule, Steam id normalisation, field validation, uniqueness conflicts,
-the public card, and every avatar rule (resize to 512x512, 2 MB limit, non-image
+`tests/profile.test.js` covers registration/JWT errors, optional platform
+fields, Steam id normalisation, field validation, uniqueness conflicts, the
+public card, and every avatar rule (resize to 512x512, 2 MB limit, non-image
 rejection, replacement, deletion).
+
+`tests/lobby.test.js` covers the declared roster/code/claim schema,
+authentication, creation validation, public pagination/filtering, code privacy,
+claim idempotence and virtual claimants, code cancellation, join/leave aliases,
+owner-only depart and kick, kicked-user re-claim blocking, owner-only deletion,
+hiding full teams, and expiry cleanup. Both files use an in-memory SQLite
+database and a temporary upload folder; the suite currently has 38 tests.
 
 ## Layout
 
@@ -84,15 +141,18 @@ backend/
     app.js                   Express app, /uploads static, 404 + error handler
     server.js                dotenv + listen
     config/database.js       node:sqlite connection and schema
-    middlewares/auth.js      Bearer token -> request.user
+    middlewares/auth.js      Bearer token -> request.user (+ optional auth)
     middlewares/errorHandler.js
     routes/auth.js           register / login
     routes/users.js          me, profile, avatar
+    routes/lobbies.js        lobby hall routes
     services/authService.js
     services/profileService.js   card validation, Steam ids, avatar resizing
+    services/lobbyService.js     team-code posts, claims, expiry, deletion
     utils/response.js        { code, message, data } envelope + ApiError
-    utils/asyncHandler.js
   tests/profile.test.js
+  tests/lobby.test.js
   uploads/avatars/           runtime, git ignored
+  uploads/demo-logs/         runtime, git ignored
   data/                      SQLite file, git ignored
 ```

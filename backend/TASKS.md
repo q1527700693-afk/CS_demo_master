@@ -102,19 +102,19 @@ Authorization: Bearer <token>
 | 任务 | 文件 | 说明 | 状态 |
 |---|---|---|---|
 | Express 骨架 | `src/app.js`, `src/server.js` | 已创建 | DONE |
-| 统一响应工具 | `src/utils/response.js` | 封装 success/error 返回 | TODO |
-| 错误处理中间件 | `src/middlewares/errorHandler.js` | 已创建，后续完善 | DOING |
-| 环境变量 | `.env.example` | PORT、JWT_SECRET、DB_PATH | TODO |
+| 统一响应工具 | `src/utils/response.js` | 封装 success/error 返回 | DONE |
+| 错误处理中间件 | `src/middlewares/errorHandler.js` | 已创建，后续完善 | DONE |
+| 环境变量 | `.env.example` | PORT、JWT_SECRET、DB_PATH、LOBBY_TTL_HOURS | DONE |
 
 ### 4.2 数据库
 
 | 任务 | 文件 | 说明 | 状态 |
 |---|---|---|---|
-| SQLite 连接 | `src/config/database.js` | 使用 `node:sqlite` | TODO |
-| users 表 | `src/config/database.js` | id, username, password_hash, nickname, avatar_url | TODO |
-| user_profiles 表 | `src/config/database.js` | bio, steam_id, steam_friend_code, wanmei_id, five_e_id, other_game_ids | TODO |
-| lobbies 表 | `src/config/database.js` | 组队大厅 | TODO |
-| lobby_members 表 | `src/config/database.js` | 队伍成员和准备状态 | TODO |
+| SQLite 连接 | `src/config/database.js` | 使用 `node:sqlite` | DONE |
+| users 表 | `src/config/database.js` | id, username, password_hash, nickname, avatar_url | DONE |
+| user_profiles 表 | `src/config/database.js` | bio, steam_id, steam_friend_code, wanmei_id, five_e_id, other_game_ids | DONE |
+| lobbies 表 | `src/config/database.js` | 队伍人数、组队码、过期时间 | DONE |
+| lobby_claims 表 | `src/config/database.js` | 领取组队码的虚位记录（claimed/kicked） | DONE |
 | demo_analyses 表 | `src/config/database.js` | Demo 日志和分析报告 | TODO |
 | minigame_scores 表 | `src/config/database.js` | 小游戏分数 | TODO |
 
@@ -122,9 +122,9 @@ Authorization: Bearer <token>
 
 | 接口 | 文件 | 要求 | 状态 |
 |---|---|---|---|
-| POST `/api/v1/auth/register` | `src/routes/auth.js`, `src/services/authService.js` | 用户名唯一，密码 bcrypt 哈希 | TODO |
-| POST `/api/v1/auth/login` | `src/routes/auth.js`, `src/services/authService.js` | 校验密码，返回 JWT | TODO |
-| GET `/api/v1/users/me` | `src/routes/users.js`, `src/middlewares/auth.js` | 根据 token 返回当前用户 | TODO |
+| POST `/api/v1/auth/register` | `src/routes/auth.js`, `src/services/authService.js` | 用户名唯一，密码 bcrypt 哈希 | DONE |
+| POST `/api/v1/auth/login` | `src/routes/auth.js`, `src/services/authService.js` | 校验密码，返回 JWT | DONE |
+| GET `/api/v1/users/me` | `src/routes/users.js`, `src/middlewares/auth.js` | 根据 token 返回当前用户 | DONE |
 
 ### 4.4 个人名片模块
 
@@ -132,24 +132,30 @@ Authorization: Bearer <token>
 |---|---|---|---|
 | GET `/api/v1/users/me/profile` | `src/routes/users.js` | 返回自己的名片 | DONE |
 | PATCH `/api/v1/users/me/profile` | `src/routes/users.js` | 编辑个性签名、Steam ID、Steam 好友码、完美 ID、5E ID、其他游戏 ID、水平、想找队友 | DONE |
-| GET `/api/v1/users/:userId/profile` | `src/routes/users.js` | 查看公开名片 | DOING |
+| GET `/api/v1/users/:userId/profile` | `src/routes/users.js` | 查看公开名片 | DONE |
 | POST `/api/v1/users/me/avatar` | `src/routes/users.js` | 上传头像，JPG/PNG/WebP，最大 2MB，压缩到 512x512 | DONE |
 | DELETE `/api/v1/users/me/avatar` | `src/routes/users.js` | 删除头像 | DONE |
 
 
 ### 4.5 组队大厅模块
 
+组队大厅是**组队码共享板**：队长填写总人数和已有玩家数（例如 5 人队已有 4 人 = 4 缺 1），发布组队码。别人点“加入”只是领取组队码，并在 `claimants` 中显示为一个虚位，**不改变** `current_players` / `slots_needed`，队伍继续挂在大厅。
+
 | 接口 | 文件 | 要求 | 状态 |
 |---|---|---|---|
-| GET `/api/v1/lobbies` | `src/routes/lobbies.js` | 获取队伍列表 | TODO |
-| POST `/api/v1/lobbies` | `src/routes/lobbies.js` | 创建队伍 | TODO |
-| GET `/api/v1/lobbies/:id` | `src/routes/lobbies.js` | 队伍详情 | TODO |
-| POST `/api/v1/lobbies/:id/join` | `src/routes/lobbies.js` | 加入未满员队伍 | TODO |
-| DELETE `/api/v1/lobbies/:id/leave` | `src/routes/lobbies.js` | 退出队伍 | TODO |
-| POST `/api/v1/lobbies/:id/ready` | `src/routes/lobbies.js` | 切换准备状态 | TODO |
-| DELETE `/api/v1/lobbies/:id` | `src/routes/lobbies.js` | 队长解散队伍 | TODO |
+| GET `/api/v1/lobbies` | `src/routes/lobbies.js` | 缺人且未过期的队伍列表（公开，分页、按模式筛选） | DONE |
+| POST `/api/v1/lobbies` | `src/routes/lobbies.js` | 发布队伍：总人数、已有玩家数、组队码 | DONE |
+| GET `/api/v1/lobbies/:id` | `src/routes/lobbies.js` | 队伍详情和虚位列表 | DONE |
+| POST `/api/v1/lobbies/:id/claim` | `src/routes/lobbies.js` | 领取组队码，记录虚位；`/join` 为兼容别名 | DONE |
+| DELETE `/api/v1/lobbies/:id/claim` | `src/routes/lobbies.js` | 取消自己的虚位；`/leave` 为兼容别名 | DONE |
+| POST `/api/v1/lobbies/:id/depart` | `src/routes/lobbies.js` | 队长发车：大厅隐藏，别人不能再领码 | DONE |
+| DELETE `/api/v1/lobbies/:id/claimants/:userId` | `src/routes/lobbies.js` | 队长踢掉虚位玩家，禁止其重新领码 | DONE |
+| DELETE `/api/v1/lobbies/:id` | `src/routes/lobbies.js` | 队长删除已组好的队伍 | DONE |
 
 > 不做聊天和发消息功能。
+> 组队码只返回给队长和已领取的人；公开列表/详情的 `team_code` 为 `null`。
+> 列表只显示未过期、未发车且 `current_players < team_size` 的队伍；队长组好队后手动删除，超时由 `LOBBY_TTL_HOURS` 自动清理。
+> 发车后除队长外所有人访问详情/领码都返回 `404`；被踢的人不会出现在 `claimants`，再次领码返回 `403`。
 
 ### 4.6 Demo 和 AI 模块
 
@@ -174,7 +180,7 @@ AI 分析先调外部 LLM API，不在服务器本地跑大模型。
 
 | 任务 | 文件 | 说明 | 状态 |
 |---|---|---|---|
-| 接口测试 | `tests/` | 注册、登录、名片、组队大厅 | TODO |
+| 接口测试 | `tests/` | 注册、登录、名片、组队大厅（38 个测试） | DONE |
 | 部署文档 | `deploy/` | Nginx、PM2、环境变量 | TODO |
 | 服务器部署 | Ubuntu + PM2 + Nginx | 后端监听 127.0.0.1:8000 | TODO |
 
