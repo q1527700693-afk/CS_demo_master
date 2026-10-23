@@ -51,4 +51,18 @@ function authenticate(request, response, next) {
     }
 }
 
-module.exports = { authenticate, signToken, jwtSecret };
+/**
+ * Public reads that still want to know who is asking.
+ *
+ * A request without an Authorization header continues anonymously; a header
+ * that is present but invalid is rejected by `authenticate`, so a client never
+ * silently gets the anonymous view after sending a bad token.
+ */
+function optionalAuthenticate(request, response, next) {
+    if (!request.get('authorization')) {
+        return next();
+    }
+    return authenticate(request, response, next);
+}
+
+module.exports = { authenticate, optionalAuthenticate, signToken, jwtSecret };

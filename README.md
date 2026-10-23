@@ -12,10 +12,11 @@ Implemented:
 - Personal profile card
 - Avatar upload and deletion
 - Public profile card
+- Team lobby hall: team-code sharing, virtual claimants, owner depart/kick, expiry cleanup (no chat)
+- Friend list: user search, mutual friend requests, accept/reject/cancel, remove friend
 
 Not implemented yet:
 
-- Lobby APIs
 - Demo analysis APIs
 - AI report APIs
 - Mini-game APIs
@@ -62,7 +63,7 @@ GET http://localhost:8000/api/v1/health
 ```
 
 Copy `backend/.env.example` to `backend/.env` if you need to override `PORT`,
-`JWT_SECRET`, `DB_PATH` or `UPLOAD_DIR`.
+`JWT_SECRET`, `DB_PATH`, `UPLOAD_DIR` or `LOBBY_TTL_HOURS`.
 
 ## Frontend Integration
 
@@ -231,6 +232,88 @@ Avatar upload rules:
 - Maximum 2 MB
 - Server resizes to 512x512 JPEG
 - `multipart/form-data` field name must be `file`
+
+### Lobby APIs
+
+The lobby hall is a **team-code sharing board**. The owner declares the team
+size and how many players are already in the team (5-player team with 4 players
+= 4缺1), then publishes the in-game team code. A visitor who clicks "join" gets
+the code and appears as a **virtual claimant**; this does not fill the roster or
+remove the post from the hall.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/v1/lobbies` | optional | Hall of short-handed teams (`page`, `pageSize`, `mode`) |
+| POST | `/api/v1/lobbies` | yes | Publish a team and its team code |
+| GET | `/api/v1/lobbies/:lobbyId` | optional | Detail and virtual claimants |
+| POST | `/api/v1/lobbies/:lobbyId/claim` | yes | Reveal the code and create a virtual claim (`/join` alias) |
+| DELETE | `/api/v1/lobbies/:lobbyId/claim` | yes | Cancel my virtual claim (`/leave` alias) |
+| POST | `/api/v1/lobbies/:lobbyId/depart` | yes | Owner发车: hide the post and stop claims |
+| DELETE | `/api/v1/lobbies/:lobbyId/claimants/:userId` | yes | Owner kicks a virtual claimant |
+| DELETE | `/api/v1/lobbies/:lobbyId` | yes | Owner removes the post |
+
+`GET` list/detail are public. Sending a token adds the caller's `is_owner` /
+`is_claimed` flags; an invalid token is still rejected with `40002`.
+
+Create example:
+
+```json
+{
+  "title": "Mirage 4缺1",
+  "description": "AWP main, looking for a support player.",
+  "mode": "premier",
+  "map": "Mirage",
+  "region": "Asia",
+  "skill_level": "完美 C+",
+  "team_size": 5,
+  "current_players": 4,
+  "team_code": "CS2-MIRAGE-8899"
+}
+```
+
+Rules:
+
+- `team_size` is 2-10 and `current_players` is 1 to `team_size - 1`.
+- `team_code` is 4-64 characters. It is returned only to the owner and to users
+  who have claimed it; public responses get `null`.
+- Claiming does not change `current_players` or `slots_needed`. The team stays
+  in the hall and the claimant is listed under `claimants` as a virtual player.
+  Multiple people may claim the same code; CS2 decides who actually joins.
+- The owner can **发车** with `POST /api/v1/lobbies/:lobbyId/depart`: the post
+  leaves the hall, is hidden from everyone except the owner, and stops accepting
+  claims. Existing claimants also lose access to the post.
+- The owner can kick a virtual claimant with
+  `DELETE /api/v1/lobbies/:lobbyId/claimants/:userId`. The kicked user disappears
+  from `claimants` and cannot claim that post again.
+- The owner deletes the post with `DELETE /api/v1/lobbies/:lobbyId` once the
+  team is formed. Posts also expire automatically (`LOBBY_TTL_HOURS`, default
+  24 hours).
+- The frontend should route to this hall right after login; the list already
+  contains only short-handed, unexpired teams.
+
+There is intentionally no chat or messaging endpoint.
+
+### Friends APIs
+
+Friendships are mutual and private: a request must be accepted before either
+user appears in the other's list. Every endpoint below requires
+`Authorization: Bearer <token>`.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/v1/users/search?q=...` | Find users by username/nickname (`page`, `pageSize`) |
+| POST | `/api/v1/friends/requests` | Send a request (`{ "user_id": 7 }`) |
+| GET | `/api/v1/friends/requests` | Pending incoming/outgoing requests + `incoming_count` |
+| POST | `/api/v1/friends/requests/:requestId/accept` | Recipient accepts |
+| POST | `/api/v1/friends/requests/:requestId/reject` | Recipient rejects |
+| DELETE | `/api/v1/friends/requests/:requestId` | Requester cancels |
+| GET | `/api/v1/friends` | My accepted friends (`page`, `pageSize`) |
+| DELETE | `/api/v1/friends/:userId` | Remove a friend for both users |
+
+Search results include a `relationship` field: `none`, `incoming_request`,
+`outgoing_request` or `friend`. Rejected/cancelled requests and removed friends
+can be requested again later. The caller cannot add themselves, cannot create a
+duplicate request, and cannot accept/reject the wrong side of a request.
 
 ## API Documentation
 

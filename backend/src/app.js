@@ -8,6 +8,7 @@ const path = require('node:path');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const lobbyRoutes = require('./routes/lobbies');
+const friendRoutes = require('./routes/friends');
 const demoRoutes = require('./routes/demos');
 const errorHandler = require('./middlewares/errorHandler');
 const { success } = require('./utils/response');
@@ -41,6 +42,7 @@ app.get('/api/v1/health', (request, response) => success(response, { status: 'ok
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/lobbies', lobbyRoutes);
+app.use('/api/v1/friends', friendRoutes);
 app.use('/api/v1/demos', demoRoutes);
 
 app.use((request, response) =>
