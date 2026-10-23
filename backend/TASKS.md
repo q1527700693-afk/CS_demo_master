@@ -39,12 +39,14 @@ backend/
     │   ├── auth.js
     │   ├── users.js
     │   ├── lobbies.js
+    │   ├── friends.js
     │   ├── demos.js
     │   └── minigames.js
     ├── services/
     │   ├── authService.js
     │   ├── profileService.js
     │   ├── lobbyService.js
+    │   ├── friendService.js
     │   ├── demoService.js
     │   └── aiService.js
     └── utils/
@@ -115,6 +117,7 @@ Authorization: Bearer <token>
 | user_profiles 表 | `src/config/database.js` | bio, steam_id, steam_friend_code, wanmei_id, five_e_id, other_game_ids | DONE |
 | lobbies 表 | `src/config/database.js` | 队伍人数、组队码、过期时间 | DONE |
 | lobby_claims 表 | `src/config/database.js` | 领取组队码的虚位记录（claimed/kicked） | DONE |
+| friendships 表 | `src/config/database.js` | 好友申请、双向好友关系（pending/accepted） | DONE |
 | demo_analyses 表 | `src/config/database.js` | Demo 日志和分析报告 | TODO |
 | minigame_scores 表 | `src/config/database.js` | 小游戏分数 | TODO |
 
@@ -176,11 +179,30 @@ AI 分析先调外部 LLM API，不在服务器本地跑大模型。
 | POST `/api/v1/minigames/aim/scores` | `src/routes/minigames.js` | 提交小游戏分数 | TODO |
 | GET `/api/v1/minigames/aim/leaderboard` | `src/routes/minigames.js` | 获取排行榜 | TODO |
 
-### 4.8 测试和部署
+### 4.8 好友模块
+
+好友关系是双向的：A 发出申请，B 同意后双方才进入对方好友列表。好友列表只对自己可见，不做聊天。
+
+| 接口 | 文件 | 要求 | 状态 |
+|---|---|---|---|
+| GET `/api/v1/users/search` | `src/routes/users.js`, `src/services/friendService.js` | 按用户名/昵称搜索用户，返回关系状态 | DONE |
+| POST `/api/v1/friends/requests` | `src/routes/friends.js` | 发送好友申请 | DONE |
+| GET `/api/v1/friends/requests` | `src/routes/friends.js` | 收到的/发出的待处理申请和 `incoming_count` | DONE |
+| POST `/api/v1/friends/requests/:id/accept` | `src/routes/friends.js` | 被申请人同意 | DONE |
+| POST `/api/v1/friends/requests/:id/reject` | `src/routes/friends.js` | 被申请人拒绝，之后可重新申请 | DONE |
+| DELETE `/api/v1/friends/requests/:id` | `src/routes/friends.js` | 申请人撤回 | DONE |
+| GET `/api/v1/friends` | `src/routes/friends.js` | 我的好友列表（分页） | DONE |
+| DELETE `/api/v1/friends/:userId` | `src/routes/friends.js` | 删除好友，双方关系解除 | DONE |
+
+> 不能加自己、不能重复申请、不能同时存在 A→B 和 B→A 两条申请；已经是好友返回 `40900`。
+> 只有被申请人能同意/拒绝，只有申请人能撤回；别人看不到我的好友列表。
+> 拒绝/撤回会删除申请记录，之后可以重新申请；删除好友后也可以重新申请。
+
+### 4.9 测试和部署
 
 | 任务 | 文件 | 说明 | 状态 |
 |---|---|---|---|
-| 接口测试 | `tests/` | 注册、登录、名片、组队大厅（38 个测试） | DONE |
+| 接口测试 | `tests/` | 注册、登录、名片、组队大厅、好友（49 个测试） | DONE |
 | 部署文档 | `deploy/` | Nginx、PM2、环境变量 | TODO |
 | 服务器部署 | Ubuntu + PM2 + Nginx | 后端监听 127.0.0.1:8000 | TODO |
 

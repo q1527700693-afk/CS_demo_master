@@ -13,6 +13,7 @@ Implemented:
 - Avatar upload and deletion
 - Public profile card
 - Team lobby hall: team-code sharing, virtual claimants, owner depart/kick, expiry cleanup (no chat)
+- Friend list: user search, mutual friend requests, accept/reject/cancel, remove friend
 
 Not implemented yet:
 
@@ -291,6 +292,28 @@ Rules:
   contains only short-handed, unexpired teams.
 
 There is intentionally no chat or messaging endpoint.
+
+### Friends APIs
+
+Friendships are mutual and private: a request must be accepted before either
+user appears in the other's list. Every endpoint below requires
+`Authorization: Bearer <token>`.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/v1/users/search?q=...` | Find users by username/nickname (`page`, `pageSize`) |
+| POST | `/api/v1/friends/requests` | Send a request (`{ "user_id": 7 }`) |
+| GET | `/api/v1/friends/requests` | Pending incoming/outgoing requests + `incoming_count` |
+| POST | `/api/v1/friends/requests/:requestId/accept` | Recipient accepts |
+| POST | `/api/v1/friends/requests/:requestId/reject` | Recipient rejects |
+| DELETE | `/api/v1/friends/requests/:requestId` | Requester cancels |
+| GET | `/api/v1/friends` | My accepted friends (`page`, `pageSize`) |
+| DELETE | `/api/v1/friends/:userId` | Remove a friend for both users |
+
+Search results include a `relationship` field: `none`, `incoming_request`,
+`outgoing_request` or `friend`. Rejected/cancelled requests and removed friends
+can be requested again later. The caller cannot add themselves, cannot create a
+duplicate request, and cannot accept/reject the wrong side of a request.
 
 ## API Documentation
 

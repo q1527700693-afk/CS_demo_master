@@ -529,13 +529,230 @@ found.
 8760). Expired posts are deleted lazily whenever the hall, a detail, or a claim
 is requested. A claim does not extend the lifetime.
 
-## 5. Mini Games (Draft)
+## 5. Friends（好友）
+
+Friend relationships are mutual: a request must be accepted before either user
+appears in the other's friend list. All friend endpoints require a valid token.
+Friend lists are private; there is no public friend-list endpoint and no chat.
+
+### User summary
+
+Search results, requests and friend lists use this public summary:
+
+```json
+{
+  "user_id": 7,
+  "username": "entry_fragger",
+  "nickname": "Entry",
+  "avatar_url": null,
+  "skill_level": "5E 2200",
+  "signature": "Entry fragger, I play after 8pm.",
+  "looking_for": "想找固定车队"
+}
+```
+
+`avatar_url` is relative to the API origin. Missing profile fields are `null`.
+
+### GET /api/v1/users/search
+
+Requires authentication. Finds users to add as friends. The caller is excluded
+from the results.
+
+| Query | Default | Rules |
+|---|---|---|
+| `q` | required | 2-32 characters, matches `username` or `nickname` (case-insensitive for ASCII) |
+| `page` | 1 | Positive integer |
+| `pageSize` | 20 | 1-50 |
+
+Each item is a user summary plus a `relationship`:
+
+| `relationship` | Meaning |
+|---|---|
+| `none` | No request and not friends |
+| `outgoing_request` | I have sent this user a pending request |
+| `incoming_request` | This user has sent me a pending request |
+| `friend` | Already friends |
+
+Response `data`:
+
+```json
+{
+  "items": [
+    {
+      "user_id": 7,
+      "username": "entry_fragger",
+      "nickname": "Entry",
+      "avatar_url": null,
+      "skill_level": "5E 2200",
+      "signature": "Entry fragger, I play after 8pm.",
+      "looking_for": "想找固定车队",
+      "relationship": "none"
+    }
+  ],
+  "page": 1,
+  "pageSize": 20,
+  "total": 1
+}
+```
+
+Errors: `40000` missing/invalid `q` or pagination, `40002` missing / invalid
+token.
+
+### POST /api/v1/friends/requests
+
+Requires authentication. Sends a pending friend request.
+
+```json
+{ "user_id": 7 }
+```
+
+Response is HTTP 201 with a request object:
+
+```json
+{
+  "id": 12,
+  "direction": "outgoing",
+  "status": "pending",
+  "user": {
+    "user_id": 7,
+    "username": "entry_fragger",
+    "nickname": "Entry",
+    "avatar_url": null,
+    "skill_level": "5E 2200",
+    "signature": null,
+    "looking_for": null
+  },
+  "created_at": "2026-10-23T10:00:00.000Z",
+  "updated_at": "2026-10-23T10:00:00.000Z",
+  "accepted_at": null
+}
+```
+
+Rules:
+
+- `user_id` must be an existing user and cannot be the caller.
+- One canonical row per pair; A→B and B→A cannot both be pending.
+- If the other user already sent a request, tell the caller to accept it
+  instead of creating a reverse request.
+- Accepted friends and existing pending requests return `40900`.
+
+Errors: `40000` invalid body / self / unknown field, `40002` missing token,
+`40400` target user not found, `40900` duplicate or already friends.
+
+### GET /api/v1/friends/requests
+
+Requires authentication. Returns all pending requests for the caller:
+
+```json
+{
+  "incoming": [],
+  "outgoing": [],
+  "incoming_count": 0
+}
+```
+
+- `incoming`: requests sent to me.
+- `outgoing`: requests I sent.
+- `incoming_count` can be used as the notification badge.
+- Every item uses the request object shown above. `direction` is `incoming` or
+  `outgoing`, and `user` is the other person.
+
+### POST /api/v1/friends/requests/{requestId}/accept
+
+Requires authentication. Only the recipient can accept. The row becomes
+`status: "accepted"`, and the two users immediately appear in each other's
+friend list. The response is the request object with `status: "accepted"` and
+`accepted_at` set.
+
+Errors: `40002` missing token, `40300` caller is the requester (not recipient),
+`40400` request not found or caller is not a participant, `40900` request is no
+longer pending.
+
+### POST /api/v1/friends/requests/{requestId}/reject
+
+Requires authentication. Only the recipient can reject. The request is deleted,
+so it disappears from both request lists. The response is the request object with
+`status: "rejected"`. The sender may send a new request later.
+
+Errors: `40002` missing token, `40300` caller is the requester, `40400` request
+not found or not a participant, `40900` request is no longer pending.
+
+### DELETE /api/v1/friends/requests/{requestId}
+
+Requires authentication. Only the sender can cancel an outgoing pending request.
+The row is deleted. The response is the request object with
+`status: "cancelled"`.
+
+Errors: `40002` missing token, `40300` caller is the recipient, `40400` request
+not found or not a participant, `40900` request is no longer pending.
+
+### GET /api/v1/friends
+
+Requires authentication. Returns only the caller's accepted friends, newest
+friendship first.
+
+| Query | Default | Rules |
+|---|---|---|
+| `page` | 1 | Positive integer |
+| `pageSize` | 20 | 1-50 |
+
+Response `data`:
+
+```json
+{
+  "items": [
+    {
+      "friendship_id": 4,
+      "user": {
+        "user_id": 7,
+        "username": "entry_fragger",
+        "nickname": "Entry",
+        "avatar_url": null,
+        "skill_level": "5E 2200",
+        "signature": "Entry fragger, I play after 8pm.",
+        "looking_for": "想找固定车队"
+      },
+      "friends_since": "2026-10-23T10:01:00.000Z"
+    }
+  ],
+  "page": 1,
+  "pageSize": 20,
+  "total": 1
+}
+```
+
+Errors: `40000` invalid pagination, `40002` missing / invalid token.
+
+### DELETE /api/v1/friends/{userId}
+
+Requires authentication. Removes an accepted friend for **both** users. Returns:
+
+```json
+{ "user_id": 7 }
+```
+
+The two users may send a new friend request afterwards.
+
+Errors: `40000` invalid/self user id, `40002` missing token, `40400` the users are
+not friends.
+
+### Friend errors
+
+| Code | HTTP | When |
+|---:|---:|---|
+| 40000 | 400 | Invalid body, self request, invalid search/pagination |
+| 40002 | 401 | Missing / invalid token |
+| 40300 | 403 | Acting as the wrong side of a request |
+| 40400 | 404 | User or friend request not found |
+| 40900 | 409 | Already friends, duplicate/reverse pending request, or already handled |
+
+## 6. Mini Games (Draft)
 
 ### POST /api/v1/minigames/aim/scores
 
 ### GET /api/v1/minigames/aim/leaderboard
 
-## 6. Demo Analysis (Draft)
+## 7. Demo Analysis (Draft)
 
 ### POST /api/v1/demos
 
@@ -545,7 +762,7 @@ is requested. A claim does not extend the lifetime.
 
 ### GET /api/v1/demos/{demoId}/report
 
-## 7. Error Codes
+## 8. Error Codes
 
 | Code | HTTP | Description |
 |---:|---:|---|
@@ -559,7 +776,7 @@ is requested. A claim does not extend the lifetime.
 | 41300 | 413 | File too large |
 | 50000 | 500 | Internal server error |
 
-## 8. Changelog
+## 9. Changelog
 
 | Version | Date | Author | Description |
 |---|---|---|---|
@@ -568,3 +785,4 @@ is requested. A claim does not extend the lifetime.
 | v1.2 | 2026-10-17 | CS Demo Master Team | Added `steam_friend_code` and removed the at-least-one-platform-id restriction |
 | v1.3 | 2026-10-22 | CS Demo Master Team | Reworked the lobby hall into a team-code sharing board (TASKS.md 4.5): declared roster, virtual claims, code privacy, owner deletion and TTL cleanup; no chat |
 | v1.4 | 2026-10-23 | CS Demo Master Team | Added owner depart (发车) and claimant kick: departed posts are owner-only and stop claims; kicked users are removed from claimants and cannot re-claim |
+| v1.5 | 2026-10-23 | CS Demo Master Team | Added mutual friend requests, accept/reject/cancel, private friend list, remove friend, and authenticated user search with relationship states |

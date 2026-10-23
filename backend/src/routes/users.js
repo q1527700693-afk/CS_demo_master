@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 const express = require('express');
 const multer = require('multer');
@@ -6,6 +6,7 @@ const multer = require('multer');
 const { authenticate } = require('../middlewares/auth');
 const { errors, success } = require('../utils/response');
 const authService = require('../services/authService');
+const friendService = require('../services/friendService');
 const profileService = require('../services/profileService');
 
 /**
@@ -40,6 +41,11 @@ function uploadAvatar(request, response, next) {
 }
 
 const router = express.Router();
+
+// GET /api/v1/users/search - find people to add as friends (authenticated)
+router.get('/search', authenticate, (request, response) =>
+    success(response, friendService.searchUsers(request.query, request.user))
+);
 
 // GET /api/v1/users/me - the account behind the token
 router.get('/me', authenticate, (request, response) =>

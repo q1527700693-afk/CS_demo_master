@@ -115,6 +115,45 @@ Design notes:
   deleted lazily on reads/claims. The owner deletes the post once the team is
   formed; there is no chat module.
 
+## Implemented: Friends (TASKS.md 4.8)
+
+Friendships are mutual. A pending request must be accepted before either user
+appears in the other's list, and friend lists are private. Every route below
+requires authentication.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/v1/users/search` | Search users by username/nickname (`q`, `page`, `pageSize`) |
+| POST | `/api/v1/friends/requests` | Send a request (`{ "user_id": 7 }`) |
+| GET | `/api/v1/friends/requests` | Pending `incoming` / `outgoing` + `incoming_count` |
+| POST | `/api/v1/friends/requests/:requestId/accept` | Recipient accepts |
+| POST | `/api/v1/friends/requests/:requestId/reject` | Recipient rejects |
+| DELETE | `/api/v1/friends/requests/:requestId` | Requester cancels |
+| GET | `/api/v1/friends` | My accepted friends (`page`, `pageSize`) |
+| DELETE | `/api/v1/friends/:userId` | Remove a friend for both users |
+
+Design notes:
+
+- `friendships` stores pending and accepted relationships in one table. The
+  pair is canonical (`user_low_id < user_high_id`) with a UNIQUE constraint, so
+  A→B and B→A cannot create two rows. `requester_id` records which side sent the
+  request.
+- Search is authenticated and excludes the caller. `q` is 2-32 characters and
+  matches username or nickname. Results include `relationship`: `none`,
+  `outgoing_request`, `incoming_request` or `friend`.
+- Sending a request rejects self-adds, unknown users, duplicate/reverse pending
+  requests and existing friendships (`40000` / `40400` / `40900`).
+- Only the recipient can accept or reject; only the requester can cancel.
+  Accepting sets `status='accepted'` and fills both friend lists. Reject/cancel
+  deletes the row, so the sender can request again later.
+- Rejection and cancellation responses keep the request shape but report
+  `status: "rejected"` / `"cancelled"`.
+- The friend list returns `friendship_id`, the friend's public summary and
+  `friends_since`, sorted newest first. Removing a friend deletes the shared row
+  for both sides.
+- Deleting a user cascades their friendships. There is no public friend list,
+  online presence or chat.
+
 ## Tests
 
 ```bash
@@ -130,8 +169,13 @@ rejection, replacement, deletion).
 authentication, creation validation, public pagination/filtering, code privacy,
 claim idempotence and virtual claimants, code cancellation, join/leave aliases,
 owner-only depart and kick, kicked-user re-claim blocking, owner-only deletion,
-hiding full teams, and expiry cleanup. Both files use an in-memory SQLite
-database and a temporary upload folder; the suite currently has 38 tests.
+hiding full teams, and expiry cleanup.
+
+`tests/friends.test.js` covers the friendship schema, auth on every route, search
+validation/privacy/relationship states, sending and duplicate requests, request
+direction and counts, accept/reject/cancel permissions, the mutual friend list,
+pagination, and friend removal/re-request. All files use an in-memory SQLite
+database and a temporary upload folder; the suite currently has 49 tests.
 
 ## Layout
 
@@ -144,14 +188,17 @@ backend/
     middlewares/auth.js      Bearer token -> request.user (+ optional auth)
     middlewares/errorHandler.js
     routes/auth.js           register / login
-    routes/users.js          me, profile, avatar
+    routes/users.js          me, profile, avatar, user search
     routes/lobbies.js        lobby hall routes
+    routes/friends.js        friend request / friend list routes
     services/authService.js
     services/profileService.js   card validation, Steam ids, avatar resizing
     services/lobbyService.js     team-code posts, claims, expiry, deletion
+    services/friendService.js    search, requests, friendships
     utils/response.js        { code, message, data } envelope + ApiError
   tests/profile.test.js
   tests/lobby.test.js
+  tests/friends.test.js
   uploads/avatars/           runtime, git ignored
   uploads/demo-logs/         runtime, git ignored
   data/                      SQLite file, git ignored
