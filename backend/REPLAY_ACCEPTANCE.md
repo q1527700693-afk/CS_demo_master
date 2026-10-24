@@ -4,10 +4,11 @@
 
 ## 执行结果
 
-- `npm test`：71 项通过、0 项失败，包含原有账号、头像、好友、组队功能及 22 项复盘测试。
+- `npm test`：75 项通过、0 项失败，包含原有账号、头像、好友、组队功能、23 项复盘接口测试及 3 项 AI 服务测试。
 - `git diff --check`：通过。
 - 正式 package-v1.1.schema.json 用于导入校验；生成的标准报告通过 report.schema.json 校验；默认证据响应通过交接 OpenAPI Evidence 校验。
-- 样例结果：23 个回合、3,760 条周期状态、131 条未知归属轨迹、19 条回看候选。标准报告状态为 partial，AI 状态为 not_configured，评分为空。
+- 样例结果：23 个回合、3,760 条周期状态、131 条未知归属轨迹、19 条回看候选。规则报告状态为 partial，基础报告中的 AI 状态为 not_configured，评分为空。
+- 可选 AI 接口：未配置 `DEEPSEEK_API_KEY` 时 POST 返回 50300；使用 mock provider 验证了精简事实构造、严格 JSON Schema 和未知 evidence_id 拒绝。未进行真实 DeepSeek 计费调用。
 - 最新集成测试样例分析阶段：912 ms，分析进程峰值 RSS 117,900 KiB（约 115 MiB）。不包含上传、排队及单独的导入校验；不是 2 核 2G 云服务器压测。
 
 ## 覆盖范围
@@ -18,7 +19,7 @@
 
 ## 联调材料
 
-- 架构、接口与 LLM 预留设计：[说明文档](../docs/replay-analysis-design.md)。
+- 架构、接口与 AI 设计：[说明文档](../docs/replay-analysis-design.md)。
 - 启动与请求流程：[REPLAY.md](REPLAY.md)。
 - 原始交接契约：[contracts/](contracts/)。
 - 本地验收产物：data/replays/acceptance-handoff/cloud-report.json 与 report.json；运行数据不提交 Git。
@@ -31,4 +32,4 @@ node scripts/analyze-package.js tests/fixtures/sample-analysis-v1.1.zip data/rep
 
 ## 仍需部署环境验收
 
-真实 Vue 前端页面联调、反向代理超时和上传限制、目标 2 核 2G 上限包与并发压力测试。当前没有外部 LLM 调用。
+真实 Vue 前端页面联调、反向代理超时和上传限制、目标 2 核 2G 上限包与并发压力测试。AI 接口尚未配置真实 Key，也没有进行真实供应商调用、计费和限流压测。

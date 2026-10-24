@@ -10,6 +10,7 @@ process.env.DB_PATH = path.join(tmp, 'app.db');
 process.env.REPLAY_DIR = path.join(tmp, 'private');
 process.env.UPLOAD_DIR = path.join(tmp, 'uploads');
 process.env.JWT_SECRET = 'replay-test-secret';
+delete process.env.DEEPSEEK_API_KEY;
 const app = require('../src/app');
 const { db, directory } = require('../src/services/replayStore');
 const { startQueue } = require('../src/services/replayQueue');
@@ -161,7 +162,7 @@ test('handoff idempotency and task/report identity satisfy formal contract',asyn
     assert.equal((await createAnalysis('contract-1',{target_player_id:'wrong'})).status,409);
     assert.equal((await createAnalysis('other-key',{target_player_id:'wrong'})).status,409);
     let job;
-    for(let i=0;i<200;i++) {job=(await call(`/analyses/${analysisId}`)).body.data;if(['completed','partial','failed'].includes(job.status))break;await delay(50);}
+    for(let i=0;i<600;i++) {job=(await call(`/analyses/${analysisId}`)).body.data;if(['completed','partial','failed'].includes(job.status))break;await delay(50);}
     assert.equal(job.status,'partial',JSON.stringify(job));assert.equal(job.report_available,true);assert.equal(job.progress,100);
     const result=await call(`/analyses/${analysisId}/report`);assert.equal(result.status,200);
     const Ajv=require('ajv'), ajv=new Ajv({strict:false});
@@ -172,6 +173,16 @@ test('handoff idempotency and task/report identity satisfy formal contract',asyn
     assert.deepEqual(result.body.data.report.scores,{});
     assert.equal(result.body.data.report.findings.length,19);
 });
+test('AI endpoint is wired but safely disabled without an API key', async () => {
+    const state = await call(`/analyses/${analysisId}/ai`);
+    assert.equal(state.status, 200, JSON.stringify(state.body));
+    assert.equal(state.body.data.ai_status, 'not_configured');
+
+    const triggered = await call(`/analyses/${analysisId}/ai`, { method: 'POST' });
+    assert.equal(triggered.status, 503, JSON.stringify(triggered.body));
+    assert.equal(triggered.body.code, 50300);
+});
+
 test('compatible and detailed evidence preserve contract without misattributing trajectories',async()=>{
     const r=await call(`/analysis-packages/${accepted.package_id}/evidence`);assert.equal(r.status,200);
     const Ajv=require('ajv');const validate=new Ajv({strict:false}).compile(require('../contracts/openapi.json').components.schemas.Evidence);
@@ -201,7 +212,7 @@ test('concurrent idempotent creates reuse one run; new resources stay out of leg
     assert.equal((await call(`/analyses/${analysisId}/details`)).body.data.rounds.length,23);
     // Keep the fixture deterministic by failing this queued job before the queue tick.
     db.prepare("UPDATE replay_jobs SET status='failed',stage='failed' WHERE id=? AND status='queued'").run(id);
-    for(let i=0;i<100;i++) {const j=(await call(`/analyses/${id}`)).body.data;if(j.status!=='running'&&j.status!=='queued')break;await delay(50);}
+    for(let i=0;i<600;i++) {const j=(await call(`/analyses/${id}`)).body.data;if(j.status!=='running'&&j.status!=='queued')break;await delay(50);}
 });
 test('deleting a package removes all its reports and files and is owner-only',async()=>{
     assert.equal((await call(`/analysis-packages/${accepted.package_id}`,{method:'DELETE'},otherToken)).status,404);

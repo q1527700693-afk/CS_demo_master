@@ -11,6 +11,8 @@ const CODES = Object.freeze({
     CONFLICT: 40900,
     FILE_TOO_LARGE: 41300,
     INTERNAL_ERROR: 50000,
+    AI_UPSTREAM_ERROR: 50200,
+    AI_NOT_CONFIGURED: 50300,
 });
 
 const HTTP_STATUS = {
@@ -22,6 +24,8 @@ const HTTP_STATUS = {
     [CODES.CONFLICT]: 409,
     [CODES.FILE_TOO_LARGE]: 413,
     [CODES.INTERNAL_ERROR]: 500,
+    [CODES.AI_UPSTREAM_ERROR]: 502,
+    [CODES.AI_NOT_CONFIGURED]: 503,
 };
 
 /** An error that is safe to show to the client. */

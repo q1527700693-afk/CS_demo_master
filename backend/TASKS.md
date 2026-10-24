@@ -172,6 +172,17 @@ Authorization: Bearer <token>
 
 AI 分析先调外部 LLM API，不在服务器本地跑大模型。
 
+当前可选 AI 教练接口（基础版）已实现：
+
+| 接口 | 文件 | 要求 | 状态 |
+|---|---|---|---|
+| GET `/api/v1/analyses/:id/ai` | `src/routes/analysis.js`, `src/services/aiAnalysis.js` | 读取 AI 解读状态/结果 | DONE |
+| POST `/api/v1/analyses/:id/ai` | `src/routes/analysis.js`, `src/services/aiAnalysis.js` | 基于就绪规则报告生成 AI 解读 | DONE |
+
+- 环境变量：`DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`、`AI_TIMEOUT_MS`、`AI_MAX_TOKENS`、`AI_PROMPT_VERSION`。
+- 未配置 Key 时返回 `50300`，不影响基础报告。
+- 当前为同步调用；后续可加独立 AI 队列、缓存和前端 AI 卡片。
+
 ### 4.7 小游戏模块
 
 | 接口 | 文件 | 要求 | 状态 |
