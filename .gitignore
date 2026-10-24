@@ -34,6 +34,10 @@ data/logs/
 
 # Test leftovers
 tests/_tmp/
+backend/tests/replay-tmp-*/
+backend/data/replays/
+*.db-shm
+*.db-wal
 package-lock.json.bak
 
 # IDE
