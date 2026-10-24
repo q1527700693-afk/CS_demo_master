@@ -44,6 +44,7 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/lobbies', lobbyRoutes);
 app.use('/api/v1/friends', friendRoutes);
 app.use('/api/v1/demos', demoRoutes);
+app.use('/api/v1', require('./routes/analysis'));
 
 app.use((request, response) =>
     response.status(404).json({ code: 40400, message: 'Resource not found', data: null })

@@ -204,6 +204,7 @@ function createDatabase(file = process.env.DB_PATH || DEFAULT_DB_PATH) {
     }
 
     const database = new DatabaseSync(file);
+    database.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 3000');
     database.exec('PRAGMA foreign_keys = ON');
     database.exec(SCHEMA);
     ensureColumns(database);

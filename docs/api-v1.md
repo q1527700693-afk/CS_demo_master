@@ -752,15 +752,22 @@ not friends.
 
 ### GET /api/v1/minigames/aim/leaderboard
 
-## 7. Demo Analysis (Draft)
+## 7. Replay analysis
 
-### POST /api/v1/demos
+The current frontend contract is implemented. Use POST /analysis-packages, then
+POST /matches/{match_id}/analyses with Idempotency-Key. Poll GET /analyses/{analysis_id};
+completed and partial both expose GET /analyses/{analysis_id}/report.
 
-### POST /api/v1/demos/{demoId}/analyze
+GET /matches and GET /matches/{match_id}/analyses provide history. GET
+/analysis-packages/{package_id}/evidence projects the legacy contract; add
+?version=1.1 for detailed data. DELETE /analysis-packages/{package_id} and DELETE
+/analyses/{analysis_id} remove non-running resources. GET /analyses/{analysis_id}/details
+provides additional rule analysis. All resources are scoped to the logged-in user.
 
-### GET /api/v1/demos/{demoId}/status
-
-### GET /api/v1/demos/{demoId}/report
+See [full API and operational guide](../backend/REPLAY.md) and the original
+[OpenAPI contract](../backend/contracts/openapi.json). The original handoff OpenAPI
+also describes local-parser endpoints; those run in the local parser, not this cloud server.
+Old /demos endpoints remain for legacy clients only.
 
 ## 8. Error Codes
 
