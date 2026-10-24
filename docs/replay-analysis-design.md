@@ -2,6 +2,8 @@
 
 更新日期：2026-10-24。本文以当前代码和 `analysis-handoff` 交接协议为依据。
 
+已接入 GLOBAL-EXPORT-v1.2 全员导出。全员接口、完整轨迹校验及分页契约见 [v1.2 接入说明](../backend/REPLAY_V12.md)。单人分析和未来 LLM 设计继续沿用本文。
+
 **已实现：本地解析包的云端导入、规则分析、报告、证据、历史与资源删除。未实现：外部 LLM 调用。第 8 节是后续接口设计，不是当前可调用的接口。**
 
 ## 1. 功能范围与数据来源
@@ -17,11 +19,12 @@
 └── map.json       周期状态、交火关键帧、关联玩家和道具轨迹
 ```
 
-上传协议为 `schema_version=1.1.0`，标准报告为 `report_schema_version=1.0.0`。这两个版本分别管理，不能混为同一个版本号。
+上传协议支持 `schema_version=1.1.0 / 1.2.0`，标准报告为 `report_schema_version=1.0.0`。这两个版本分别管理，不能混为同一个版本号。v1.2 新增全员字段，原有目标玩家字段保持独立。
 
 协议原件位于 [contracts](../backend/contracts/)：
 
 - [package-v1.1.schema.json](../backend/contracts/package-v1.1.schema.json)：上传数据校验规则。
+- [package-v1.2.schema.json](../backend/contracts/package-v1.2.schema.json)：全员导出校验规则。
 - [report.schema.json](../backend/contracts/report.schema.json)：标准报告结构。
 - [openapi.json](../backend/contracts/openapi.json)：原始前端交接契约，也包含独立本机解析服务的接口。
 - [frontend-contracts.ts](../backend/contracts/frontend-contracts.ts)：前端类型副本。
@@ -62,6 +65,7 @@ API 进程负责鉴权、文件接收、任务调度和读取结果；计算放�
 | [replayWorker.js](../backend/src/replayWorker.js) | 按 import / analysis / legacy 类型执行任务 |
 | [services/replayImport.js](../backend/src/services/replayImport.js) | ZIP 条目检查、摘要验证、身份关联、地图流式读取 |
 | [services/replaySchema.js](../backend/src/services/replaySchema.js) | 编译正式 Schema，校验文件、地图记录及报告 |
+| [services/replayGlobal.js](../backend/src/services/replayGlobal.js) | 全员轨迹语义校验、JSONL 与定长偏移索引、按回合分页 |
 | [services/replayAnalysis.js](../backend/src/services/replayAnalysis.js) | 确定性规则、回合筛选、状态观察、证据索引 |
 | [services/cloudReplay.js](../backend/src/services/cloudReplay.js) | 导入产物、兼容证据投影、标准报告组装 |
 | [routes/demos.js](../backend/src/routes/demos.js) | 旧 `/demos` 客户端兼容；不访问新协议任务 |
@@ -93,7 +97,7 @@ API 进程负责鉴权、文件接收、任务调度和读取结果；计算放�
 2. 计算 ZIP SHA-256，查找同用户已存在的导入任务，重试时可复用。
 3. 创建 import 任务，独立进程扫描 ZIP 中央目录，要求恰好是五个指定根目录文件。
 4. 检查重复或未知文件名、加密、符号链接、声明大小及实际解压字节数；逐个文件解压并计算 SHA-256。
-5. 对四个较小 JSON 完整校验；对 `map.json` 的数组逐条校验，并检查头部、必填数组和数组数量。
+5. 对 manifest/metrics/rounds 完整校验；对 events/map 的数组逐条校验，并检查头部、必填数组和数组数量。目标事件在上限内保留供规则分析，全员流不整体装入内存。
 6. 额外检查跨文件 match/package 标签、目标玩家与名单、事件 ID 唯一性、回合引用、模块证据引用和轨迹引用等。
 7. 生成兼容证据投影及导入元数据，校验成功后登记包并返回 201。格式错误返回 400，超限返回 413。
 
@@ -154,6 +158,9 @@ API 进程负责鉴权、文件接收、任务调度和读取结果；计算放�
 | GET | `/matches` | page 默认 1、pageSize 默认 100，最多 100 | `{items,page,pageSize,total}` / 200 |
 | GET | `/matches/{match_id}/analyses` | 无 | `{items:AnalysisRun[]}`，按新到旧 / 200 |
 | GET | `/analysis-packages/{package_id}/evidence` | 可选 version=1.1 | `{match_id,package_id,events,map}` / 200 |
+| GET | `/analysis-packages/{package_id}/evidence?version=1.2` | 仅 v1.2 包 | 完整 events 对象与 map 对象 / 200 |
+| GET | `/analysis-packages/{package_id}/global` | 仅 v1.2 包 | 全员统计、名单、回合、采样、覆盖与计数 / 200 |
+| GET | `/analysis-packages/{package_id}/global/{kind}` | events/samples/trajectories；round_num、offset、limit | `{items,total,offset,next_offset}` / 200 |
 | DELETE | `/analyses/{analysis_id}` | 无 | null / 200 |
 | DELETE | `/analysis-packages/{package_id}` | 无 | null / 200 |
 
@@ -230,7 +237,7 @@ Content-Type: application/json
 
 使用 `?version=1.1` 可取得原始事件新增时间字段和完整地图数组，包括 player_samples、target_keyframes、combat_participant_states、nearby_context、unattributed_trajectories。该响应按文件流式发送，但前端 JSON.parse 完整响应仍会占用浏览器内存，应按需加载。
 
-新协议目前没有按回合分页的 HTTP 地图接口。旧 `/demos` 接口有分页能力，但只能查询旧任务；不能用新 analysis_id 调旧接口。后续如需对新页面分页，应增加新的版本化接口，而不是跨用 ID。
+v1.2 全员数据已支持包级按回合分页，见 global/{kind} 接口。v1.1 目标地图仍无新的分页接口。旧 `/demos` 分页只能查询旧任务，不能用新 analysis_id 调用。v1.2 包请求 version=1.1 返回兼容目标投影；请求 version=1.2 时 events 改为完整文档对象，含独立 items/global_items/global_coverage。
 
 ### 4.6 错误与权限
 
@@ -257,8 +264,8 @@ Content-Type: application/json
 | 上传并发 | 新上传路由同时接收最多 2 个文件；此限制与旧路由分别计数 |
 | 内存 | worker V8 old-space 上限 384 MiB；不等于进程 RSS 硬上限 |
 | 容量 | 全局内部任务最多 100、单用户最多 20；待处理最多 50、单用户待处理最多 3 |
-| 文件 | 新 ZIP ≤50 MiB、解压总量 ≤50 MiB、events ≤16 MiB、其余小文件各 ≤2 MiB |
-| 记录 | 最多 100 回合、20,000 事件、所有地图数组合计 100,000 记录；单地图记录与嵌套有额外限额 |
+| 文件 | 新 ZIP ≤50 MiB；v1.1 解压总量 ≤50 MiB、events ≤16 MiB；v1.2 解压总量 ≤256 MiB、events ≤64 MiB；其余小文件各 ≤2 MiB |
+| 记录 | 最多 100 回合、20,000 目标事件；v1.2 另允许 200,000 全局事件；地图合计 v1.1 100,000 / v1.2 500,000 记录；单条记录与嵌套有额外限额 |
 | 磁盘读取 | ZIP 顺序读取；地图逐条处理；结果文件流式响应 |
 | 数据库 | WAL、短事务、任务持久化，不引入 Redis |
 
@@ -296,7 +303,7 @@ node scripts/analyze-package.js tests/fixtures/sample-analysis-v1.1.zip data/rep
 
 离线验收命令要求输出目录不存在，输出 cloud-report.json 和扩展 report.json。它不经过 JWT HTTP 层，适用于人工检查结果。
 
-目前全量 71 项测试通过，其中 22 项覆盖复盘。样例有 23 回合、3,760 条周期状态、131 条未知归属轨迹、19 条回看候选。最新开发机样例分析阶段约 912 ms、峰值 RSS 约 115 MiB；不包含单独的导入校验、上传与排队，不是目标云服务器容量结论。详见 [验收记录](../backend/REPLAY_ACCEPTANCE.md)。
+v1.1 样例有 23 回合、3,760 条周期状态、131 条未知归属轨迹、19 条回看候选。v1.2 样例有 18 回合、39,046 条全员位置、319 条全员轨迹和 6 条目标玩家回看候选。测试及开发机性能记录见 [验收记录](../backend/REPLAY_ACCEPTANCE.md)，不代表目标云服务器容量结论。
 
 ## 7. 当前边界
 

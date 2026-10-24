@@ -14,7 +14,8 @@ Implemented:
 - Public profile card
 - Team lobby hall: team-code sharing, virtual claimants, owner depart/kick, expiry cleanup (no chat)
 - Friend list: user search, mutual friend requests, accept/reject/cancel, remove friend
-- ZIP replay packages (schema 1.1.0): validation, queued rule analysis, reports, evidence, history and deletion
+- ZIP replay packages (schema 1.1.0 / 1.2.0): validation, queued rule analysis, reports, evidence, history and deletion
+- Global v1.2 data: all-player statistics, events, sampled positions and full utility trajectories with round pagination
 
 Not implemented yet:
 
@@ -25,6 +26,7 @@ Not implemented yet:
 
 - [Architecture, implementation, APIs and future LLM integration (中文)](docs/replay-analysis-design.md)
 - [Backend usage and integration](backend/REPLAY.md)
+- [Global v1.2 integration and pagination](backend/REPLAY_V12.md)
 - [Acceptance results and deployment checks](backend/REPLAY_ACCEPTANCE.md)
 
 Rule-based replay analysis works without an LLM. External LLM commentary APIs are

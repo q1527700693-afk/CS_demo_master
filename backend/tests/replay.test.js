@@ -180,6 +180,8 @@ test('compatible and detailed evidence preserve contract without misattributing 
     const detailed=await call(`/analysis-packages/${accepted.package_id}/evidence?version=1.1`);
     assert.equal(detailed.body.data.map.schema_version,'1.1.0');assert.equal(detailed.body.data.map.unattributed_trajectories.length,131);
     assert.equal(detailed.body.data.map.player_samples.length,3760);
+    assert.equal((await call(`/analysis-packages/${accepted.package_id}/global`)).status,409);
+    assert.equal((await call(`/analysis-packages/${accepted.package_id}/evidence?version=1.2`)).status,409);
 });
 test('match history keeps available report when newest analysis fails; owners isolated',async()=>{
     const r=await createAnalysis('contract-2'), newer=r.body.data.analysis_id;
@@ -211,4 +213,147 @@ test('deleting a package removes all its reports and files and is owner-only',as
     assert.equal(fs.existsSync(directory(p.storage_id)),false);
     for(const r of runs) {assert.equal(fs.existsSync(directory(r.analysis_id)),false);assert.equal((await call(`/analyses/${r.analysis_id}/report`)).status,404);}
     assert.equal((await call('/matches')).body.data.total,0);
+});
+
+const globalSample = fs.readFileSync(path.join(__dirname, 'fixtures/ZywOo-B8-vs-Vitality-Mirage-all-players-v1.2.zip'));
+let globalPackage, globalAnalysis, globalDir;
+test('v1.2 real ZIP over the previous expanded limit imports and exposes separate global data', async () => {
+    const result = await cloudUpload(globalSample);
+    assert.equal(result.status, 201, JSON.stringify(result)); globalPackage = result.body.data;
+    globalDir = directory(db.prepare('SELECT storage_id FROM analysis_packages WHERE package_id=?').get(globalPackage.package_id).storage_id);
+    assert.ok(fs.statSync(path.join(globalDir, 'map.json')).size > 50 * 1024 * 1024);
+    assert.equal((await cloudUpload(globalSample)).body.data.reused, true);
+    const summary = (await call(`/analysis-packages/${globalPackage.package_id}/global`)).body.data;
+    assert.equal(summary.schema_version, '1.2.0'); assert.equal(summary.all_player_stats.length, 10);
+    assert.deepEqual(summary.counts, { events: 4316, samples: 39046, trajectories: 319 });
+    assert.equal(summary.global_sampling.periodic_interval_seconds, 0.5);
+    assert.equal(summary.export_scope.ownership, 'source_only_no_inference');
+    assert.equal(summary.rounds.length, 18);
+});
+test('v1.2 single-player report does not double count global streams', async () => {
+    const created = await call(`/matches/${globalPackage.match_id}/analyses`, { method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'global-report' }, body: JSON.stringify({ package_id: globalPackage.package_id, target_player_id: globalPackage.target_player_id }) });
+    assert.equal(created.status, 202); globalAnalysis = created.body.data.analysis_id;
+    let job;
+    for (let i = 0; i < 1200; i++) {
+        job = (await call(`/analyses/${globalAnalysis}`)).body.data;
+        if (['completed', 'partial', 'failed'].includes(job.status)) break;
+        assert.equal((await call('/health')).status, 200); await delay(50);
+    }
+    assert.equal(job.status, 'partial', JSON.stringify(job));
+    const report = (await call(`/analyses/${globalAnalysis}/report`)).body.data;
+    require('../src/services/replaySchema').enforce(require('../src/services/replaySchema').report, report, 'report');
+    assert.equal(report.report.findings.length, 6); assert.equal(report.report.ai_status, 'not_configured');
+    const details = (await call(`/analyses/${globalAnalysis}/details`)).body.data;
+    assert.deepEqual(details.statistics.modules, JSON.parse(fs.readFileSync(path.join(globalDir, 'metrics.json'))).modules);
+    assert.equal(details.findings.filter(f => f.rule_id === 'team_flash').length, 3);
+    assert.equal(details.findings.filter(f => f.rule_id === 'death_unused_utility').length, 3);
+    assert.equal(details.map.counts.all_player_samples, 39046);
+    console.log('v1.2 analysis benchmark (local):', JSON.stringify(details.performance));
+});
+test('global events and samples have bounded seek pagination and round filtering', async () => {
+    const prefix = `/analysis-packages/${globalPackage.package_id}/global`;
+    const a = (await call(`${prefix}/samples?round_num=1&limit=7`)).body.data;
+    const b = (await call(`${prefix}/samples?round_num=1&limit=7&offset=${a.next_offset}`)).body.data;
+    assert.equal(a.items.length, 7); assert.equal(a.next_offset, 7); assert.equal(b.offset, 7);
+    assert.ok(a.items.every(item => item.round_num === 1 && typeof item.state.steamid === 'string'));
+    assert.notDeepEqual(a.items, b.items);
+    const events = (await call(`${prefix}/events?round_num=2&limit=500`)).body.data;
+    assert.ok(events.items.length > 0); assert.ok(events.items.every(e => e.round_num === 2 && e.data.scope === 'match_context'));
+    assert.deepEqual((await call(`${prefix}/samples?offset=500000`)).body.data.items, []);
+    for (const query of ['limit=501', 'offset=-1', 'round_num=../1', 'round_num=1&round_num=2', 'offset=1e2', 'player=123']) assert.equal((await call(`${prefix}/samples?${query}`)).status, 400, query);
+    assert.equal((await call(`${prefix}/unknown`)).status, 404);
+});
+test('global trajectory pages preserve every source row, ownership and aligned point arrays', async () => {
+    const expected = [];
+    await require('../src/services/replayImport').streamMap(path.join(globalDir, 'map.json'), async (kind, item) => {
+        if (kind === 'all_trajectories') expected.push(item);
+    }, '1.2.0');
+    let offset = 0, points = 0, count = 0;
+    do {
+        const page = (await call(`/analysis-packages/${globalPackage.package_id}/global/trajectories?offset=${offset}&limit=500`)).body.data;
+        assert.equal(page.total, 319); assert.ok(page.items.length > 0);
+        for (const item of page.items) { assert.deepEqual(item, expected[count++]); points += item.records.length; }
+        offset = page.next_offset;
+    } while (offset !== null);
+    assert.equal(count, 319); assert.equal(points, 46904);
+    assert.ok(expected.some(t => t.points.length > 200));
+    assert.ok(expected.every(t => t.ownership === 'unknown' && t.thrower_player_id === null));
+});
+test('v1.2 retains default and v1.1 evidence contracts and has explicit full evidence', async () => {
+    const prefix = `/analysis-packages/${globalPackage.package_id}/evidence`;
+    const legacy = (await call(prefix)).body.data;
+    const validate = new (require('ajv'))({ strict: false }).compile(require('../contracts/openapi.json').components.schemas.Evidence);
+    assert.equal(validate(legacy), true, JSON.stringify(validate.errors)); assert.equal(legacy.events.length, 1111);
+    const detailed = (await call(prefix + '?version=1.1')).body.data;
+    const mapValidator = require('../src/services/replaySchema').forVersion('1.1.0').files.map;
+    assert.equal(mapValidator(detailed.map), true, JSON.stringify(mapValidator.errors));
+    assert.equal(detailed.map.all_player_samples, undefined); assert.equal(detailed.events.length, 1111);
+    const full = (await call(prefix + '?version=1.2')).body.data;
+    assert.equal(full.events.items.length, 1111); assert.equal(full.events.global_items.length, 4316);
+    assert.equal(full.map.all_player_samples.length, 39046); assert.equal(full.map.schema_version, '1.2.0');
+    assert.equal((await call(prefix + '?version=9')).status, 400);
+});
+test('global endpoints enforce ownership and package deletion cleans all indexed data', async () => {
+    const prefix = `/analysis-packages/${globalPackage.package_id}`;
+    for (const endpoint of ['/global', '/global/events', '/global/samples', '/global/trajectories', '/evidence?version=1.2']) {
+        assert.equal((await call(prefix + endpoint, {}, otherToken)).status, 404);
+        assert.equal((await call(prefix + endpoint, {}, null)).status, 401);
+    }
+    assert.equal((await call(prefix, { method: 'DELETE' })).status, 200);
+    assert.equal(fs.existsSync(globalDir), false);
+    assert.equal((await call(prefix + '/global')).status, 404);
+});
+
+function minimalGlobal(v) {
+    for (const value of Object.values(v)) value.schema_version = '1.2.0';
+    const coverage = Object.fromEntries(['stats','kills','damages','shots','blinds','bomb','item_events','round_economy','grenades','smokes','fires'].map(k => [k, { status: 'empty', source_rows: 0, retained_source_rows: 0 }]));
+    const sampling = { scope: 'all_players', periodic_interval_ticks: 32, periodic_interval_seconds: 0.5, visibility: 'not_evaluated', round_scope: 'recorded_non_knife_rounds', missing_states: 'not_interpolated' };
+    v['manifest.json'].export_scope = { scope: 'all_players_and_all_utility', round_scope: 'recorded_non_knife_rounds', target_analysis_preserved: true, global_dataset_coverage: coverage, position_sampling: sampling, utility_sampling: 'all_source_rows', ownership: 'source_only_no_inference' };
+    v['metrics.json'].all_player_stats = [];
+    v['events.json'].global_items = []; v['events.json'].global_coverage = structuredClone(coverage);
+    Object.assign(v['map.json'], { global_sampling: sampling, all_player_samples: [], all_trajectories: [] });
+}
+function oneTrajectory(v) {
+    const t = { trajectory_id: 'test-global', entity_id: 1, entity_serial: 2, type: 'smoke', thrower_player_id: null, ownership: 'unknown', start_tick: 100, end_tick: 100, sample_stride_rows: 1,
+        points: [[null, 2, 3]], point_ticks: [100], records: [{ tick: 100, entity_id: 1, entity_serial: 2, type: 'smoke', x: null, y: 2, z: 3, thrower_steamid: null }] };
+    v['map.json'].all_trajectories = [t];
+    for (const c of [v['manifest.json'].export_scope.global_dataset_coverage, v['events.json'].global_coverage]) c.grenades = { status: 'available', source_rows: 1, retained_source_rows: 1 };
+    return t;
+}
+for (const [name, mutate, reason] of [
+    ['mixed versions', v => { v['events.json'].schema_version = '1.1.0'; }, /Schema|envelope/],
+    ['missing global array', v => { delete v['map.json'].all_player_samples; }, /Schema/],
+    ['numeric global SteamID', v => { v['metrics.json'].all_player_stats = [{ steamid: 123 }]; }, /SteamID/],
+    ['global event coverage', v => { v['events.json'].global_coverage.kills.source_rows = 1; }, /coverage/],
+    ['duplicate global event', v => { const e = { event_id: 'global-test', type: 'kill', tick: 100, time_seconds: 1, round_num: 1, data: { source_dataset: 'kills', scope: 'match_context', record: {} } }; v['events.json'].global_items = [e, e]; }, /event ID/],
+    ['global sample roster', v => { v['map.json'].all_player_samples = [{ tick: 100, time_seconds: 1, round_num: 1, state: { tick: 100, steamid: '123', x: null, y: null, z: null } }]; }, /roster/],
+    ['unaligned global trajectory', v => { oneTrajectory(v).point_ticks = [100, 101]; }, /alignment/],
+    ['changed global coordinates', v => { oneTrajectory(v).points[0][0] = 0; }, /point mismatch/],
+    ['inferred global ownership', v => { const t = oneTrajectory(v); t.ownership = 'known'; t.thrower_player_id = v['manifest.json'].target_player_id; }, /ownership/],
+    ['global coverage point loss', v => { oneTrajectory(v); v['manifest.json'].export_scope.global_dataset_coverage.grenades.retained_source_rows = 2; }, /coverage/],
+]) test(`v1.2 rejects ${name}`, async () => {
+    const bytes = await alteredZip(v => { minimalGlobal(v); mutate(v); });
+    const r = await cloudUpload(bytes); assert.equal(r.status, 400, JSON.stringify(r)); assert.match(r.body.message, reason);
+});
+test('v1.2 preserves null coordinates and conflict ownership without inferring an owner', async () => {
+    const bytes = await alteredZip(v => {
+        minimalGlobal(v); const t = oneTrajectory(v);
+        t.ownership = 'conflicting'; t.end_tick = 101;
+        t.records[0].thrower_steamid = '111'; t.records.push({ ...t.records[0], tick: 101, thrower_steamid: '222' });
+        t.points.push([null, 2, 3]); t.point_ticks.push(101);
+        for (const c of [v['manifest.json'].export_scope.global_dataset_coverage, v['events.json'].global_coverage]) c.grenades = { status: 'available', source_rows: 2, retained_source_rows: 2 };
+        // Header order is deliberately changed; validation must not depend on it.
+        delete v['map.json'].schema_version; v['map.json'].schema_version = '1.2.0';
+    });
+    const r = await cloudUpload(bytes); assert.equal(r.status, 201, JSON.stringify(r));
+    const prefix = `/analysis-packages/${r.body.data.package_id}`;
+    const t = (await call(prefix + '/global/trajectories')).body.data.items[0];
+    assert.equal(t.points[0][0], null); assert.equal(t.thrower_player_id, null); assert.equal(t.ownership, 'conflicting');
+    await call(prefix, { method: 'DELETE' });
+});
+test('v1.2 rejects declared expanded size above 256 MiB before extraction', async () => {
+    const bytes = Buffer.from(globalSample);
+    const central = bytes.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02])); assert.ok(central >= 0);
+    bytes.writeUInt32LE(257 * 1024 * 1024, central + 24);
+    const r = await cloudUpload(bytes); assert.equal(r.status, 413); assert.match(r.body.message, /256 MiB/);
 });

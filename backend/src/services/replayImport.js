@@ -14,10 +14,11 @@ const FILES = ['manifest.json', 'metrics.json', 'rounds.json', 'events.json', 'm
 const MB = 1024 * 1024;
 function check(ok, message) { if (!ok) throw new Error(message); }
 const validateEnvelope = new Ajv().compile({ type: 'object', required: ['schema_version', 'match_id', 'package_id'],
-    properties: { schema_version: { const: '1.1.0' }, match_id: { type: 'string', minLength: 1, maxLength: 128 },
+    properties: { schema_version: { enum: ['1.1.0', '1.2.0'] }, match_id: { type: 'string', minLength: 1, maxLength: 128 },
         package_id: { type: 'string', minLength: 1, maxLength: 128 } } });
 function envelope(value, manifest) {
-    check(validateEnvelope(value), 'Invalid 1.1.0 document envelope');
+    check(validateEnvelope(value), 'Invalid document envelope');
+    check(value.schema_version === manifest.schema_version, 'Mixed document envelope versions');
     check(value.match_id === manifest.match_id && value.package_id === manifest.package_id, 'Package identity mismatch');
 }
 function identifiers(value, depth = 0) {
@@ -30,7 +31,7 @@ function identifiers(value, depth = 0) {
         identifiers(child, depth + 1);
     }
 }
-async function unpack(file, dest) {
+async function unpack(file, dest, onGlobalEvent = async () => {}) {
     const zip = await new Promise((resolve, reject) => yauzl.open(file, { lazyEntries: true, validateEntrySizes: true }, (e, z) => e ? reject(e) : resolve(z)));
     const entries = new Map(); let declared = 0;
     try {
@@ -42,8 +43,8 @@ async function unpack(file, dest) {
                     check(!(entry.generalPurposeBitFlag & 1), 'Encrypted ZIP unsupported');
                     check(((entry.externalFileAttributes >>> 16) & 0xf000) !== 0xa000, 'ZIP symlinks unsupported');
                     declared += entry.uncompressedSize;
-                    check(declared <= 50 * MB, 'Expanded ZIP exceeds 50 MiB');
-                    const limit = entry.fileName === 'map.json' ? 80 * MB : entry.fileName === 'events.json' ? 16 * MB : 2 * MB;
+                    check(declared <= 256 * MB, 'Expanded ZIP exceeds 256 MiB');
+                    const limit = entry.fileName === 'map.json' ? 256 * MB : entry.fileName === 'events.json' ? 64 * MB : 2 * MB;
                     check(entry.uncompressedSize <= limit, `File too large: ${entry.fileName}`);
                     entries.set(entry.fileName, entry); zip.readEntry();
                 } catch (e) { reject(e); }
@@ -68,11 +69,15 @@ async function unpack(file, dest) {
         }
     } finally { reader.close(); }
     const data = {};
-    for (const name of FILES.filter(n => n !== 'map.json')) {
+    for (const name of ['manifest.json', 'metrics.json', 'rounds.json']) {
         data[name] = JSON.parse(await fsp.readFile(path.join(dest, name), 'utf8'));
         identifiers(data[name]);
     }
     const manifest = data['manifest.json'];
+    if (manifest.schema_version === '1.1.0') {
+        check(declared <= 50 * MB, 'Expanded v1.1 ZIP exceeds 50 MiB');
+        check(entries.get('events.json').uncompressedSize <= 16 * MB, 'Events file exceeds 16 MiB');
+    }
     for (const value of Object.values(data)) envelope(value, manifest);
     check(typeof manifest.target_player_id === 'string', 'Missing target player');
     check(manifest.analysis_scope?.target_player_id === manifest.target_player_id &&
@@ -84,20 +89,49 @@ async function unpack(file, dest) {
         check(manifest.files?.[name]?.sha256 === hashes[name].sha256 && manifest.files[name].size_bytes === hashes[name].size_bytes, `Integrity check failed: ${name}`);
     }
     check(Array.isArray(data['rounds.json'].items) && data['rounds.json'].items.length <= 100, 'Invalid rounds');
-    check(Array.isArray(data['events.json'].items) && data['events.json'].items.length <= 20000, 'Invalid events');
     check(data['metrics.json'].modules && typeof data['metrics.json'].modules === 'object', 'Missing metrics modules');
-    for (const [name, value] of Object.entries(data)) formal.enforce(formal.files[name.replace('.json', '')], value, name);
+    const validators = formal.forVersion(manifest.schema_version);
+    for (const [name, value] of Object.entries(data)) formal.enforce(validators.files[name.replace('.json', '')], value, name);
     const ids = new Set(), rounds = new Set(data['rounds.json'].items.map(r => r.round_num));
     check(rounds.size === data['rounds.json'].items.length, 'Duplicate round');
-    for (const event of data['events.json'].items) {
-        check(!ids.has(event.event_id), 'Duplicate event ID'); ids.add(event.event_id);
-        check(event.round_num == null || rounds.has(event.round_num), 'Unknown event round');
+    const targetEvents = [], globalIds = new Set(), globalCounts = {};
+    let targetBytes = 0;
+    const eventMeta = await streamDocument(path.join(dest, 'events.json'), 'events', manifest.schema_version, async (kind, event) => {
+        const seen = kind === 'items' ? ids : globalIds;
+        check(event.event_id.length <= 128 && !seen.has(event.event_id), 'Duplicate event ID or oversized ID'); seen.add(event.event_id);
+        check(event.round_num == null || event.round_num === 0 || rounds.has(event.round_num), 'Unknown event round');
+        if (kind === 'items') {
+            targetBytes += Buffer.byteLength(JSON.stringify(event));
+            check(targetEvents.length < 20000 && targetBytes <= 16 * MB, 'Target events exceeds limits');
+            targetEvents.push(event);
+        } else {
+            check(globalIds.size <= 200000, 'Too many global events');
+            const source = event.data.source_dataset;
+            globalCounts[source] = (globalCounts[source] || 0) + 1;
+            await onGlobalEvent(event);
+        }
+    });
+    envelope(eventMeta, manifest);
+    if (manifest.schema_version === '1.2.0') {
+        const coverage = eventMeta.global_coverage, declaredCoverage = manifest.export_scope.global_dataset_coverage;
+        check(JSON.stringify(Object.keys(coverage).sort()) === JSON.stringify(Object.keys(declaredCoverage).sort()), 'Global coverage keys mismatch');
+        for (const [key, value] of Object.entries(coverage)) {
+            const expected = declaredCoverage[key];
+            check(value.status === expected.status && value.source_rows === expected.source_rows && value.retained_source_rows === expected.retained_source_rows, 'Global coverage mismatch');
+            check(value.retained_source_rows <= value.source_rows, 'Invalid global coverage count');
+        }
+        for (const key of ['kills','damages','shots','blinds','item_events','bomb','smokes','fires']) check((globalCounts[key] || 0) === coverage[key].retained_source_rows, 'Global event coverage mismatch');
+        const stats = data['metrics.json'].all_player_stats, roster = new Set(manifest.players.map(p => p.player_id));
+        check(new Set(stats.map(p => p.steamid)).size === stats.length && stats.every(p => roster.has(p.steamid)), 'Invalid all-player stats roster');
+        check(stats.length === coverage.stats.retained_source_rows, 'Global stats coverage mismatch');
     }
+    data['events.json'] = { ...eventMeta, items: targetEvents };
     for (const module of Object.values(data['metrics.json'].modules)) check(module.evidence_ids.every(id => ids.has(id)), 'Missing module evidence');
     return data;
 }
 // Consume one top-level array item at a time. No complete map arrays are retained.
-async function streamMap(file, onItem) {
+async function streamDocument(file, name, version, onItem) {
+    const rules = formal.forVersion(version).arrays[name];
     const input = fs.createReadStream(file);
     const tokens = input.pipe(parser({ streamKeys: false, streamStrings: false, streamNumbers: false }));
     input.on('error', e => tokens.destroy(e));
@@ -112,19 +146,23 @@ async function streamMap(file, onItem) {
                 check(!keys.has(token.value), 'Duplicate map field'); keys.add(token.value); key = token.value; continue;
             }
             if (depth === 1 && token.name === 'startArray') {
-                check(['player_samples','target_keyframes','combat_participant_states','nearby_context','trajectories','unattributed_trajectories'].includes(key), 'Unknown map array');
+                check(Object.hasOwn(rules, key), `Unknown ${name} array`);
                 arrays.add(key); counts[key] = 0; arrayKey = key; depth++; continue;
             }
             if (arrayKey && depth === 2 && token.name === 'endArray') { arrayKey = null; depth--; continue; }
             if (depth >= (arrayKey ? 2 : 1) && !(depth === 1 && token.name === 'endObject')) {
                 if (!assembler) { assembler = new Assembler(); size = 0; }
                 size += String(token.value ?? '').length + 8;
-                check(size < 512 * 1024 && depth < 40, 'Map record exceeds limits');
+                check(size < (arrayKey === 'all_trajectories' ? 8 * MB : 512 * 1024) && depth < 40, `${name} record exceeds limits`);
                 if (token.name === 'keyValue') check(!['__proto__', 'constructor', 'prototype'].includes(token.value), 'Unsafe map key');
                 assembler.consume(token);
                 if (assembler.done) {
                     identifiers(assembler.current);
-                    if (arrayKey) { check(++count <= 100000, 'Too many map records'); counts[arrayKey]++; formal.mapItem(arrayKey, assembler.current); await onItem(arrayKey, assembler.current); }
+                    if (arrayKey) {
+                        const limit = name === 'events' ? (version === '1.2.0' ? 220000 : 20000) : (version === '1.2.0' ? 500000 : 100000);
+                        check(++count <= limit, `Too many ${name} records`); counts[arrayKey]++;
+                        formal.item(name, arrayKey, assembler.current, version); await onItem(arrayKey, assembler.current);
+                    }
                     else metadata[key] = assembler.current;
                     assembler = null;
                 }
@@ -132,9 +170,10 @@ async function streamMap(file, onItem) {
             if (start) depth++;
             if (end) depth--;
         }
-        check(arrays.has('player_samples') && arrays.has('target_keyframes'), 'Missing map arrays');
-        formal.mapHeader(metadata, counts);
+        if (name === 'map') check(arrays.has('player_samples') && arrays.has('target_keyframes'), 'Missing map arrays');
+        formal.header(name, metadata, counts, version);
         return metadata;
     } finally { input.destroy(); tokens.destroy(); }
 }
-module.exports = { unpack, streamMap, check, envelope };
+async function streamMap(file, onItem, version = '1.1.0') { return streamDocument(file, 'map', version, onItem); }
+module.exports = { unpack, streamMap, streamDocument, check, envelope };

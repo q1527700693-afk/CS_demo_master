@@ -2,11 +2,12 @@
 
 Node.js + Express backend API for CS Demo Master.
 
-ZIP replay analysis (schema 1.1.0): see [REPLAY.md](REPLAY.md) for upload APIs,
+ZIP replay analysis (schema 1.1.0 / 1.2.0): see [REPLAY.md](REPLAY.md) for upload APIs,
 queue lifecycle, rule reports, sample acceptance tests and 2-core/2GB limits.
 It runs without an LLM; API-based commentary can be added separately.
 See the [replay architecture and API specification](../docs/replay-analysis-design.md)
 for implementation details, current endpoints and the proposed LLM extension contract.
+For all-player exports and paginated global evidence, see [REPLAY_V12.md](REPLAY_V12.md).
 
 ## Tech Stack
 

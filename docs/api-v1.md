@@ -764,6 +764,18 @@ GET /matches and GET /matches/{match_id}/analyses provide history. GET
 /analyses/{analysis_id} remove non-running resources. GET /analyses/{analysis_id}/details
 provides additional rule analysis. All resources are scoped to the logged-in user.
 
+Both ZIP schema 1.1.0 and 1.2.0 are supported. For v1.2 packages, GET
+`/analysis-packages/{package_id}/global` returns all-player statistics and metadata.
+GET `/analysis-packages/{package_id}/global/{kind}` accepts `events`, `samples`, or
+`trajectories`, with `round_num`, `offset`, and `limit` pagination. Follow
+`next_offset` until null; byte limits can shorten a page. These streams are
+separate from target-player evidence and must not be added together.
+
+`evidence?version=1.1` remains a target-only projection. Explicit
+`evidence?version=1.2` returns the complete events document as an object (including
+`items`, `global_items`, and `global_coverage`) and the full map document.
+See [v1.2 integration details](../backend/REPLAY_V12.md).
+
 See [full API and operational guide](../backend/REPLAY.md) and the original
 [OpenAPI contract](../backend/contracts/openapi.json). The original handoff OpenAPI
 also describes local-parser endpoints; those run in the local parser, not this cloud server.

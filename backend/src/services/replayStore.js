@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { db } = require('../config/database');
 const { errors } = require('../utils/response');
-const VERSION = 'rules-1.0.0';
+const VERSION = 'rules-1.1.0';
 const root = path.resolve(process.env.REPLAY_DIR || path.join(__dirname, '../../data/replays'));
 fs.mkdirSync(path.join(root, 'incoming'), { recursive: true });
 db.exec(`CREATE TABLE IF NOT EXISTS replay_jobs (

@@ -9,6 +9,7 @@ const { pipeline } = require('node:stream/promises');
 const { authenticate } = require('../middlewares/auth');
 const { success, errors } = require('../utils/response');
 const { db, root, directory, VERSION } = require('../services/replayStore');
+const { readGlobalPage } = require('../services/replayGlobal');
 const router = express.Router();
 router.use(['/analysis-packages','/analyses','/matches'], authenticate);
 const wrap = fn => (req,res,next) => Promise.resolve(fn(req,res)).catch(next);
@@ -53,17 +54,17 @@ router.post('/analysis-packages', (req,res,next) => {
     try {
         const hash = crypto.createHash('sha256'); for await (const c of fs.createReadStream(req.file.path)) hash.update(c);
         const digest = hash.digest('hex');
-        job = db.prepare("SELECT * FROM replay_jobs WHERE owner_id=? AND digest=? AND version='import-1.1.0'").get(req.user.id,digest);
+        job = db.prepare("SELECT * FROM replay_jobs WHERE owner_id=? AND digest=? AND version='import-1.2.0'").get(req.user.id,digest);
         if (!job) {
             capacity(req.user.id);
             const id=crypto.randomUUID(), now=new Date().toISOString(), dir=directory(id);
             await fs.promises.mkdir(dir); await fs.promises.rename(req.file.path,path.join(dir,'package.zip'));
-            try { db.prepare("INSERT INTO replay_jobs(id,owner_id,digest,version,kind,created_at,updated_at) VALUES(?,?,?,'import-1.1.0','import',?,?)").run(id,req.user.id,digest,now,now); }
+            try { db.prepare("INSERT INTO replay_jobs(id,owner_id,digest,version,kind,created_at,updated_at) VALUES(?,?,?,'import-1.2.0','import',?,?)").run(id,req.user.id,digest,now,now); }
             catch(e) {
                 await fs.promises.rm(dir,{recursive:true,force:true});
-                if (!db.prepare("SELECT id FROM replay_jobs WHERE owner_id=? AND digest=? AND version='import-1.1.0'").get(req.user.id,digest)) throw e;
+                if (!db.prepare("SELECT id FROM replay_jobs WHERE owner_id=? AND digest=? AND version='import-1.2.0'").get(req.user.id,digest)) throw e;
             }
-            job=db.prepare("SELECT * FROM replay_jobs WHERE owner_id=? AND digest=? AND version='import-1.1.0'").get(req.user.id,digest);
+            job=db.prepare("SELECT * FROM replay_jobs WHERE owner_id=? AND digest=? AND version='import-1.2.0'").get(req.user.id,digest);
         }
     } finally { await fs.promises.unlink(req.file.path).catch(()=>{}); }
     const deadline=Date.now()+150000;
@@ -173,14 +174,30 @@ router.get('/matches',wrap(async(req,res)=>{
             latest_available_analysis_id:available?.id??null,summary:available?.summary?JSON.parse(available.summary):null};
     }); success(res,{items,page,pageSize,total});
 }));
+function globalDirectory(req) {
+    const p = getPackage(req.user.id, req.params.id);
+    if (JSON.parse(p.manifest).schema_version !== '1.2.0') throw errors.conflict('Global data requires a v1.2 package');
+    return directory(p.storage_id);
+}
+router.get('/analysis-packages/:id/global', wrap(async (req, res) => {
+    await stored(res, path.join(globalDirectory(req), 'global-summary.json'));
+}));
+router.get('/analysis-packages/:id/global/:kind', wrap(async (req, res) => {
+    success(res, await readGlobalPage(globalDirectory(req), req.params.kind, req.query));
+}));
 router.get('/analysis-packages/:id/evidence',wrap(async(req,res)=>{
     const p=getPackage(req.user.id,req.params.id), dir=directory(p.storage_id), m=JSON.parse(p.manifest);
-    if(req.query.version && req.query.version!=='1.1') throw errors.invalidParameter('Unsupported evidence version');
+    if(req.query.version && !['1.1','1.2'].includes(req.query.version)) throw errors.invalidParameter('Unsupported evidence version');
+    if(req.query.version === '1.2' && m.schema_version !== '1.2.0') throw errors.conflict('Full v1.2 evidence requires a v1.2 package');
     res.type('json');res.write('{"code":0,"message":"success","data":'+JSON.stringify({match_id:p.match_id,package_id:p.package_id}).slice(0,-1)+',"events":');
-    if(req.query.version==='1.1') {
+    if(req.query.version==='1.2') {
+        // v1.2 returns the complete events document, including separate target/global streams.
+        await streamFile(res,path.join(dir,'events.json'));
+        res.write(',"map":');await streamFile(res,path.join(dir,'map.json'));
+    } else if(req.query.version==='1.1') {
         // A separate small events projection avoids parsing the large map on the API thread.
         await streamFile(res,path.join(dir,'detailed-events.json'));
-        res.write(',"map":');await streamFile(res,path.join(dir,'map.json'));
+        res.write(',"map":');await streamFile(res,path.join(dir,m.schema_version==='1.2.0'?'target-map.json':'map.json'));
     } else {
         await streamFile(res,path.join(dir,'compat-events.json'));
         res.write(',"map":'+JSON.stringify({schema_version:'1.0.0',match_id:m.match_id,package_id:m.package_id,coordinate_system:'source_world',asset_version:null}).slice(0,-1)+',"trajectories":');

@@ -3,7 +3,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { once } = require('node:events');
 const { unpack, streamMap, check, envelope } = require('./replayImport');
-const VERSION = 'rules-1.0.0';
+const { globalMapValidation } = require('./replayGlobal');
+const VERSION = 'rules-1.1.0';
 async function analyze(directory, progress = () => {}) {
     const started = performance.now(); progress('validating');
     const data = await unpack(path.join(directory, 'package.zip'), directory);
@@ -58,12 +59,16 @@ async function analyze(directory, progress = () => {}) {
     const counts = {}, outputs = new Map(), failures = [];
     const fireTicks = new Set(events.filter(e => e.type === 'weapon_fire' && !/knife|grenade|flashbang|molotov|decoy|c4|bayonet/.test(e.data.record?.weapon || '')).map(e => e.tick));
     const measured = new Set(); let speedTotal = 0, speedMax = 0, jumping = 0;
-    const allowed = new Set(['player_samples','target_keyframes','combat_participant_states','nearby_context','trajectories','unattributed_trajectories']);
+    const allowed = new Set(['player_samples','target_keyframes','combat_participant_states','nearby_context','trajectories','unattributed_trajectories','all_player_samples','all_trajectories']);
+    const validateGlobal = globalMapValidation(manifest, rounds);
     let mapMeta;
     try {
         mapMeta = await streamMap(path.join(directory, 'map.json'), async (kind, item) => {
             check(allowed.has(kind) && item && typeof item === 'object' && !Array.isArray(item), 'Invalid map record');
             counts[kind] = (counts[kind] || 0) + 1;
+            validateGlobal.item(kind, item);
+            // Global data belongs to the package. Do not duplicate it or feed it into target rules.
+            if (kind === 'all_player_samples' || kind === 'all_trajectories') return;
             if (['player_samples', 'target_keyframes'].includes(kind)) check(item.state?.steamid === manifest.target_player_id, 'Map target mismatch');
             const round = item.round_num === 0 ? null : item.round_num ?? rounds.find(r => r.start_tick !== null && item.start_tick >= r.start_tick && item.start_tick <= r.end_tick)?.round_num;
             check(round == null || roundNumbers.has(round), 'Unknown map round');
@@ -82,8 +87,9 @@ async function analyze(directory, progress = () => {}) {
             }
             if (failures.length) throw failures[0];
             if (!outputs.get(name).write(JSON.stringify({ kind, ...item }) + '\n')) await once(outputs.get(name), 'drain');
-        });
+        }, manifest.schema_version);
         envelope(mapMeta, manifest);
+        validateGlobal.finish(mapMeta);
         await Promise.all([...outputs.values()].map(out => new Promise((resolve, reject) => { out.once('error', reject); out.end(resolve); })));
         if (failures.length) throw failures[0];
     } finally { for (const out of outputs.values()) out.destroy(); }
@@ -91,6 +97,7 @@ async function analyze(directory, progress = () => {}) {
     const report = { schema_version: 'report-1.0.0', analysis_version: VERSION, ai_status: 'not_requested',
         source: { match_id: manifest.match_id, package_id: manifest.package_id, producer: manifest.producer, identity_verified: false },
         target_player_id: manifest.target_player_id, match: manifest.match, analysis_scope: manifest.analysis_scope,
+        ...(manifest.export_scope ? { export_scope: manifest.export_scope } : {}),
         data_quality: manifest.data_quality, statistics: metrics, findings, key_rounds: keyRounds,
         rounds: rounds.map(r => ({ round_num: r.round_num, winner_side: r.winner_side, target_summary: r.target_summary })),
         map: { ...mapMeta, counts }, movement: { status: measured.size ? 'observed' : 'insufficient_data', measured_fire_ticks: measured.size,

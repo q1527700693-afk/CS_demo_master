@@ -2,6 +2,8 @@
 
 基于仓库 dev 分支，在 `feature/zip-replay` 本地分支实现。运行环境 Node.js 22.23.2 或兼容的更新版本；使用原有 Express、JWT 和 SQLite。无需 Python、Redis、GPU 或模型 API Key。
 
+现已兼容 v1.2 全员导出包。新增字段、全员分页接口和资源限制详见 [REPLAY_V12.md](REPLAY_V12.md)；原有 v1.1 单人接口继续可用。
+
 ## 启动和验收
 
 ```powershell
@@ -36,6 +38,9 @@ node --test tests/replay.test.js
 | GET /matches/:match_id/analyses | 按新到旧列出全部分析 |
 | GET /analysis-packages/:package_id/evidence | 符合交接 OpenAPI 的旧版兼容证据视图 |
 | GET /analysis-packages/:package_id/evidence?version=1.1 | 完整 1.1 事件与地图；保留所有采样和未知归属轨迹 |
+| GET /analysis-packages/:package_id/evidence?version=1.2 | 完整 v1.2 证据；events 为包含 items/global_items 的对象 |
+| GET /analysis-packages/:package_id/global | 全员统计、名单、回合、覆盖与采样摘要；仅 v1.2 |
+| GET /analysis-packages/:package_id/global/:kind | kind 为 events/samples/trajectories，支持 round_num、offset、limit |
 | GET /analyses/:analysis_id/details | 扩展事实、关键回合、移动射击观察和质量信息 |
 | DELETE /analyses/:analysis_id | 删除非运行中的分析及结果 |
 | DELETE /analysis-packages/:package_id | 删除包及其全部分析；存在运行任务返回 409 |
@@ -67,7 +72,7 @@ report.schema.json 的顶层包含 report_schema_version、四个身份标签、
 
 ## 1.1.0 导入约束
 
-已将 analysis-handoff 中的正式 package-v1.1.schema.json、report.schema.json、openapi.json 和 TypeScript 类型原样保存在 contracts/。导入器对四个较小 JSON 完整校验，对 map 的每条数组记录和头部逐项校验，最后检查必填数组和数量上限。无需把整张地图装入内存。服务端还执行身份、摘要和跨文件引用校验；JSON Schema 本身不能代替这些检查。
+已将 analysis-handoff 中的正式 package-v1.1.schema.json、report.schema.json、openapi.json 和 TypeScript 类型原样保存在 contracts/，另加入本次交接的 package-v1.2.schema.json。manifest/metrics/rounds 完整校验，events/map 按数组记录与头部流式校验，最后检查必填数组和数量上限。服务端还执行身份、摘要和跨文件引用校验；JSON Schema 本身不能代替这些检查。
 
 已校验五个固定文件名、重复/未知条目、加密与符号链接、声明及实际解压字节、SHA-256 和大小、schema_version=1.1.0、跨文件 match/package ID、目标玩家与名单/确认范围、SteamID 字符串、回合和事件引用、关键地图状态所属玩家、模块证据引用。允许源记录增加字段，未知状态保持原样。
 
@@ -78,7 +83,7 @@ report.schema.json 的顶层包含 report_schema_version、四个身份标签、
 - 每次只运行 1 个 CPU 分析进程；API 负责调度与读结果。分析进程 V8 old-space 上限 384 MiB，这不等同于 RSS 硬限制；生产环境用 systemd/cgroup 对总内存另设限制。
 - 分析最多 120 秒。任务租约 150 秒；异常中断的任务在租约过期后恢复，最多尝试 3 次。格式错误直接失败。
 - 上传并发最多 2；队列最多 50；单用户最多 3 个待处理任务。存储任务上限全局 100、单用户 20，达到后通过删除接口释放；新接口容量不足返回 409；删除接口可释放容量。
-- 新接口 ZIP ≤50 MiB，解压总量 ≤50 MiB（旧上传接口仍为 20 MiB），map 受总量上限约束，events ≤16 MiB，其余各 ≤2 MiB；最多 100 回合、20,000 事件、100,000 地图记录，单条地图记录及嵌套深度有界。
+- 新接口 ZIP ≤50 MiB（旧上传接口仍为 20 MiB）。v1.1 解压总量 ≤50 MiB、events ≤16 MiB、地图合计 100,000 记录；v1.2 解压总量 ≤256 MiB、events ≤64 MiB、地图合计 500,000 记录。其余小文件各 ≤2 MiB；最多 100 回合、20,000 目标事件，v1.2 另允许最多 200,000 全局事件。完整限制见 REPLAY_V12.md。
 - ZIP 顺序解压到磁盘，map 数组逐条流式读取，每回合写 JSONL；报告和回合详情流式返回，证据按文件偏移读取；地图分页最多 500 条。
 - SQLite WAL、短事务，不在分析期间占用写事务。数据库、原 ZIP、规范化结果使用持久磁盘；分析任务成功后删除临时解压 JSON；已接受包保留原始 JSON 供证据下载，导入校验失败会清理文件。
 - 默认存储在 backend/data/replays，可用 REPLAY_DIR 设置绝对路径；DB_PATH 可设置数据库位置。停止服务后备份数据库和复盘目录，或使用支持 WAL 的 SQLite 备份机制。
