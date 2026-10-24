@@ -10,6 +10,7 @@ const { authenticate } = require('../middlewares/auth');
 const { success, errors } = require('../utils/response');
 const { db, root, directory, VERSION } = require('../services/replayStore');
 const { readGlobalPage } = require('../services/replayGlobal');
+const aiAnalysis = require('../services/aiAnalysis');
 const router = express.Router();
 router.use(['/analysis-packages','/analyses','/matches'], authenticate);
 const wrap = fn => (req,res,next) => Promise.resolve(fn(req,res)).catch(next);
@@ -128,6 +129,39 @@ router.post('/matches/:match/analyses',wrap(async(req,res)=>{
     }
     success(res,run(getRun(req.user.id,id)),'queued',202);
 }));
+function aiReportPath(id) {
+    return path.join(directory(id), 'ai-report.json');
+}
+
+router.get('/analyses/:id/ai', wrap(async (req, res) => {
+    const job = getRun(req.user.id, req.params.id);
+    if (job.status !== 'ready') throw errors.conflict('Report not ready');
+
+    try {
+        const raw = await fs.promises.readFile(aiReportPath(job.id), 'utf8');
+        return success(res, JSON.parse(raw));
+    } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+        return success(res, {
+            ai_status: aiAnalysis.isConfigured() ? 'not_generated' : 'not_configured',
+            analysis_id: job.id,
+            model: aiAnalysis.configuration().model
+        });
+    }
+}));
+
+router.post('/analyses/:id/ai', wrap(async (req, res) => {
+    const job = getRun(req.user.id, req.params.id);
+    if (job.status !== 'ready') throw errors.conflict('Report not ready');
+
+    const details = JSON.parse(
+        await fs.promises.readFile(path.join(directory(job.id), 'report.json'), 'utf8')
+    );
+    const result = await aiAnalysis.analyze(details, { analysisId: job.id });
+    await fs.promises.writeFile(aiReportPath(job.id), JSON.stringify(result));
+    return success(res, result, 'success', 201);
+}));
+
 router.get('/analyses/:id',wrap(async(req,res)=>success(res,run(getRun(req.user.id,req.params.id)))));
 router.get('/analyses/:id/report',wrap(async(req,res)=>{
     const job=getRun(req.user.id,req.params.id); if(job.status!=='ready') throw errors.conflict('Report not ready');

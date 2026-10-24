@@ -2,9 +2,9 @@
 
 更新日期：2026-10-24。本文以当前代码和 `analysis-handoff` 交接协议为依据。
 
-已接入 GLOBAL-EXPORT-v1.2 全员导出。全员接口、完整轨迹校验及分页契约见 [v1.2 接入说明](../backend/REPLAY_V12.md)。单人分析和未来 LLM 设计继续沿用本文。
+已接入 GLOBAL-EXPORT-v1.2 全员导出。全员接口、完整轨迹校验及分页契约见 [v1.2 接入说明](../backend/REPLAY_V12.md)。单人分析和 AI 解读设计继续沿用本文。
 
-**已实现：本地解析包的云端导入、规则分析、报告、证据、历史与资源删除。未实现：外部 LLM 调用。第 8 节是后续接口设计，不是当前可调用的接口。**
+**已实现：本地解析包的云端导入、规则分析、报告、证据、历史与资源删除；GLOBAL-EXPORT-v1.2 全员导出；可选 AI 教练解读（`GET/POST /analyses/{analysis_id}/ai`，同步调用、JSON Schema 与 evidence_ids 校验、未配置时返回 50300）。未实现：独立 AI 队列、缓存、评论任务表和前端 AI 卡片。第 8 节同时说明当前基础实现和后续异步扩展。**
 
 ## 1. 功能范围与数据来源
 
@@ -303,20 +303,29 @@ node scripts/analyze-package.js tests/fixtures/sample-analysis-v1.1.zip data/rep
 
 离线验收命令要求输出目录不存在，输出 cloud-report.json 和扩展 report.json。它不经过 JWT HTTP 层，适用于人工检查结果。
 
-v1.1 样例有 23 回合、3,760 条周期状态、131 条未知归属轨迹、19 条回看候选。v1.2 样例有 18 回合、39,046 条全员位置、319 条全员轨迹和 6 条目标玩家回看候选。测试及开发机性能记录见 [验收记录](../backend/REPLAY_ACCEPTANCE.md)，不代表目标云服务器容量结论。
+v1.1 样例有 23 回合、3,760 条周期状态、131 条未知归属轨迹、19 条回看候选。v1.2 样例有 18 回合、39,046 条全员位置、319 条全员轨迹和 6 条目标玩家回看候选。合并后全量测试覆盖 v1.2 复盘、AI 服务和调试页面；测试及开发机性能记录见 [验收记录](../backend/REPLAY_ACCEPTANCE.md)，不代表目标云服务器容量结论。
 
 ## 7. 当前边界
 
 - 原始 Demo 解析、账号与 Steam 所有权绑定、前端三维重放不在此模块实现。
-- 当前没有外部模型请求、模型密钥、提示词服务或 AI 解读任务表。
+- 当前 AI 解读是同步基础版，没有独立任务表、缓存、计费统计和前端 AI 卡片；模型密钥只从后端环境变量读取，当前本地默认为空。
 - 本地与 HTTP 集成测试已完成；真实前端页面、生产代理和 2 核 2G 压力测试仍需部署环境验证。
 - 当前以持久磁盘存储为主，未实现对象存储、自动归档和集群队列。
 
-## 8. 外接 LLM 预留设计（尚未实现）
+## 8. 外接 LLM：当前基础实现与后续扩展
 
-可后续接入 DeepSeek 等托管模型 API，无需在 2 核 2G 服务器训练或部署模型。模型负责解释已计算事实、组织回看建议和训练建议；规则报告独立可用。
+已可接入 DeepSeek 等托管模型 API，无需在 2 核 2G 服务器训练或部署模型。模型负责解释已计算事实、组织回看建议和训练建议；规则报告独立可用。
 
-**以下路径、类型和配置是待实现约定。当前服务调用这些新路径会返回 404，不应据此开启前端 AI 按钮。**
+当前已实现：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/analyses/{analysis_id}/ai` | 读取已有 AI 结果或 `not_configured` / `not_generated` 状态 |
+| POST | `/api/v1/analyses/{analysis_id}/ai` | 从已就绪基础报告生成 AI 教练解读，当前为同步调用 |
+
+配置项使用 `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`、`AI_TIMEOUT_MS`、`AI_MAX_TOKENS`、`AI_PROMPT_VERSION`。未配置 Key 时 POST 返回 50300，不会发起网络请求。后端会校验 AI JSON Schema 和所有 `evidence_ids`，未知证据返回 50200；结果保存为分析目录下的 `ai-report.json`。
+
+**以下 8.1–8.4 是后续异步/缓存扩展建议，不是当前已完成的能力。**
 
 ### 8.1 建议的独立接口
 
@@ -393,6 +402,6 @@ interface CommentaryProvider {
 
 ### 8.4 拟新增配置与接入验收
 
-建议配置 `LLM_PROVIDER`、`LLM_API_KEY`、`LLM_MODEL`、`LLM_TIMEOUT_MS`、`LLM_MAX_OUTPUT_TOKENS`、`LLM_MAX_CONCURRENCY`。这些变量目前未被后端读取；只有将来接入适配器后才生效。模型密钥仅存后端环境，不能写入 VITE_* 或前端包。
+当前基础实现配置 `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`、`AI_TIMEOUT_MS`、`AI_MAX_TOKENS`、`AI_PROMPT_VERSION`。后续异步扩展可复用这些变量，并增加并发和缓存配置。模型密钥仅存后端环境，不能写入 VITE_* 或前端包。
 
 实现顺序：定义解读输出 Schema → 摘要选择器 → 供应商适配器 → 独立任务/缓存 → 证据校验 → 前端 AI 卡片。验收应覆盖供应商不可用、错误 JSON、虚构证据、超时、重复请求、跨账号访问，以及基础报告不受 AI 失败影响。

@@ -16,10 +16,11 @@ Implemented:
 - Friend list: user search, mutual friend requests, accept/reject/cancel, remove friend
 - ZIP replay packages (schema 1.1.0 / 1.2.0): validation, queued rule analysis, reports, evidence, history and deletion
 - Global v1.2 data: all-player statistics, events, sampled positions and full utility trajectories with round pagination
+- Optional AI coaching analysis API (DeepSeek/OpenAI-compatible; disabled when `DEEPSEEK_API_KEY` is empty)
 
 Not implemented yet:
 
-- AI report APIs
+- AI result UI integration
 - Mini-game APIs
 
 ## Replay Analysis Documentation
@@ -29,8 +30,11 @@ Not implemented yet:
 - [Global v1.2 integration and pagination](backend/REPLAY_V12.md)
 - [Acceptance results and deployment checks](backend/REPLAY_ACCEPTANCE.md)
 
-Rule-based replay analysis works without an LLM. External LLM commentary APIs are
-documented as a future design and are not implemented yet.
+Rule-based replay analysis works without an LLM. The optional AI coaching
+endpoint reads the compact rule report, calls a configured OpenAI-compatible
+provider, validates the returned JSON and evidence references, and stores
+`ai-report.json`. Without a key the endpoint returns `50300` and the base report
+continues to work normally.
 
 ## Modules
 
@@ -74,7 +78,8 @@ GET http://localhost:8000/api/v1/health
 ```
 
 Copy `backend/.env.example` to `backend/.env` if you need to override `PORT`,
-`JWT_SECRET`, `DB_PATH`, `UPLOAD_DIR` or `LOBBY_TTL_HOURS`.
+`JWT_SECRET`, `DB_PATH`, `UPLOAD_DIR`, `LOBBY_TTL_HOURS` or the optional
+`DEEPSEEK_*` / `AI_*` variables.
 
 ## Frontend Integration
 
@@ -325,6 +330,36 @@ Search results include a `relationship` field: `none`, `incoming_request`,
 `outgoing_request` or `friend`. Rejected/cancelled requests and removed friends
 can be requested again later. The caller cannot add themselves, cannot create a
 duplicate request, and cannot accept/reject the wrong side of a request.
+
+## AI Coaching Integration
+
+The replay report is the source of truth. The AI module only receives compact
+facts such as modules, findings, key rounds, movement summary and data quality;
+it does not receive the full map or raw ZIP.
+
+Configure on the server only:
+
+```env
+DEEPSEEK_API_KEY=
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-chat
+AI_TIMEOUT_MS=60000
+AI_MAX_TOKENS=2000
+AI_PROMPT_VERSION=coach-1.0.0
+```
+
+If `DEEPSEEK_API_KEY` is empty, the backend stays healthy and the AI endpoints
+return `not_configured` / `50300`.
+
+Endpoints:
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/v1/analyses/:analysisId/ai` | Read existing AI coaching result or status |
+| POST | `/api/v1/analyses/:analysisId/ai` | Generate AI coaching result from a ready report |
+
+The current implementation is synchronous and returns after the provider call.
+A queued AI task can be added later without changing the base report contract.
 
 ## API Documentation
 

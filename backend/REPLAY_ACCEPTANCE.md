@@ -4,11 +4,11 @@
 
 ## 执行结果
 
-- `npm test`：89 项通过、0 项失败，包含原有账号、头像、好友、组队功能及 40 项复盘测试（新增 18 项 v1.2 测试）。
+- `npm test`：待合并后重新统计，包含原有账号、头像、好友、组队功能、v1.2 复盘测试及 AI 服务测试。
 - `git diff --check`：通过。
-- 正式 package-v1.1.schema.json 用于导入校验；生成的标准报告通过 report.schema.json 校验；默认证据响应通过交接 OpenAPI Evidence 校验。
-- 样例结果：23 个回合、3,760 条周期状态、131 条未知归属轨迹、19 条回看候选。标准报告状态为 partial，AI 状态为 not_configured，评分为空。
-- 本轮全量测试 v1.1 样例分析阶段：1,037 ms，分析进程峰值 RSS 122,440 KiB（约 120 MiB）。不包含上传、排队及单独的导入校验；不是 2 核 2G 云服务器压测。
+- 正式 package-v1.1 / package-v1.2 Schema 用于导入校验；生成的标准报告通过 report.schema.json 校验；默认证据响应通过交接 OpenAPI Evidence 校验。
+- v1.1 样例：23 个回合、3,760 条周期状态、131 条未知归属轨迹、19 条回看候选。规则报告状态为 partial，基础报告中的 AI 状态为 not_configured，评分为空。
+- 可选 AI 接口：未配置 `DEEPSEEK_API_KEY` 时 POST 返回 50300；使用 mock provider 验证了精简事实构造、严格 JSON Schema 和未知 evidence_id 拒绝。未进行真实 DeepSeek 计费调用。
 
 ## v1.2 全员样例
 
@@ -17,7 +17,6 @@
 - 18 回合、10 名玩家统计、4,316 条全局事件、39,046 条全员状态、319 条全员轨迹。
 - 46,904 个轨迹源行逐条对照原数据，points/point_ticks/records 完整保留，包括超过旧 200 点抽稀规模的轨迹。
 - 单人规则仍使用目标流，得到 6 条回看候选（3 条携带道具死亡、3 条队友受闪），没有重复累加全局事件。
-- 本轮全量测试分析阶段：4,340 ms，worker 峰值 RSS 116,808 KiB（约 114 MiB）；不包含上传与单独导入校验，不代表云服务器上限包性能。
 - 新增接口覆盖全员摘要、按回合分页、字节预算分页续读、旧 Evidence/v1.1 投影、完整 v1.2 Evidence、账号隔离及删除清理。
 - 异常验证覆盖混合版本、缺失数组、数值 SteamID、错误覆盖计数、重复全局事件、名单不匹配、轨迹对齐/坐标/归属错误、256 MiB 解压上限；null 坐标、冲突归属及任意 JSON 头部字段顺序可正确处理。
 
@@ -31,7 +30,7 @@
 
 ## 联调材料
 
-- 架构、接口与 LLM 预留设计：[说明文档](../docs/replay-analysis-design.md)。
+- 架构、接口与 AI 设计：[说明文档](../docs/replay-analysis-design.md)。
 - 启动与请求流程：[REPLAY.md](REPLAY.md)。
 - 原始交接契约：[contracts/](contracts/)。
 - 本地验收产物：data/replays/acceptance-handoff/cloud-report.json 与 report.json；运行数据不提交 Git。
@@ -44,4 +43,4 @@ node scripts/analyze-package.js tests/fixtures/sample-analysis-v1.1.zip data/rep
 
 ## 仍需部署环境验收
 
-真实 Vue 前端页面联调、反向代理超时和上传限制、目标 2 核 2G 上限包与并发压力测试。当前没有外部 LLM 调用。
+真实 Vue 前端页面联调、反向代理超时和上传限制、目标 2 核 2G 上限包与并发压力测试。AI 接口尚未配置真实 Key，也没有进行真实供应商调用、计费和限流压测。

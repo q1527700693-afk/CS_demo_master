@@ -4,10 +4,12 @@ Node.js + Express backend API for CS Demo Master.
 
 ZIP replay analysis (schema 1.1.0 / 1.2.0): see [REPLAY.md](REPLAY.md) for upload APIs,
 queue lifecycle, rule reports, sample acceptance tests and 2-core/2GB limits.
-It runs without an LLM; API-based commentary can be added separately.
+The base report runs without an LLM. An optional AI coaching endpoint reads the
+saved rule report and calls a configured OpenAI-compatible provider. Without a
+key it returns `50300` and the base report remains available.
 See the [replay architecture and API specification](../docs/replay-analysis-design.md)
-for implementation details, current endpoints and the proposed LLM extension contract.
-For all-player exports and paginated global evidence, see [REPLAY_V12.md](REPLAY_V12.md).
+for implementation details, the current AI extension contract, and all-player
+v1.2 exports/paginated global evidence in [REPLAY_V12.md](REPLAY_V12.md).
 
 ## Tech Stack
 
@@ -39,8 +41,8 @@ GET /api/v1/health
 ```
 
 Copy `.env.example` to `.env` to override `PORT`, `JWT_SECRET`, `DB_PATH`,
-`UPLOAD_DIR` and `LOBBY_TTL_HOURS`. The SQLite file and the upload folder are
-created automatically.
+`UPLOAD_DIR`, `LOBBY_TTL_HOURS` and optional `DEEPSEEK_*` / `AI_*` values. The
+SQLite file and the upload folder are created automatically.
 
 ## Implemented: Personal Card (TASKS.md 4.4)
 
@@ -161,6 +163,38 @@ Design notes:
 - Deleting a user cascades their friendships. There is no public friend list,
   online presence or chat.
 
+## Implemented: Optional AI Coaching (DeepSeek-compatible)
+
+The AI endpoint does not replace the rule report. It generates a separate
+coaching artifact from compact, already-validated facts.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/v1/analyses/:analysisId/ai` | yes | Read AI result or `not_configured` / `not_generated` |
+| POST | `/api/v1/analyses/:analysisId/ai` | yes | Generate AI coaching from a ready report |
+
+Server-only configuration:
+
+```env
+DEEPSEEK_API_KEY=
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-chat
+AI_TIMEOUT_MS=60000
+AI_MAX_TOKENS=2000
+AI_PROMPT_VERSION=coach-1.0.0
+```
+
+Behavior:
+
+- Empty `DEEPSEEK_API_KEY`: `POST` returns `50300`; no network call is made.
+- The service sends compact modules, findings, key rounds, movement summary,
+  data quality and limitations. It never sends the complete map or raw ZIP.
+- The provider must return strict JSON. The backend validates the schema and
+  rejects unknown `evidence_ids` with `50200`.
+- The result is stored as `ai-report.json` in the private analysis directory.
+- AI failure does not modify or invalidate the base rule report.
+- The current call is synchronous; a separate AI task queue can be added later.
+
 ## Tests
 
 ```bash
@@ -181,8 +215,13 @@ hiding full teams, and expiry cleanup.
 `tests/friends.test.js` covers the friendship schema, auth on every route, search
 validation/privacy/relationship states, sending and duplicate requests, request
 direction and counts, accept/reject/cancel permissions, the mutual friend list,
-pagination, and friend removal/re-request. All files use an in-memory SQLite
-database and a temporary upload folder; the suite currently has 49 tests.
+pagination, and friend removal/re-request.
+
+`tests/replay.test.js` covers ZIP validation, queueing, idempotency, reports,
+evidence, ownership, deletion and lease recovery. `tests/aiAnalysis.test.js`
+covers the disabled state, compact-fact provider call, output schema validation
+and rejection of unknown evidence IDs. All files use an in-memory SQLite
+database and temporary directories; the suite currently has 75 tests.
 
 ## Layout
 
@@ -198,13 +237,21 @@ backend/
     routes/users.js          me, profile, avatar, user search
     routes/lobbies.js        lobby hall routes
     routes/friends.js        friend request / friend list routes
+    routes/analysis.js       ZIP replay APIs + AI coaching routes
     services/authService.js
     services/profileService.js   card validation, Steam ids, avatar resizing
     services/lobbyService.js     team-code posts, claims, expiry, deletion
     services/friendService.js    search, requests, friendships
+    services/replayImport.js     ZIP extraction, Schema and cross-file validation
+    services/replayAnalysis.js   deterministic rule analysis and evidence
+    services/replayQueue.js      persistent single-worker queue
+    services/aiAnalysis.js       optional provider call and AI output validation
     utils/response.js        { code, message, data } envelope + ApiError
   tests/profile.test.js
   tests/lobby.test.js
+  tests/friends.test.js
+  tests/replay.test.js
+  tests/aiAnalysis.test.js
   tests/friends.test.js
   uploads/avatars/           runtime, git ignored
   uploads/demo-logs/         runtime, git ignored

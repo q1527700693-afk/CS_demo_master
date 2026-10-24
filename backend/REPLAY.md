@@ -1,4 +1,4 @@
-# ZIP 复盘后端（不依赖 LLM）
+# ZIP 复盘后端（基础报告不依赖 LLM）
 
 基于仓库 dev 分支，在 `feature/zip-replay` 本地分支实现。运行环境 Node.js 22.23.2 或兼容的更新版本；使用原有 Express、JWT 和 SQLite。无需 Python、Redis、GPU 或模型 API Key。
 
@@ -42,6 +42,8 @@ node --test tests/replay.test.js
 | GET /analysis-packages/:package_id/global | 全员统计、名单、回合、覆盖与采样摘要；仅 v1.2 |
 | GET /analysis-packages/:package_id/global/:kind | kind 为 events/samples/trajectories，支持 round_num、offset、limit |
 | GET /analyses/:analysis_id/details | 扩展事实、关键回合、移动射击观察和质量信息 |
+| GET /analyses/:analysis_id/ai | 读取已生成的 AI 教练解读；未配置时返回 not_configured |
+| POST /analyses/:analysis_id/ai | 从已就绪的基础报告生成 AI 教练解读；当前同步调用 |
 | DELETE /analyses/:analysis_id | 删除非运行中的分析及结果 |
 | DELETE /analysis-packages/:package_id | 删除包及其全部分析；存在运行任务返回 409 |
 
@@ -49,13 +51,15 @@ node --test tests/replay.test.js
 
 任务终态为 completed / partial / failed，partial 表示已有可读报告，不能继续无限轮询。未知进度为 null；已保存为 100。报告与任务始终保持 match/package/player/analysis 标签一致。当前样例有未计算模块，所以报告为 partial。
 
+AI 教练解读是独立于基础报告的可选步骤。未配置 `DEEPSEEK_API_KEY` 时，`POST /analyses/:analysis_id/ai` 返回 `50300`，基础报告、证据和历史查询不受影响。
+
 相同用户、Idempotency-Key 和请求体（含 match_id）复用原任务；同键不同请求返回 409。新键创建独立分析并保留历史。相同 package_id 与相同内容复用上传结果；同编号不同内容返回 409。不同 ZIP 压缩形式但文件内容及 manifest 相同也复用。明确删除资源后，其幂等记录也删除。重新分析失败时，比赛列表仍保留先前可用报告入口。
 
 旧 /demos 路由作为已有客户端的兼容接口保留，仅访问旧任务，不与新协议任务混用；新复盘页面使用上表接口。
 
 ## 正式报告
 
-report.schema.json 的顶层包含 report_schema_version、四个身份标签、status、match、perspective、is_fixture、uploaded_at、analyzed_at、versions、report。report 内为 modules、scores、findings、training_suggestions、ai_status、warnings。默认 scores={}，训练建议为空，ai_status=not_configured，不调用 LLM。生成报告时再次执行正式 Schema 校验。
+report.schema.json 的顶层包含 report_schema_version、四个身份标签、status、match、perspective、is_fixture、uploaded_at、analyzed_at、versions、report。report 内为 modules、scores、findings、training_suggestions、ai_status、warnings。规则报告默认 scores={}、训练建议为空、ai_status=not_configured；基础报告不依赖 LLM。AI 教练解读单独保存在 `ai-report.json`，不修改标准报告。生成报告时再次执行正式 Schema 校验。
 
 交接包 Evidence 响应仍固定为旧版结构，所以默认接口剔除顶层新增事件时间字段，地图只投影已归属轨迹，并标明 schema_version=1.0.0。原始数据保留在 version=1.1 接口，未知归属轨迹不会被当成目标玩家投掷。前端后续升级时使用详细接口。
 
@@ -66,7 +70,7 @@ report.schema.json 的顶层包含 report_schema_version、四个身份标签、
 - `key_rounds`：根据记录中的首个击杀、多杀和规则命中筛选回合。录制缺失时首个观察事件不证明整回合完整，需同时展示 data_quality。
 - `movement`：枪械开火 tick 对应精确关键帧的水平速度统计和跳跃状态；不插值、不以 0.5 秒采样估算反应时间、不输出急停评分。
 - `map`：地图元信息、采样规则和各类记录数；具体点位由分页接口提供。未知归属轨迹保留为上下文，不归给目标玩家。
-- `ai_status: not_requested`：没有调用外部模型。以后可在规则报告上单独生成 AI 解读，不改变当前报告可用性。
+- `ai_status: not_requested`：规则报告本身没有调用外部模型。可通过独立 AI 接口生成教练解读，不改变基础报告可用性。
 
 死亡状态来自 death_context，闪光来自 blind，不将 flash_effect 等重复证据再加一遍。规则命中只是回看候选，不声称操作失误或因果关系。报告最多保留 1,000 个发现；回合原始事件保留以便核查。
 
@@ -89,6 +93,28 @@ report.schema.json 的顶层包含 report_schema_version、四个身份标签、
 - 默认存储在 backend/data/replays，可用 REPLAY_DIR 设置绝对路径；DB_PATH 可设置数据库位置。停止服务后备份数据库和复盘目录，或使用支持 WAL 的 SQLite 备份机制。
 - 本机样例初测规则/轨迹处理约 0.8–0.9 秒、分析进程峰值 RSS 约 110 MiB；最终耗时包含证据落盘，见测试日志。这不是目标云服务器压测。部署前测试同时上传、查询和上限大小包，测 RSS、CPU、磁盘及 API 延迟。
 
-## 后续接入 DeepSeek 等 API
+## 可选 AI 教练分析（已接入）
 
-独立增加 commentary 服务，从已保存报告中选取事实、少量关键证据、数据质量与训练项目。模型 API Key 只保存在后端环境变量。配置供应商、model、超时、输入输出限额，结构化响应须验证事件引用与数值；按报告内容、模型和提示词版本缓存。调用失败时只更新 AI 状态，不把基础报告变成失败。当前没有模型调用、计费或密钥配置要求。
+接口：
+
+- `GET /api/v1/analyses/:analysis_id/ai`
+- `POST /api/v1/analyses/:analysis_id/ai`
+
+后端会从已保存的扩展报告中抽取精简事实：模块指标、findings、key rounds、movement 摘要、data_quality 和 limitations；不会把完整地图或原始 ZIP 发给模型。
+
+模型服务使用 OpenAI-compatible 协议，服务器环境变量：
+
+```env
+DEEPSEEK_API_KEY=
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-chat
+AI_TIMEOUT_MS=60000
+AI_MAX_TOKENS=2000
+AI_PROMPT_VERSION=coach-1.0.0
+```
+
+- `DEEPSEEK_API_KEY` 留空时，AI 接口返回 `50300`，后端仍可正常启动。
+- 返回必须是严格 JSON，并校验 `evidence_ids` 必须存在于报告中；未知证据返回 `50200`。
+- 结果保存为分析目录下的 `ai-report.json`。
+- 当前是同步调用；AI 失败不影响规则报告。
+- 云端部署时只在服务器 `.env` 配置密钥，不能写入前端或提交到 Git。

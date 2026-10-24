@@ -781,7 +781,84 @@ See [full API and operational guide](../backend/REPLAY.md) and the original
 also describes local-parser endpoints; those run in the local parser, not this cloud server.
 Old /demos endpoints remain for legacy clients only.
 
-## 8. Error Codes
+## 8. AI Coaching (optional)
+
+AI coaching reads an already-ready rule report and calls an OpenAI-compatible
+provider. It never receives the full map, raw events or the original ZIP. The
+base report remains available if AI is disabled or fails.
+
+All AI endpoints require authentication and an analysis whose base report is
+ready.
+
+### GET /api/v1/analyses/{analysisId}/ai
+
+Returns an existing AI result, or a status object:
+
+```json
+{
+  "ai_status": "not_configured",
+  "analysis_id": "analysis-example",
+  "model": "deepseek-chat"
+}
+```
+
+`ai_status` may be `completed`, `not_generated` or `not_configured`.
+
+### POST /api/v1/analyses/{analysisId}/ai
+
+Generates AI coaching synchronously and stores `ai-report.json` in the private
+analysis directory.
+
+Server-only configuration:
+
+```env
+DEEPSEEK_API_KEY=
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-chat
+AI_TIMEOUT_MS=60000
+AI_MAX_TOKENS=2000
+AI_PROMPT_VERSION=coach-1.0.0
+```
+
+If `DEEPSEEK_API_KEY` is empty, the endpoint returns `50300` and makes no
+network call.
+
+Response `data` shape:
+
+```json
+{
+  "ai_status": "completed",
+  "analysis_id": "analysis-example",
+  "model": "deepseek-chat",
+  "prompt_version": "coach-1.0.0",
+  "generated_at": "2026-10-24T12:00:00.000Z",
+  "summary": "本场主要提升点是道具使用时机和闪光弹安全性。",
+  "improvement_areas": [
+    {
+      "priority": "high",
+      "category": "utility",
+      "title": "死亡时未使用道具偏多",
+      "evidence_ids": ["death_17", "death_42"],
+      "explanation": "多次死亡时仍携带可用道具。",
+      "training": ["交火前先规划道具用途。"]
+    }
+  ],
+  "strengths": [],
+  "data_limitations": ["烟雾弹和燃烧弹缺少投掷者归属。"]
+}
+```
+
+Errors:
+
+| Code | HTTP | When |
+|---:|---:|---|
+| 40002 | 401 | Missing / invalid token |
+| 40400 | 404 | Analysis not found or not owned by caller |
+| 40900 | 409 | Base report is not ready |
+| 50200 | 502 | Provider error, timeout, invalid JSON or unknown evidence ID |
+| 50300 | 503 | `DEEPSEEK_API_KEY` is not configured |
+
+## 9. Error Codes
 
 | Code | HTTP | Description |
 |---:|---:|---|
@@ -794,8 +871,10 @@ Old /demos endpoints remain for legacy clients only.
 | 40900 | 409 | Resource conflict |
 | 41300 | 413 | File too large |
 | 50000 | 500 | Internal server error |
+| 50200 | 502 | AI provider error, invalid AI JSON or unknown evidence ID |
+| 50300 | 503 | AI analysis is not configured |
 
-## 9. Changelog
+## 10. Changelog
 
 | Version | Date | Author | Description |
 |---|---|---|---|
@@ -805,3 +884,4 @@ Old /demos endpoints remain for legacy clients only.
 | v1.3 | 2026-10-22 | CS Demo Master Team | Reworked the lobby hall into a team-code sharing board (TASKS.md 4.5): declared roster, virtual claims, code privacy, owner deletion and TTL cleanup; no chat |
 | v1.4 | 2026-10-23 | CS Demo Master Team | Added owner depart (发车) and claimant kick: departed posts are owner-only and stop claims; kicked users are removed from claimants and cannot re-claim |
 | v1.5 | 2026-10-23 | CS Demo Master Team | Added mutual friend requests, accept/reject/cancel, private friend list, remove friend, and authenticated user search with relationship states |
+| v1.6 | 2026-10-24 | CS Demo Master Team | Added optional AI coaching endpoints backed by a server-side DeepSeek/OpenAI-compatible provider; disabled without `DEEPSEEK_API_KEY` |
