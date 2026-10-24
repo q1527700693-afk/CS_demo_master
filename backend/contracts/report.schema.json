@@ -1,0 +1,295 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "report_schema_version": {
+      "const": "1.0.0"
+    },
+    "match_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+    },
+    "package_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+    },
+    "analysis_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+    },
+    "target_player_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "partial"
+      ]
+    },
+    "match": {
+      "type": "object",
+      "properties": {
+        "started_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "started_at_source": {
+          "enum": [
+            "demo",
+            "platform",
+            "user_input",
+            "unknown"
+          ]
+        },
+        "map": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "tick_rate": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "teams": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "team_id": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "score": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              }
+            },
+            "required": [
+              "team_id",
+              "name",
+              "score"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 200000
+        }
+      },
+      "required": [
+        "started_at",
+        "started_at_source",
+        "map",
+        "tick_rate",
+        "complete",
+        "teams"
+      ],
+      "additionalProperties": false
+    },
+    "perspective": {
+      "type": "object",
+      "properties": {
+        "player_team_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "player_team_id"
+      ],
+      "additionalProperties": false
+    },
+    "is_fixture": {
+      "type": "boolean"
+    },
+    "uploaded_at": {
+      "type": "string"
+    },
+    "analyzed_at": {
+      "type": "string"
+    },
+    "versions": {
+      "type": "object",
+      "properties": {
+        "evaluation": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "evaluation",
+        "prompt"
+      ],
+      "additionalProperties": false
+    },
+    "report": {
+      "type": "object",
+      "properties": {
+        "modules": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 32,
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "module_version": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "status": {
+                "enum": [
+                  "completed",
+                  "partial",
+                  "not_computed",
+                  "insufficient_data",
+                  "failed"
+                ]
+              },
+              "reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sample_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "metrics": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": true
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+                },
+                "maxItems": 200000
+              },
+              "evaluation_status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "module_version",
+              "status",
+              "reason",
+              "sample_count",
+              "metrics",
+              "evidence_ids"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "scores": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "finding_id": {
+                "type": "string"
+              },
+              "module": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "package_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "finding_id",
+              "module",
+              "description",
+              "evidence_ids",
+              "package_id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "training_suggestions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ai_status": {
+          "enum": [
+            "completed",
+            "not_configured",
+            "failed"
+          ]
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "modules",
+        "scores",
+        "findings",
+        "training_suggestions",
+        "ai_status",
+        "warnings"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "report_schema_version",
+    "match_id",
+    "package_id",
+    "analysis_id",
+    "target_player_id",
+    "status",
+    "match",
+    "perspective",
+    "is_fixture",
+    "uploaded_at",
+    "analyzed_at",
+    "versions",
+    "report"
+  ],
+  "additionalProperties": false
+}
