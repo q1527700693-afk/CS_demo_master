@@ -1,0 +1,1039 @@
+<script setup lang="ts">
+import { computed, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import AsyncState from '@/components/AsyncState.vue'
+import { errorMessage } from '@/api/http'
+import { useAuthStore } from '@/stores/auth'
+import { mockModules } from '@/app/config'
+import {
+  cachedReport,
+  downloadReport,
+  getReportEvents,
+  getHistory,
+  getReportDetails,
+  startAnalysis,
+} from './analysis-api'
+import type { AnalysisReport, AnalysisRun, ReplayDetails, ReplayEvent } from './contracts'
+import {
+  assertDetailsIdentity,
+  describeEvent,
+  eventLabels,
+  metricLabels,
+  moduleLabels,
+  numberText,
+  reasonLabels,
+  roundRows,
+  secondsText,
+  statusLabels,
+} from './report-data'
+import ReportChart from './ReportChart.vue'
+import RoundMap from './RoundMap.vue'
+
+const route = useRoute(),
+  router = useRouter(),
+  auth = useAuthStore()
+const report = ref<AnalysisReport | null>(null),
+  details = ref<ReplayDetails | null>(null)
+const loading = ref(true),
+  error = ref(''),
+  detailsError = ref(''),
+  evidenceError = ref(''),
+  historyError = ref('')
+const downloaded = ref<number | null>(null),
+  retrying = ref(false),
+  actionError = ref('')
+const evidence = ref<Awaited<ReturnType<typeof getReportEvents>> | null>(null),
+  history = ref<AnalysisRun[]>([])
+const selectedRound = ref(1),
+  eventRound = ref('all'),
+  eventType = ref('all'),
+  search = ref(''),
+  eventPage = ref(1)
+const focusedEvent = ref<string | null>(null)
+let generation = 0
+const basic = computed(() => report.value?.report.modules.basic_stats?.metrics)
+const rows = computed(() => (details.value ? roundRows(details.value) : []))
+const weapons = computed(() =>
+  [...(details.value?.statistics.tables?.by_weapon || [])].sort(
+    (a, b) => (b.kills ?? -1) - (a.kills ?? -1),
+  ),
+)
+const allEvents = computed(() => (evidence.value?.events || []) as ReplayEvent[])
+const eventTypes = computed(() => [...new Set(allEvents.value.map((e) => e.type))].sort())
+const filteredEvents = computed(() =>
+  allEvents.value
+    .filter(
+      (e) =>
+        (eventRound.value === 'all' || String(e.round_num) === eventRound.value) &&
+        (eventType.value === 'all' || e.type === eventType.value) &&
+        (!search.value.trim() ||
+          `${e.event_id} ${describeEvent(e)}`
+            .toLowerCase()
+            .includes(search.value.trim().toLowerCase())),
+    )
+    .sort((a, b) => a.tick - b.tick),
+)
+const eventPages = computed(() => Math.max(1, Math.ceil(filteredEvents.value.length / 20)))
+const visibleEvents = computed(() =>
+  filteredEvents.value.slice((eventPage.value - 1) * 20, eventPage.value * 20),
+)
+const focused = computed(() => allEvents.value.find((e) => e.event_id === focusedEvent.value))
+watch([eventRound, eventType, search], () => (eventPage.value = 1))
+const metricCards = computed(() => [
+  {
+    label: '击杀 / 死亡 / 助攻',
+    value: [basic.value?.kills, basic.value?.deaths, basic.value?.assists]
+      .map((v) => numberText(v, 0))
+      .join(' / '),
+    note: '本地解析统计',
+  },
+  { label: 'ADR', value: numberText(basic.value?.adr), note: '平均每回合伤害' },
+  {
+    label: 'KAST',
+    value: basic.value?.kast_pct == null ? '未知' : `${numberText(basic.value.kast_pct)}%`,
+    note: '有贡献回合占比',
+  },
+  {
+    label: '爆头率',
+    value: basic.value?.headshot_pct == null ? '未知' : `${numberText(basic.value.headshot_pct)}%`,
+    note: '爆头击杀占比',
+  },
+])
+const chartBase = {
+  backgroundColor: 'transparent',
+  color: ['#ed9a60', '#90bcac', '#8caecb'],
+  textStyle: { color: '#93989e' },
+  tooltip: { trigger: 'axis', renderMode: 'richText' },
+  legend: { top: 0, textStyle: { color: '#afb6bc' } },
+  grid: { left: 48, right: 45, top: 42, bottom: 45 },
+  xAxis: {
+    type: 'category',
+    data: [] as number[],
+    axisLine: { lineStyle: { color: '#3b4248' } },
+    axisTick: { show: false },
+  },
+}
+const performanceChart = computed(() => ({
+  ...chartBase,
+  xAxis: { ...chartBase.xAxis, data: rows.value.map((r) => r.round_num) },
+  yAxis: [
+    { type: 'value', name: '次数', minInterval: 1, splitLine: { lineStyle: { color: '#292f34' } } },
+    { type: 'value', name: '原始伤害', splitLine: { show: false } },
+  ],
+  series: [
+    {
+      name: '击杀',
+      type: 'bar',
+      data: rows.value.map((r) => r.stats.kills ?? null),
+      barMaxWidth: 16,
+    },
+    {
+      name: '死亡',
+      type: 'bar',
+      data: rows.value.map((r) => r.stats.deaths ?? null),
+      barMaxWidth: 16,
+    },
+    {
+      name: '原始生命伤害',
+      type: 'line',
+      yAxisIndex: 1,
+      data: rows.value.map((r) => r.stats.raw_health_damage_dealt ?? null),
+      connectNulls: false,
+      symbolSize: 5,
+    },
+  ],
+}))
+const economyChart = computed(() => ({
+  ...chartBase,
+  xAxis: { ...chartBase.xAxis, data: rows.value.map((r) => r.round_num) },
+  yAxis: { type: 'value', name: '装备价值 $', splitLine: { lineStyle: { color: '#292f34' } } },
+  series: [
+    {
+      name: '我方',
+      type: 'line',
+      data: rows.value.map((r) => r.ownEconomy),
+      connectNulls: false,
+      symbolSize: 4,
+    },
+    {
+      name: '对方',
+      type: 'line',
+      data: rows.value.map((r) => r.enemyEconomy),
+      connectNulls: false,
+      symbolSize: 4,
+      lineStyle: { type: 'dashed' },
+    },
+  ],
+}))
+const warningText = computed(() => report.value?.report.warnings || [])
+const scoreText = computed(
+  () =>
+    report.value?.match.teams.map((t) => `${t.name} ${t.score ?? '未知'}`).join(' : ') ||
+    '比分未知',
+)
+const keyRound = computed(() =>
+  details.value?.key_rounds.find((r) => r.round_num === selectedRound.value),
+)
+const keyRoundText = computed(() =>
+  keyRound.value?.reasons.map((reason) => reasonLabels[reason] || reason).join(' / '),
+)
+
+async function load() {
+  const current = ++generation,
+    id = String(route.params.id)
+  loading.value = true
+  error.value = ''
+  detailsError.value = ''
+  evidenceError.value = ''
+  historyError.value = ''
+  report.value = null
+  details.value = null
+  evidence.value = null
+  history.value = []
+  focusedEvent.value = null
+  eventRound.value = 'all'
+  eventType.value = 'all'
+  search.value = ''
+  downloaded.value = null
+  try {
+    const value =
+      cachedReport(id) ||
+      (await downloadReport(id, (n) => {
+        if (current === generation) downloaded.value = n
+      }))
+    if (current !== generation) return
+    report.value = value
+    const results = await Promise.allSettled([
+      getReportEvents(value.package_id),
+      getHistory(value.match_id),
+      mockModules.replay ? Promise.resolve(null) : getReportDetails(id),
+    ])
+    if (current !== generation) return
+    if (
+      results[0].status === 'fulfilled' &&
+      results[0].value.match_id === value.match_id &&
+      results[0].value.package_id === value.package_id
+    )
+      evidence.value = results[0].value
+    else if (results[0].status === 'fulfilled') evidenceError.value = '事件证据与当前报告身份不一致'
+    else evidenceError.value = errorMessage(results[0].reason)
+    if (results[1].status === 'fulfilled') history.value = results[1].value.items
+    else historyError.value = errorMessage(results[1].reason)
+    if (results[2].status === 'fulfilled' && results[2].value) {
+      try {
+        assertDetailsIdentity(results[2].value, value)
+        details.value = results[2].value
+        selectedRound.value = rows.value[0]?.round_num ?? 1
+      } catch (e) {
+        detailsError.value = errorMessage(e)
+      }
+    } else if (results[2].status === 'rejected')
+      detailsError.value = errorMessage(results[2].reason)
+  } catch (e) {
+    if (current === generation) error.value = errorMessage(e)
+  } finally {
+    if (current === generation) loading.value = false
+  }
+}
+function selectRound(round: number) {
+  if (rows.value.some((r) => r.round_num === round)) selectedRound.value = round
+}
+function showEvidence(ids: string[]) {
+  const event = allEvents.value.find((e) => ids.includes(e.event_id))
+  if (!event) {
+    actionError.value = '此条依据暂未读取，请重试证据加载'
+    return
+  }
+  eventRound.value = 'all'
+  eventType.value = 'all'
+  search.value = event.event_id
+  focusedEvent.value = event.event_id
+  document.getElementById('report-events')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+async function reanalyze() {
+  if (!report.value) return
+  retrying.value = true
+  actionError.value = ''
+  try {
+    const run = await startAnalysis(report.value, crypto.randomUUID())
+    sessionStorage.setItem(`csdm.pending-analysis.${auth.user?.id || 'guest'}`, run.analysis_id)
+    await router.push('/replays/new?view=cloud')
+  } catch (e) {
+    actionError.value = errorMessage(e)
+  } finally {
+    retrying.value = false
+  }
+}
+function exportReport() {
+  if (!report.value) return
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify({ report: report.value, details: details.value }, null, 2)], {
+      type: 'application/json',
+    }),
+  )
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `replay-${report.value.analysis_id}.json`
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+watch(() => [route.params.id, auth.user?.id], load, { immediate: true })
+onUnmounted(() => generation++)
+</script>
+<template>
+  <p v-if="loading" class="muted" role="status">
+    正在读取报告{{ downloaded === null ? '…' : ` ${downloaded}%` }}
+  </p>
+  <AsyncState :loading="loading" :error="error" @retry="load"
+    ><template v-if="report">
+      <p v-if="mockModules.replay" class="sample-caption">
+        前端合成演示报告 · 等待后端组接入真实分析接口
+      </p>
+      <section class="page-heading report-heading">
+        <div>
+          <RouterLink to="/replays" class="text-link">← 我的复盘</RouterLink>
+          <div class="eyebrow">MATCH REPORT / {{ report.match.map }}</div>
+          <h1>{{ report.match.map }} <span class="orange">/</span> 复盘报告</h1>
+          <p>
+            {{ details?.target_player?.name || report.target_player_id }} ·
+            {{
+              report.match.started_at
+                ? new Date(report.match.started_at).toLocaleString('zh-CN')
+                : '比赛时间未知'
+            }}
+          </p>
+        </div>
+        <button class="button secondary" @click="exportReport">导出报告 JSON</button>
+      </section>
+      <section class="panel match-overview">
+        <div>
+          <span class="status-pill" :data-status="report.status">{{
+            statusLabels[report.status] || report.status
+          }}</span>
+          <h2>{{ scoreText }}</h2>
+          <p class="muted">
+            {{ report.match.complete ? '完整比赛' : '完整性未确认 · 仅展示已记录回合' }} ·
+            {{ rows.length || '未知' }} 回合
+          </p>
+        </div>
+        <div class="report-meta">
+          <span>上传 {{ new Date(report.uploaded_at).toLocaleString('zh-CN') }}</span
+          ><span>分析 {{ new Date(report.analyzed_at).toLocaleString('zh-CN') }}</span>
+        </div>
+      </section>
+      <div class="metric-cards">
+        <article v-for="card in metricCards" :key="card.label" class="panel metric-card">
+          <span class="muted">{{ card.label }}</span
+          ><strong>{{ card.value }}</strong
+          ><small class="muted">{{ card.note }}</small>
+        </article>
+      </div>
+      <nav class="report-navigation" aria-label="报告内容">
+        <a href="#report-performance">回合表现</a><a href="#report-map">位置与轨迹</a
+        ><a href="#report-findings">回看候选</a><a href="#report-events">事件证据</a
+        ><a href="#report-modules">全部指标</a>
+      </nav>
+      <details class="panel quality-notes">
+        <summary>数据说明与计算范围（{{ warningText.length }}）</summary>
+        <p class="muted">
+          综合 Rating 尚未启用；未知指标保留为空。规则命中表示值得回看，不代表失误或因果关系。
+        </p>
+        <p v-for="warning in warningText" :key="warning" class="muted small-text">{{ warning }}</p>
+        <p class="muted small-text">
+          目标 SteamID：{{ report.target_player_id }} · 规则版本：{{ report.versions.evaluation }}
+        </p>
+      </details>
+      <div v-if="detailsError" role="alert" class="panel error-text">
+        扩展数据读取失败：{{ detailsError }}
+        <button class="button secondary compact" @click="load">重新读取</button>
+      </div>
+      <template v-if="details">
+        <section id="report-performance" class="report-section">
+          <div class="section-title">
+            <div>
+              <div class="eyebrow">ROUND BY ROUND</div>
+              <h2>回合表现与经济</h2>
+            </div>
+            <span class="muted small-text">点击图表回合可切换地图</span>
+          </div>
+          <div class="chart-grid">
+            <article class="panel">
+              <h3>逐回合表现</h3>
+              <p class="muted small-text">伤害为解析器原始生命伤害合计，可能包含过量伤害。</p>
+              <ReportChart
+                :option="performanceChart"
+                label="每回合击杀、死亡及原始生命伤害图"
+                @select="selectRound"
+              />
+            </article>
+            <article class="panel">
+              <h3>双方装备价值</h3>
+              <p class="muted small-text">按目标玩家每回合阵营区分我方与对方；未知值留空。</p>
+              <ReportChart
+                :option="economyChart"
+                label="双方每回合装备价值折线图"
+                @select="selectRound"
+              />
+            </article>
+          </div>
+          <div class="panel">
+            <div class="panel-heading">
+              <h3>逐回合统计表</h3>
+              <span class="muted small-text">点击回合查看坐标图</span>
+            </div>
+            <div class="table-scroll">
+              <table class="replay-table" data-testid="round-table">
+                <thead>
+                  <tr>
+                    <th>回合</th>
+                    <th>结果</th>
+                    <th>击杀</th>
+                    <th>死亡</th>
+                    <th>助攻</th>
+                    <th>原始伤害</th>
+                    <th>受到伤害</th>
+                    <th>我方装备 $</th>
+                    <th>对方装备 $</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="r in rows"
+                    :key="r.round_num"
+                    :class="{ 'selected-row': selectedRound === r.round_num }"
+                  >
+                    <td>
+                      <button
+                        class="round-link"
+                        :aria-pressed="selectedRound === r.round_num"
+                        @click="selectRound(r.round_num)"
+                      >
+                        第 {{ r.round_num }} 回合
+                      </button>
+                    </td>
+                    <td :class="r.outcome === '胜' ? 'positive' : 'muted'">{{ r.outcome }}</td>
+                    <td>{{ numberText(r.stats.kills, 0) }}</td>
+                    <td>{{ numberText(r.stats.deaths, 0) }}</td>
+                    <td>{{ numberText(r.stats.assists, 0) }}</td>
+                    <td>{{ numberText(r.stats.raw_health_damage_dealt, 0) }}</td>
+                    <td>{{ numberText(r.stats.raw_health_damage_received, 0) }}</td>
+                    <td>{{ numberText(r.ownEconomy, 0) }}</td>
+                    <td>{{ numberText(r.enemyEconomy, 0) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="section-title">
+            <h2>武器统计</h2>
+            <span class="muted small-text">按击杀数排序</span>
+          </div>
+          <div class="table-scroll">
+            <table class="replay-table" data-testid="weapon-table">
+              <thead>
+                <tr>
+                  <th>武器</th>
+                  <th>开火事件</th>
+                  <th>击杀</th>
+                  <th>被该武器击杀</th>
+                  <th>原始伤害</th>
+                  <th>受到该武器伤害</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="weapon in weapons" :key="weapon.weapon">
+                  <td>{{ weapon.weapon }}</td>
+                  <td>{{ numberText(weapon.shots, 0) }}</td>
+                  <td>{{ numberText(weapon.kills, 0) }}</td>
+                  <td>{{ numberText(weapon.deaths, 0) }}</td>
+                  <td>{{ numberText(weapon.raw_health_damage_dealt, 0) }}</td>
+                  <td>{{ numberText(weapon.raw_health_damage_received, 0) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="muted small-text">
+            开火事件可能包含刀具或道具，不用作命中率分母；伤害合计沿用原始记录口径。
+          </p>
+        </section>
+        <section id="report-map" class="panel">
+          <div class="panel-heading">
+            <div>
+              <div class="eyebrow">SPATIAL REVIEW</div>
+              <h2>道具轨迹坐标图</h2>
+            </div>
+            <label class="round-selector"
+              >选择回合<select v-model.number="selectedRound" aria-label="地图回合">
+                <option v-for="r in rows" :key="r.round_num" :value="r.round_num">
+                  第 {{ r.round_num }} 回合
+                </option>
+              </select></label
+            >
+          </div>
+          <p v-if="keyRound" class="key-round-label">关键回合 · {{ keyRoundText }}</p>
+          <RoundMap :analysis-id="report.analysis_id" :round="selectedRound" />
+        </section>
+        <section class="panel movement-panel">
+          <h2>开火时移动状态</h2>
+          <div class="movement-stats">
+            <div>
+              <span>精确开火 tick 样本</span
+              ><strong
+                >{{ details.movement.measured_fire_ticks }} /
+                {{ details.movement.eligible_fire_ticks }}</strong
+              >
+            </div>
+            <div>
+              <span>平均水平速度</span
+              ><strong
+                >{{ numberText(details.movement.mean_horizontal_speed) }}
+                <small>单位/秒</small></strong
+              >
+            </div>
+            <div>
+              <span>最大水平速度</span
+              ><strong
+                >{{ numberText(details.movement.max_horizontal_speed) }}
+                <small>单位/秒</small></strong
+              >
+            </div>
+            <div>
+              <span>跳跃开火 tick</span><strong>{{ details.movement.jumping_fire_ticks }}</strong>
+            </div>
+          </div>
+          <p class="muted small-text">
+            {{ details.movement.interpretation }} 这些观察不用于计算急停或反应时间评分。
+          </p>
+        </section>
+      </template>
+      <section v-else-if="mockModules.replay" class="panel">
+        <h2>道具轨迹坐标图</h2>
+        <p class="muted">演示模式未提供详细位置数据。</p>
+      </section>
+      <section id="report-findings" class="panel">
+        <div class="section-title">
+          <div>
+            <div class="eyebrow">REVIEW CANDIDATES</div>
+            <h2>回看候选与依据</h2>
+          </div>
+          <span class="status-pill">{{ report.report.findings.length }} 条</span>
+        </div>
+        <p class="muted small-text">结合当时局势判断，下列观察不直接代表操作失误。</p>
+        <p v-if="!report.report.findings.length" class="muted">没有可展示的规则发现。</p>
+        <div class="finding-list">
+          <article
+            v-for="finding in report.report.findings"
+            :key="finding.finding_id"
+            class="finding-row"
+          >
+            <span class="finding-module">{{ moduleLabels[finding.module] || finding.module }}</span>
+            <p>{{ finding.description }}</p>
+            <button
+              class="button secondary compact"
+              :disabled="!evidence || !finding.evidence_ids.length"
+              @click="showEvidence(finding.evidence_ids)"
+            >
+              查看依据
+            </button>
+          </article>
+        </div>
+        <p v-if="actionError" class="error-text" role="alert">{{ actionError }}</p>
+      </section>
+      <section id="report-events" class="panel">
+        <div class="section-title">
+          <div>
+            <div class="eyebrow">EVENT EXPLORER</div>
+            <h2>关键事件与依据</h2>
+          </div>
+          <span class="muted small-text"
+            >{{ filteredEvents.length }} / {{ allEvents.length }} 条</span
+          >
+        </div>
+        <p v-if="evidenceError" class="error-text" role="alert">
+          {{ evidenceError }}
+          <button class="button secondary compact" @click="load">重试证据</button>
+        </p>
+        <div class="event-filters">
+          <label
+            >回合<select v-model="eventRound" aria-label="事件回合">
+              <option value="all">全部回合</option>
+              <option
+                v-for="r in [...new Set(allEvents.map((e) => e.round_num))].sort(
+                  (a, b) => (a ?? 0) - (b ?? 0),
+                )"
+                :key="String(r)"
+                :value="String(r)"
+              >
+                {{ r === null ? '回合未知' : `第 ${r} 回合` }}
+              </option>
+            </select></label
+          ><label
+            >事件类型<select v-model="eventType" aria-label="事件类型">
+              <option value="all">全部类型</option>
+              <option v-for="type in eventTypes" :key="type" :value="type">
+                {{ eventLabels[type] || type }}
+              </option>
+            </select></label
+          ><label class="event-search"
+            >搜索<input v-model="search" aria-label="搜索事件" placeholder="玩家、武器或事件编号"
+          /></label>
+        </div>
+        <div class="table-scroll">
+          <table class="replay-table" data-testid="event-table">
+            <thead>
+              <tr>
+                <th>回合</th>
+                <th>类型</th>
+                <th>时间 / tick</th>
+                <th>事件</th>
+                <th>依据</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="event in visibleEvents"
+                :key="event.event_id"
+                :class="{ 'selected-row': focusedEvent === event.event_id }"
+              >
+                <td>{{ event.round_num ?? '未知' }}</td>
+                <td>{{ eventLabels[event.type] || event.type }}</td>
+                <td>
+                  {{ secondsText(event.live_elapsed_seconds)
+                  }}<small class="muted">tick {{ event.tick }}</small>
+                </td>
+                <td>{{ describeEvent(event) }}</td>
+                <td>
+                  <button
+                    class="round-link"
+                    @click="focusedEvent = focusedEvent === event.event_id ? null : event.event_id"
+                  >
+                    详情
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="!visibleEvents.length">
+                <td colspan="5" class="muted">没有符合筛选条件的事件。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <button class="button secondary compact" :disabled="eventPage <= 1" @click="eventPage--">
+            上一页</button
+          ><span>第 {{ eventPage }} / {{ eventPages }} 页</span
+          ><button
+            class="button secondary compact"
+            :disabled="eventPage >= eventPages"
+            @click="eventPage++"
+          >
+            下一页
+          </button>
+        </div>
+        <article v-if="focused" class="evidence-detail" data-testid="evidence-detail">
+          <h3>{{ eventLabels[focused.type] || focused.type }} · {{ focused.event_id }}</h3>
+          <p>{{ describeEvent(focused) }}</p>
+          <details>
+            <summary>查看原始证据字段</summary>
+            <pre>{{ JSON.stringify(focused.data, null, 2) }}</pre>
+          </details>
+        </article>
+      </section>
+      <section id="report-modules" class="report-section">
+        <div class="section-title">
+          <div>
+            <div class="eyebrow">METRICS & COVERAGE</div>
+            <h2>全部分析指标</h2>
+          </div>
+          <span class="muted small-text">保留未知值及计算状态</span>
+        </div>
+        <div class="module-grid">
+          <section v-for="(module, id) in report.report.modules" :key="id" class="panel">
+            <div class="panel-heading">
+              <h3>{{ moduleLabels[id] || id }}</h3>
+              <span class="status-pill" :data-status="module.status">{{
+                statusLabels[module.status] || module.status
+              }}</span>
+            </div>
+            <p v-if="module.reason" class="muted small-text">{{ module.reason }}</p>
+            <dl v-if="module.metrics">
+              <div v-for="(value, key) in module.metrics" :key="key">
+                <dt>{{ metricLabels[key] || key }}</dt>
+                <dd>{{ numberText(value) }}</dd>
+              </div>
+            </dl>
+            <small class="muted"
+              >算法 {{ module.module_version }} · 有效样本 {{ module.sample_count }}</small
+            >
+          </section>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>训练建议</h2>
+        <p v-if="!report.report.training_suggestions.length" class="muted">
+          暂未生成 AI 训练建议，可先结合上面的事件复看。
+        </p>
+        <p v-for="text in report.report.training_suggestions" :key="text">{{ text }}</p>
+        <RouterLink to="/training" class="text-link">前往训练大厅</RouterLink>
+      </section>
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>历次分析</h2>
+          <button class="button secondary" :disabled="retrying" @click="reanalyze">
+            重新进行云端分析
+          </button>
+        </div>
+        <p v-if="historyError" class="error-text" role="alert">{{ historyError }}</p>
+        <div class="history-list">
+          <div v-for="run in history" :key="run.analysis_id">
+            <span class="muted">{{
+              run.created_at ? new Date(run.created_at).toLocaleString('zh-CN') : '时间未知'
+            }}</span
+            ><RouterLink
+              v-if="run.report_available"
+              :to="`/replays/${run.analysis_id}`"
+              class="text-link"
+              >{{ statusLabels[run.status] || run.status }} ·
+              {{ run.analysis_id === report.analysis_id ? '当前报告' : '查看报告' }}</RouterLink
+            ><span v-else>{{ statusLabels[run.status] || run.status }} · {{ run.message }}</span>
+          </div>
+        </div>
+      </section>
+      <details class="panel small-text muted">
+        <summary>报告编号</summary>
+        <p>比赛 {{ report.match_id }}</p>
+        <p>分析包 {{ report.package_id }}</p>
+        <p>分析任务 {{ report.analysis_id }}</p>
+      </details>
+    </template></AsyncState
+  >
+</template>
+<style scoped>
+.panel {
+  padding: 24px;
+  margin-bottom: 20px;
+  min-width: 0;
+}
+.panel p {
+  overflow-wrap: anywhere;
+}
+.panel h2,
+.panel h3 {
+  line-height: 1.5;
+}
+.report-heading .eyebrow {
+  margin-top: 18px;
+}
+.report-heading h1 {
+  margin: 4px 0;
+}
+.match-overview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.match-overview h2 {
+  font-size: 24px;
+  margin: 10px 0 4px;
+}
+.report-meta {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.status-pill {
+  display: inline-flex;
+  padding: 5px 10px;
+  border: 1px solid #3c454a;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #abb7c1;
+  white-space: nowrap;
+}
+.status-pill[data-status='partial'] {
+  color: #edbd82;
+  border-color: #624c33;
+  background: #30271c;
+}
+.status-pill[data-status='completed'] {
+  color: var(--green);
+  border-color: #38594b;
+}
+.metric-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.metric-card {
+  display: grid;
+  gap: 10px;
+}
+.metric-card strong {
+  font-size: 29px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.report-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 4px 0 24px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.report-navigation a:hover {
+  color: var(--orange);
+}
+.quality-notes summary {
+  cursor: pointer;
+}
+.quality-notes p {
+  margin-top: 12px;
+}
+.report-section,
+section[id] {
+  scroll-margin-top: 24px;
+}
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.section-title .eyebrow {
+  margin-bottom: 6px;
+}
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.chart-grid .panel {
+  padding: 22px 18px 8px;
+}
+.panel-heading {
+  padding: 0 0 16px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.replay-table {
+  width: 100%;
+  white-space: nowrap;
+}
+.replay-table td {
+  font-variant-numeric: tabular-nums;
+}
+.replay-table td small {
+  display: block;
+  font-weight: 400;
+}
+.selected-row {
+  background: #2b2822;
+}
+.round-link {
+  border: 0;
+  background: transparent;
+  color: var(--orange);
+  padding: 6px 0;
+  text-align: left;
+  white-space: nowrap;
+}
+.round-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.round-selector select {
+  width: 145px;
+}
+.key-round-label {
+  margin-bottom: 14px;
+  color: var(--orange);
+  font-size: 13px;
+}
+.movement-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin: 22px 0;
+}
+.movement-stats > div {
+  display: grid;
+  gap: 12px;
+}
+.movement-stats span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.movement-stats strong {
+  font-size: 22px;
+  font-weight: 500;
+}
+.movement-stats small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.finding-row {
+  display: grid;
+  grid-template-columns: 90px 1fr auto;
+  gap: 16px;
+  align-items: start;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.finding-module {
+  font-size: 12px;
+  color: var(--orange);
+  padding-top: 5px;
+}
+.finding-row p {
+  font-size: 13px;
+}
+.finding-row:last-child {
+  border-bottom: 0;
+}
+.event-filters {
+  display: grid;
+  grid-template-columns: 150px 160px 1fr;
+  gap: 14px;
+  margin: 20px 0;
+}
+.event-filters label {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.event-filters input,
+.event-filters select {
+  padding: 10px;
+}
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+  margin-top: 18px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.evidence-detail {
+  padding: 18px;
+  margin-top: 18px;
+  background: #12171a;
+  border: 1px solid #36434b;
+  border-radius: 8px;
+}
+.evidence-detail details {
+  margin-top: 12px;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: #aebbbf;
+  max-height: 420px;
+  overflow: auto;
+}
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 20px;
+}
+dl {
+  margin: 12px 0 18px;
+}
+dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0;
+  font-size: 13px;
+}
+dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.history-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+@media (max-width: 1050px) {
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+  .metric-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 650px) {
+  .panel {
+    padding: 18px;
+  }
+  .match-overview,
+  .section-title {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .match-overview h2 {
+    font-size: 20px;
+  }
+  .metric-cards {
+    gap: 12px;
+  }
+  .metric-card strong {
+    font-size: 22px;
+  }
+  .report-navigation {
+    gap: 14px;
+  }
+  .module-grid {
+    grid-template-columns: 1fr;
+  }
+  .movement-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .finding-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .finding-row button {
+    justify-self: start;
+  }
+  .event-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+  .event-search {
+    grid-column: 1/-1;
+  }
+  .history-list > div {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .pagination {
+    justify-content: center;
+  }
+  .round-selector {
+    width: 100%;
+  }
+  .round-selector select {
+    flex: 1;
+  }
+}
+</style>

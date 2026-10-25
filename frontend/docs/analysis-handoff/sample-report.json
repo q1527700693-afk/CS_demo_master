@@ -1,0 +1,130 @@
+{
+  "report_schema_version": "1.0.0",
+  "match_id": "d7b330f6-b771-4e22-801e-f7bff85b551c",
+  "package_id": "d913b170-547b-4f54-b5dd-f945e36c85be",
+  "analysis_id": "sample-analysis-001",
+  "target_player_id": "76561198000000001",
+  "status": "partial",
+  "match": {
+    "started_at": null,
+    "started_at_source": "unknown",
+    "map": "de_mirage",
+    "tick_rate": 64,
+    "complete": true,
+    "teams": [
+      {
+        "team_id": "team_a",
+        "name": "队伍 1",
+        "score": 1
+      },
+      {
+        "team_id": "team_b",
+        "name": "队伍 2",
+        "score": 1
+      }
+    ]
+  },
+  "perspective": {
+    "player_team_id": "team_a"
+  },
+  "is_fixture": true,
+  "uploaded_at": "2026-10-23T05:49:24.965382+00:00",
+  "analyzed_at": "2026-10-23T05:49:24.965382+00:00",
+  "versions": {
+    "evaluation": "1.0.0",
+    "prompt": "1.0.0"
+  },
+  "report": {
+    "modules": {
+      "basic_stats": {
+        "module_version": "1.0.0",
+        "status": "completed",
+        "reason": null,
+        "sample_count": 2,
+        "metrics": {
+          "kills": 1,
+          "deaths": 1,
+          "assists": 0,
+          "adr": 50,
+          "kast_pct": 100,
+          "headshot_pct": 100,
+          "opening_kills": 1,
+          "opening_deaths": 1
+        },
+        "evidence_ids": []
+      },
+      "utility": {
+        "module_version": "1.0.0",
+        "status": "completed",
+        "reason": null,
+        "sample_count": 1,
+        "metrics": {
+          "flashes_thrown": 1,
+          "enemies_blinded": 1,
+          "teammates_blinded": 1,
+          "self_blinds": 0,
+          "team_blinding_events": 1,
+          "enemy_blind_seconds": 2.0
+        },
+        "evidence_ids": [
+          "flash_64"
+        ]
+      },
+      "death_context": {
+        "module_version": "1.0.0",
+        "status": "completed",
+        "reason": null,
+        "sample_count": 1,
+        "metrics": {
+          "deaths_with_context": 1,
+          "missing_snapshots": 0
+        },
+        "evidence_ids": [
+          "death_800_0"
+        ]
+      },
+      "reaction": {
+        "module_version": "1.0.0",
+        "status": "not_computed",
+        "reason": "扩展接口已预留，算法尚未实现和验证",
+        "sample_count": 0,
+        "metrics": null,
+        "evidence_ids": []
+      },
+      "crosshair": {
+        "module_version": "1.0.0",
+        "status": "not_computed",
+        "reason": "扩展接口已预留，算法尚未实现和验证",
+        "sample_count": 0,
+        "metrics": null,
+        "evidence_ids": []
+      },
+      "movement_shooting": {
+        "module_version": "1.0.0",
+        "status": "not_computed",
+        "reason": "扩展接口已预留，算法尚未实现和验证",
+        "sample_count": 0,
+        "metrics": null,
+        "evidence_ids": []
+      }
+    },
+    "scores": {},
+    "findings": [
+      {
+        "finding_id": "team_flash",
+        "module": "utility",
+        "description": "演示：记录到致盲队友事件，需结合回合复看，不能直接判为失误。",
+        "evidence_ids": [
+          "flash_64"
+        ],
+        "package_id": "d913b170-547b-4f54-b5dd-f945e36c85be"
+      }
+    ],
+    "training_suggestions": [],
+    "ai_status": "not_configured",
+    "warnings": [
+      "前端合成演示数据，未运行真实 Demo 解析或云端分析",
+      "比赛时间未知，未使用上传时间代替"
+    ]
+  }
+}

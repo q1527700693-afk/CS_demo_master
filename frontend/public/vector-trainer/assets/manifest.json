@@ -1,0 +1,41 @@
+{
+  "license": "per-file",
+  "authors": {
+    "valve": "Valve Corporation; local CS2 installation",
+    "decor": "User-provided artwork"
+  },
+  "files": [
+    {
+      "file": "assets/valve/usp.glb",
+      "bytes": 3864852,
+      "sha256": "a1255a9af8c2abd27572cb518f4982bc2870595176dac60ed97f322ccd22948e",
+      "source": "steam://run/730",
+      "resource": "weapons/models/usp_silencer/weapon_pist_usp_silencer.vmdl_c",
+      "license": "Valve-local-game-content",
+      "author": "Valve Corporation"
+    },
+    {
+      "file": "assets/valve/arms.glb",
+      "bytes": 2803684,
+      "sha256": "0bce3888b38097bd14c2ea4168372502afb2f63a3e361086abf3c29e777f3170",
+      "source": "steam://run/730",
+      "resource": "agents/models/ctm_sas/ctm_sas.vmdl_c",
+      "license": "Valve-local-game-content",
+      "author": "Valve Corporation",
+      "poseResource": "animation/anims/viewmodel/pistol/_default_pistol/idle_pistol.vnmclip_c"
+    },
+    {
+      "file": "assets/decor/character-T-butterfly-ruby-cutout.png",
+      "bytes": 1839052,
+      "sha256": "82d96d6bf987640eac5ffeabe19774ca52249af867348dcf05e8ed56b9a10b55",
+      "source": "user-provided:character-T-butterfly-ruby.png",
+      "sourceSha256": "aea53fa9ecb72b85f58870e638ba781597e00e51fb6180d8dfdcbe739293ed8a",
+      "license": "User-provided",
+      "author": "User-provided artwork",
+      "processing": "Built-in imagegen background extraction; transparent RGBA",
+      "width": 1448,
+      "height": 1086,
+      "alpha": true
+    }
+  ]
+}
