@@ -1,10 +1,10 @@
 # 复盘后端验收记录
 
-验收日期：2026-10-24（Asia/Shanghai）。代码分支：feature/zip-replay。本记录为本地验收，尚未部署到云服务器。
+验收日期：2026-10-25（Asia/Shanghai）。代码分支：release/cloud-test（ZIP v1.1/v1.2 + AI + front_end）。本记录为本地验收，尚未部署到云服务器。
 
 ## 执行结果
 
-- `npm test`：待合并后重新统计，包含原有账号、头像、好友、组队功能、v1.2 复盘测试及 AI 服务测试。
+- `npm test`：94 项通过、0 项失败，包含原有账号、头像、好友、组队功能、42 项复盘接口测试（含前端回合/地图/事件兼容接口及 AI 端点）和 3 项 AI 服务测试。
 - `git diff --check`：通过。
 - 正式 package-v1.1 / package-v1.2 Schema 用于导入校验；生成的标准报告通过 report.schema.json 校验；默认证据响应通过交接 OpenAPI Evidence 校验。
 - v1.1 样例：23 个回合、3,760 条周期状态、131 条未知归属轨迹、19 条回看候选。规则报告状态为 partial，基础报告中的 AI 状态为 not_configured，评分为空。

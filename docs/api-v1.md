@@ -781,6 +781,23 @@ See [full API and operational guide](../backend/REPLAY.md) and the original
 also describes local-parser endpoints; those run in the local parser, not this cloud server.
 Old /demos endpoints remain for legacy clients only.
 
+### Replay tab compatibility endpoints
+
+The Vue frontend also uses these authenticated endpoints:
+
+```text
+GET /api/v1/analyses/{analysisId}/rounds/{round}
+GET /api/v1/analyses/{analysisId}/rounds/{round}/map?limit=200&offset=0
+GET /api/v1/analysis-packages/{packageId}/events
+```
+
+- `rounds/{round}` returns the saved round detail (`round-<n>.json`).
+- `/map` returns `{ items, next_offset }`; `limit` is 1-500.
+- `events` returns `{ match_id, package_id, events }` for the target player's
+  event stream.
+- All three return `404` when the analysis/package does not belong to the caller.
+
+
 ## 8. AI Coaching (optional)
 
 AI coaching reads an already-ready rule report and calls an OpenAI-compatible

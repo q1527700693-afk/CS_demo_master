@@ -173,6 +173,29 @@ test('handoff idempotency and task/report identity satisfy formal contract',asyn
     assert.deepEqual(result.body.data.report.scores,{});
     assert.equal(result.body.data.report.findings.length,19);
 });
+test('frontend replay tab endpoints expose rounds, paginated map and events', async () => {
+    const round = await call(`/analyses/${analysisId}/rounds/3`);
+    assert.equal(round.status, 200, JSON.stringify(round.body));
+    assert.equal(round.body.data.round_num, 3);
+
+    const map = await call(`/analyses/${analysisId}/rounds/3/map?limit=10&offset=0`);
+    assert.equal(map.status, 200, JSON.stringify(map.body));
+    assert.equal(map.body.data.items.length, 10);
+    assert.equal(map.body.data.next_offset, 10);
+
+    const events = await call(`/analysis-packages/${accepted.package_id}/events`);
+    assert.equal(events.status, 200, JSON.stringify(events.body));
+    assert.equal(events.body.data.match_id, accepted.match_id);
+    assert.equal(events.body.data.package_id, accepted.package_id);
+    assert.ok(Array.isArray(events.body.data.events));
+    assert.ok(events.body.data.events.length > 0);
+
+    const otherRound = await call(`/analyses/${analysisId}/rounds/3`, {}, otherToken);
+    assert.equal(otherRound.status, 404);
+    const otherEvents = await call(`/analysis-packages/${accepted.package_id}/events`, {}, otherToken);
+    assert.equal(otherEvents.status, 404);
+});
+
 test('AI endpoint is wired but safely disabled without an API key', async () => {
     const state = await call(`/analyses/${analysisId}/ai`);
     assert.equal(state.status, 200, JSON.stringify(state.body));

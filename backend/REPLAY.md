@@ -42,6 +42,9 @@ node --test tests/replay.test.js
 | GET /analysis-packages/:package_id/global | 全员统计、名单、回合、覆盖与采样摘要；仅 v1.2 |
 | GET /analysis-packages/:package_id/global/:kind | kind 为 events/samples/trajectories，支持 round_num、offset、limit |
 | GET /analyses/:analysis_id/details | 扩展事实、关键回合、移动射击观察和质量信息 |
+| GET /analyses/:analysis_id/rounds/:round | 单回合详情，供报告页面回合复盘使用 |
+| GET /analyses/:analysis_id/rounds/:round/map?limit=500&offset=0 | 单回合地图记录分页 |
+| GET /analysis-packages/:package_id/events | 目标玩家事件流，供事件详情表使用 |
 | GET /analyses/:analysis_id/ai | 读取已生成的 AI 教练解读；未配置时返回 not_configured |
 | POST /analyses/:analysis_id/ai | 从已就绪的基础报告生成 AI 教练解读；当前同步调用 |
 | DELETE /analyses/:analysis_id | 删除非运行中的分析及结果 |

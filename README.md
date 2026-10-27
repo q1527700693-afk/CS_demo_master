@@ -361,6 +361,30 @@ Endpoints:
 The current implementation is synchronous and returns after the provider call.
 A queued AI task can be added later without changing the base report contract.
 
+## Production Build and Deployment
+
+The combined deployment branch contains the Vue frontend and Node backend.
+Build the frontend with pnpm:
+
+```bash
+cd frontend
+pnpm install --frozen-lockfile
+pnpm build
+```
+
+The output is `frontend/dist/`. Serve it with Nginx and proxy `/api/` and
+`/uploads/` to the backend on `127.0.0.1:8000`.
+
+See [deploy/README.md](deploy/README.md) for:
+
+- production environment variables
+- systemd service example
+- Nginx root-domain and `/cs2/` subpath examples
+- persistent directories and smoke-test steps
+
+AI is optional. If `DEEPSEEK_API_KEY` is empty, AI endpoints return `50300` and
+the rule report remains available.
+
 ## API Documentation
 
 Full API details:

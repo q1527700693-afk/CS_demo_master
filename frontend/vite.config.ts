@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
     env.LOCAL_PARSER_TOKEN_FILE ||
     fileURLToPath(new URL('../local_parser/token.txt', import.meta.url))
   return {
+    base: env.VITE_BASE_PATH || '/',
     plugins: [
       vue(),
       {

@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const multer = require('multer');
 const { setTimeout: delay } = require('node:timers/promises');
 const { pipeline } = require('node:stream/promises');
+const readline = require('node:readline');
 const { authenticate } = require('../middlewares/auth');
 const { success, errors } = require('../utils/response');
 const { db, root, directory, VERSION } = require('../services/replayStore');
@@ -160,6 +161,74 @@ router.post('/analyses/:id/ai', wrap(async (req, res) => {
     const result = await aiAnalysis.analyze(details, { analysisId: job.id });
     await fs.promises.writeFile(aiReportPath(job.id), JSON.stringify(result));
     return success(res, result, 'success', 201);
+}));
+
+router.get('/analyses/:id/rounds/:round', wrap(async (req, res) => {
+    const job = getRun(req.user.id, req.params.id);
+    if (job.status !== 'ready') throw errors.conflict('Report not ready');
+    if (!/^\d{1,3}$/.test(req.params.round)) throw errors.invalidParameter('Invalid round');
+    try {
+        await stored(res, path.join(directory(job.id), `round-${Number(req.params.round)}.json`));
+    } catch (error) {
+        if (error.code === 'ENOENT') throw errors.notFound('Round not found');
+        throw error;
+    }
+}));
+
+router.get('/analyses/:id/rounds/:round/map', wrap(async (req, res) => {
+    const job = getRun(req.user.id, req.params.id);
+    if (job.status !== 'ready') throw errors.conflict('Report not ready');
+    const round = req.params.round;
+    if (!/^(\d{1,3}|context)$/.test(round)) throw errors.invalidParameter('Invalid round');
+    const offset = Number(req.query.offset ?? 0);
+    const limit = Number(req.query.limit ?? 200);
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000 ||
+        !Number.isInteger(limit) || limit < 1 || limit > 500) {
+        throw errors.invalidParameter('Invalid pagination');
+    }
+    const file = path.join(
+        directory(job.id),
+        `map-${round === 'context' ? 'context' : Number(round)}.jsonl`
+    );
+    if (!fs.existsSync(file)) return success(res, { items: [], next_offset: null });
+
+    const stream = fs.createReadStream(file);
+    const lines = readline.createInterface({ input: stream, crlfDelay: Infinity });
+    const items = [];
+    let index = 0;
+    let more = false;
+    try {
+        for await (const line of lines) {
+            if (index++ < offset) continue;
+            if (items.length === limit) {
+                more = true;
+                break;
+            }
+            items.push(JSON.parse(line));
+        }
+    } finally {
+        lines.close();
+        stream.destroy();
+    }
+    success(res, { items, next_offset: more ? offset + items.length : null });
+}));
+
+router.get('/analysis-packages/:id/events', wrap(async (req, res) => {
+    const p = getPackage(req.user.id, req.params.id);
+    const dir = directory(p.storage_id);
+    const candidates = ['detailed-events.json', 'events.json'];
+    let events = null;
+    for (const filename of candidates) {
+        try {
+            const parsed = JSON.parse(await fs.promises.readFile(path.join(dir, filename), 'utf8'));
+            events = Array.isArray(parsed) ? parsed : parsed.items;
+            break;
+        } catch (error) {
+            if (error.code !== 'ENOENT') throw error;
+        }
+    }
+    if (!Array.isArray(events)) throw errors.notFound('Events not found');
+    success(res, { match_id: p.match_id, package_id: p.package_id, events });
 }));
 
 router.get('/analyses/:id',wrap(async(req,res)=>success(res,run(getRun(req.user.id,req.params.id)))));

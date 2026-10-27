@@ -221,7 +221,7 @@ pagination, and friend removal/re-request.
 evidence, ownership, deletion and lease recovery. `tests/aiAnalysis.test.js`
 covers the disabled state, compact-fact provider call, output schema validation
 and rejection of unknown evidence IDs. All files use an in-memory SQLite
-database and temporary directories; the suite currently has 75 tests.
+database and temporary directories; the suite currently has 94 tests.
 
 ## Layout
 

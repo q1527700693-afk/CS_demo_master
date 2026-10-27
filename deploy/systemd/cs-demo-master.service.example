@@ -1,0 +1,19 @@
+[Unit]
+Description=CS Demo Master Node backend
+After=network.target
+
+[Service]
+Type=simple
+User=csdemo
+Group=csdemo
+WorkingDirectory=/opt/cs-demo-master/backend
+EnvironmentFile=/opt/cs-demo-master/backend/.env
+ExecStart=/usr/bin/node src/server.js
+Restart=always
+RestartSec=5
+# Protect the private replay directory from the rest of the system as needed.
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
