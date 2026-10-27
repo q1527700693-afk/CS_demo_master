@@ -1,0 +1,240 @@
+{
+  "source": "../training/CSPlatform/aim-trainer",
+  "files": [
+    {
+      "path": "src/app.js",
+      "bytes": 43634,
+      "sha256": "cb7ed82aa162dfdbc29fb909a5b7b4478ec110f93619a4225f3e95f0eff1209a"
+    },
+    {
+      "path": "src/audio.js",
+      "bytes": 1267,
+      "sha256": "ee2f1122bf8e158a98cd30d49fa337f631d4dfec02983e4276904959f68e1d70"
+    },
+    {
+      "path": "src/engine.js",
+      "bytes": 8839,
+      "sha256": "b0bb078e6ee0063d223f40f614c5aefbebcb4c18bf222fc3bd90d84aac6774ab"
+    },
+    {
+      "path": "src/icons.js",
+      "bytes": 2431,
+      "sha256": "aedd2137220beca2aaf8f5cbe9a0e335f682560cfe446233b477aec60c7c6e1a"
+    },
+    {
+      "path": "src/modes.js",
+      "bytes": 4919,
+      "sha256": "886ab3eae6f77553766d5a4631a4fcd3729798d28159dfc3681b32d6dadb5e45"
+    },
+    {
+      "path": "src/offline.js",
+      "bytes": 1425,
+      "sha256": "f773536c426345e37f51db920ab0baffbd83a70fc50c41006c4c2b0a03718d40"
+    },
+    {
+      "path": "src/renderer.js",
+      "bytes": 12794,
+      "sha256": "92c10ffca0afe699121de44fad0f443772bfe75fcbb1437ccb424a5ffa3951f4"
+    },
+    {
+      "path": "src/spatial.js",
+      "bytes": 1480,
+      "sha256": "fd4424f9980490f72d15e071e3ed351a07b26059cc391d2128f86d5de8b38cf5"
+    },
+    {
+      "path": "src/storage.js",
+      "bytes": 3521,
+      "sha256": "9b09fcb6fe8918f912ca3edb409be21e202643449da559ade88d449c988d1bcf"
+    },
+    {
+      "path": "src/weapon.js",
+      "bytes": 2367,
+      "sha256": "711d34edf6c90635945205c893e9e5aaa3be7ea02399f0f5cb308cc4aa4746d4"
+    },
+    {
+      "path": "vendor/three/LICENSE",
+      "bytes": 1081,
+      "sha256": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc"
+    },
+    {
+      "path": "vendor/three/addons/loaders/GLTFLoader.js",
+      "bytes": 117586,
+      "sha256": "03952cb129d558f92b8e6c757fbf7c1f718b3126c4d34f264d574b40ea36054f"
+    },
+    {
+      "path": "vendor/three/addons/utils/BufferGeometryUtils.js",
+      "bytes": 37728,
+      "sha256": "259085a7dac89e0840393a9347c77123fbc4206ec2146bf0c29ffc72e14a2800"
+    },
+    {
+      "path": "vendor/three/addons/utils/SkeletonUtils.js",
+      "bytes": 11551,
+      "sha256": "28017bf37d0ecb0c4be6048db759ff14df729a562464830b064d4cc239c5af17"
+    },
+    {
+      "path": "vendor/three/three.core.js",
+      "bytes": 1458113,
+      "sha256": "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6"
+    },
+    {
+      "path": "vendor/three/three.module.js",
+      "bytes": 662772,
+      "sha256": "9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea"
+    },
+    {
+      "path": "vendor/three/version.json",
+      "bytes": 230,
+      "sha256": "0017b2c6837a998e8d5d1d76eb71c4a3306c5e8f916904e811beea53c2a2f70f"
+    },
+    {
+      "path": "assets/LICENSE.md",
+      "bytes": 1454,
+      "sha256": "0c4d5bf11635747237ffcbfd6a341e132130f245b737497b97b6345597ec64c9"
+    },
+    {
+      "path": "assets/concrete/color.jpg",
+      "bytes": 927975,
+      "sha256": "5e06d0fb226f671470f59bf7798954b6965c9ed56dd45084dfd012e15737e444"
+    },
+    {
+      "path": "assets/concrete/normal.jpg",
+      "bytes": 883889,
+      "sha256": "5a403c176361193b785198ab363d3dc3755773ca5b023f19e05874e50caea302"
+    },
+    {
+      "path": "assets/concrete/roughness.jpg",
+      "bytes": 503981,
+      "sha256": "342110e685c07af2c56194662a796b2ab4f2a4d992a9745b8fc55943414faead"
+    },
+    {
+      "path": "assets/decor/character-T-butterfly-ruby-cutout.png",
+      "bytes": 1839052,
+      "sha256": "82d96d6bf987640eac5ffeabe19774ca52249af867348dcf05e8ed56b9a10b55"
+    },
+    {
+      "path": "assets/decor/character-T-butterfly-ruby.png",
+      "bytes": 4353791,
+      "sha256": "aea53fa9ecb72b85f58870e638ba781597e00e51fb6180d8dfdcbe739293ed8a"
+    },
+    {
+      "path": "assets/decor/cutout-prompt.txt",
+      "bytes": 1349,
+      "sha256": "becc1dbaa25fb3f984a5674ca08097258254193b00a692054a3439ee0b3337f4"
+    },
+    {
+      "path": "assets/decor/manifest.json",
+      "bytes": 597,
+      "sha256": "c3296468ba1983292d6946d7ac9685857d5e6a3dc92af617a2ae6f9dab9f980d"
+    },
+    {
+      "path": "assets/factory/factory.gltf",
+      "bytes": 372666,
+      "sha256": "41ff58b722f9cb3e9db8bcacae3163946603ae99a1d42bb6f9045d7c4ec0f179"
+    },
+    {
+      "path": "assets/factory/modular_factory_facade.bin",
+      "bytes": 6269260,
+      "sha256": "12702fb065a838695e0621e1aac3947af92d32c439fb965c8b0563ad691fed70"
+    },
+    {
+      "path": "assets/factory/textures/modular_factory_facade_brick_arm_1k.jpg",
+      "bytes": 726245,
+      "sha256": "322cba4e6b03e39fa2a57335deddfbda6d819f8b29b108b9000790ded99b0d95"
+    },
+    {
+      "path": "assets/factory/textures/modular_factory_facade_brick_diff_1k.jpg",
+      "bytes": 1115986,
+      "sha256": "852b01c61efc07fd8e60e59767657ef51112bf65f5eaf184f02c27ea5170582d"
+    },
+    {
+      "path": "assets/factory/textures/modular_factory_facade_brick_nor_gl_1k.jpg",
+      "bytes": 1052229,
+      "sha256": "1168796e949c5ce3957142e86bce1d09531466aaea90dc46cbc3f3225cbdd78e"
+    },
+    {
+      "path": "assets/factory/textures/modular_factory_facade_doors_arm_1k.jpg",
+      "bytes": 723782,
+      "sha256": "794b16de5bd2aae6431fd8aee7b10b3b1095bbe89b233a158a1e031e0a27c4e3"
+    },
+    {
+      "path": "assets/factory/textures/modular_factory_facade_doors_diff_1k.jpg",
+      "bytes": 570733,
+      "sha256": "157b59b9d1c929e51e2747f4f9481389743acba539308cecbb98c17294b6c7e1"
+    },
+    {
+      "path": "assets/factory/textures/modular_factory_facade_doors_nor_gl_1k.jpg",
+      "bytes": 488916,
+      "sha256": "1e3bdff6d4b30cb26e901d6d14e42d398aeacfb46767900404eb38ec5ba016dc"
+    },
+    {
+      "path": "assets/factory/textures/modular_factory_facade_garage_arm_1k.jpg",
+      "bytes": 682331,
+      "sha256": "a72cfa9020a0a7aad2476b2ceb3c60dc21ac69d4e9026dcddc82710e6784b40f"
+    },
+    {
+      "path": "assets/factory/textures/modular_factory_facade_garage_diff_1k.jpg",
+      "bytes": 588149,
+      "sha256": "d1cf6239c7364900b02279600937a4c9bf0a21d315efabf18f16d5637020e39f"
+    },
+    {
+      "path": "assets/factory/textures/modular_factory_facade_garage_nor_gl_1k.jpg",
+      "bytes": 752068,
+      "sha256": "e8ac6265622fb8c8df454ae02a75746bc37ded0d4533dbe65fa275d0e40f28ba"
+    },
+    {
+      "path": "assets/factory/textures/modular_factory_facade_trim_01_arm_1k.jpg",
+      "bytes": 733418,
+      "sha256": "0ab1657c75a9b5beb3d5552adfafccdd5174c391f20ccd6c0b41939c1a8bfe3f"
+    },
+    {
+      "path": "assets/factory/textures/modular_factory_facade_trim_01_diff_1k.jpg",
+      "bytes": 617348,
+      "sha256": "beff49832938c5493a4b5bbb82eeabd138c29c6523e5228e006f702859bbc87f"
+    },
+    {
+      "path": "assets/factory/textures/modular_factory_facade_trim_01_nor_gl_1k.jpg",
+      "bytes": 827556,
+      "sha256": "05441cf545c9d5f6786cd191e9b3b627668b1176e155d1fae7fbe28f6a8d3802"
+    },
+    {
+      "path": "assets/factory/textures/modular_factory_facade_windows_arm_1k.jpg",
+      "bytes": 873236,
+      "sha256": "7bfc0d579188dd88bb2d8962ae81402e6ccabff244709e68ba3be4cc5d500d0d"
+    },
+    {
+      "path": "assets/factory/textures/modular_factory_facade_windows_diff_1k.jpg",
+      "bytes": 619613,
+      "sha256": "d361dacbd23095dacf1d82eb5a509a305c44b007f8adfb221dc2e5efe56180e0"
+    },
+    {
+      "path": "assets/factory/textures/modular_factory_facade_windows_nor_gl_1k.jpg",
+      "bytes": 612643,
+      "sha256": "4dc9e4a6b97d5384849faeebca87eae9f6736664971c6c10a41fc19bd01fc106"
+    },
+    {
+      "path": "assets/manifest.json",
+      "bytes": 1547,
+      "sha256": "398daef92bdc60fca9d2ed62de5772463104a1e6fa1bb264d2de392ea59b09ec"
+    },
+    {
+      "path": "assets/valve/arms.glb",
+      "bytes": 2803684,
+      "sha256": "0bce3888b38097bd14c2ea4168372502afb2f63a3e361086abf3c29e777f3170"
+    },
+    {
+      "path": "assets/valve/manifest.json",
+      "bytes": 827,
+      "sha256": "de1e1a43eaeee5fabc71b4e9ec4199bd63feba3fba6590a215f544addc33299e"
+    },
+    {
+      "path": "assets/valve/usp.glb",
+      "bytes": 3864852,
+      "sha256": "a1255a9af8c2abd27572cb518f4982bc2870595176dac60ed97f322ccd22948e"
+    },
+    {
+      "path": "styles.css",
+      "bytes": 17787,
+      "sha256": "a0f9f5890a8f73bda703b951f07f76b1d16473d24fd8bf606aca28bbd3c4f983"
+    }
+  ]
+}

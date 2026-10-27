@@ -1,0 +1,253 @@
+{
+  "metrics": {
+    "schema_version": "1.0.0",
+    "match_id": "d7b330f6-b771-4e22-801e-f7bff85b551c",
+    "package_id": "d913b170-547b-4f54-b5dd-f945e36c85be",
+    "modules": {
+      "basic_stats": {
+        "module_version": "1.0.0",
+        "status": "completed",
+        "reason": null,
+        "sample_count": 2,
+        "metrics": {
+          "kills": 1,
+          "deaths": 1,
+          "assists": 0,
+          "adr": 50,
+          "kast_pct": 100,
+          "headshot_pct": 100,
+          "opening_kills": 1,
+          "opening_deaths": 1
+        },
+        "evidence_ids": []
+      },
+      "utility": {
+        "module_version": "1.0.0",
+        "status": "completed",
+        "reason": null,
+        "sample_count": 1,
+        "metrics": {
+          "flashes_thrown": 1,
+          "enemies_blinded": 1,
+          "teammates_blinded": 1,
+          "self_blinds": 0,
+          "team_blinding_events": 1,
+          "enemy_blind_seconds": 2.0
+        },
+        "evidence_ids": [
+          "flash_64"
+        ]
+      },
+      "death_context": {
+        "module_version": "1.0.0",
+        "status": "completed",
+        "reason": null,
+        "sample_count": 1,
+        "metrics": {
+          "deaths_with_context": 1,
+          "missing_snapshots": 0
+        },
+        "evidence_ids": [
+          "death_800_0"
+        ]
+      },
+      "reaction": {
+        "module_version": "1.0.0",
+        "status": "not_computed",
+        "reason": "扩展接口已预留，算法尚未实现和验证",
+        "sample_count": 0,
+        "metrics": null,
+        "evidence_ids": []
+      },
+      "crosshair": {
+        "module_version": "1.0.0",
+        "status": "not_computed",
+        "reason": "扩展接口已预留，算法尚未实现和验证",
+        "sample_count": 0,
+        "metrics": null,
+        "evidence_ids": []
+      },
+      "movement_shooting": {
+        "module_version": "1.0.0",
+        "status": "not_computed",
+        "reason": "扩展接口已预留，算法尚未实现和验证",
+        "sample_count": 0,
+        "metrics": null,
+        "evidence_ids": []
+      }
+    }
+  },
+  "rounds": {
+    "schema_version": "1.0.0",
+    "match_id": "d7b330f6-b771-4e22-801e-f7bff85b551c",
+    "package_id": "d913b170-547b-4f54-b5dd-f945e36c85be",
+    "items": [
+      {
+        "round_num": 1,
+        "start_tick": 0,
+        "end_tick": 500,
+        "winner_team_id": "team_a"
+      },
+      {
+        "round_num": 2,
+        "start_tick": 501,
+        "end_tick": 1000,
+        "winner_team_id": "team_b"
+      }
+    ]
+  },
+  "events": {
+    "schema_version": "1.0.0",
+    "match_id": "d7b330f6-b771-4e22-801e-f7bff85b551c",
+    "package_id": "d913b170-547b-4f54-b5dd-f945e36c85be",
+    "items": [
+      {
+        "event_id": "flash_64",
+        "type": "flash_effect",
+        "tick": 64,
+        "round_num": 1,
+        "data": {
+          "victims": [
+            {
+              "player_id": "76561198000000002",
+              "relation": "enemy",
+              "duration_seconds": 2.0
+            },
+            {
+              "player_id": "76561198000000003",
+              "relation": "teammate",
+              "duration_seconds": 1.0
+            }
+          ]
+        }
+      },
+      {
+        "event_id": "death_800_0",
+        "type": "death_context",
+        "tick": 800,
+        "round_num": 2,
+        "data": {
+          "active_weapon": "flashbang",
+          "is_reloading": false,
+          "is_blinded": false,
+          "flashbangs": 1,
+          "smoke_grenades": 1,
+          "he_grenades": 0,
+          "fire_grenades": 0,
+          "x": 500,
+          "y": 200,
+          "z": 0
+        }
+      },
+      {
+        "event_id": "grenade_0",
+        "type": "grenade",
+        "tick": 50,
+        "round_num": 1,
+        "data": {
+          "grenade_type": "flashbang"
+        }
+      }
+    ]
+  },
+  "map": {
+    "schema_version": "1.0.0",
+    "match_id": "d7b330f6-b771-4e22-801e-f7bff85b551c",
+    "package_id": "d913b170-547b-4f54-b5dd-f945e36c85be",
+    "coordinate_system": "source_world",
+    "asset_version": null,
+    "trajectories": [
+      {
+        "event_id": "grenade_0",
+        "type": "flashbang",
+        "points": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            20,
+            50,
+            0
+          ],
+          [
+            100,
+            90,
+            0
+          ]
+        ]
+      }
+    ]
+  },
+  "manifest": {
+    "schema_version": "1.0.0",
+    "match_id": "d7b330f6-b771-4e22-801e-f7bff85b551c",
+    "package_id": "d913b170-547b-4f54-b5dd-f945e36c85be",
+    "target_player_id": "76561198000000001",
+    "source": {
+      "demo_sha256": "8433273dc302b93f632fc03afe58495c4f6c1a387a0585557d6af15d5b8414e0"
+    },
+    "exported_at": "2026-10-23T05:49:24.965382+00:00",
+    "producer": {
+      "app_version": "0.1.0",
+      "parser_version": "synthetic-fixture",
+      "adapter_version": "1.0.0"
+    },
+    "match": {
+      "started_at": null,
+      "started_at_source": "unknown",
+      "map": "de_mirage",
+      "tick_rate": 64,
+      "complete": true,
+      "teams": [
+        {
+          "team_id": "team_a",
+          "name": "队伍 1",
+          "score": 1
+        },
+        {
+          "team_id": "team_b",
+          "name": "队伍 2",
+          "score": 1
+        }
+      ]
+    },
+    "players": [
+      {
+        "player_id": "76561198000000001",
+        "name": "Fixture A",
+        "team_id": "team_a"
+      },
+      {
+        "player_id": "76561198000000002",
+        "name": "Fixture B",
+        "team_id": "team_b"
+      },
+      {
+        "player_id": "76561198000000003",
+        "name": "Fixture C",
+        "team_id": "team_a"
+      }
+    ],
+    "is_fixture": true,
+    "files": {
+      "metrics.json": {
+        "sha256": "4a76edf04cc6600ecebc2570c8692b67b45014c238ff97de66fefb0604067d04",
+        "size_bytes": 1352
+      },
+      "rounds.json": {
+        "sha256": "fcfd50a8ec6c2e6257352c76ad65c72b40af3375a8499ce3c24549259e819e82",
+        "size_bytes": 285
+      },
+      "events.json": {
+        "sha256": "2348fa75e476edaea703eb4d721032f4f7b0c008c4726a5885e523375f124613",
+        "size_bytes": 728
+      },
+      "map.json": {
+        "sha256": "420d109d24cfa13e31c9ad7ec277fd67beb9c3fb2b6426635de8d5f770b92719",
+        "size_bytes": 285
+      }
+    }
+  }
+}

@@ -1,0 +1,503 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "manifest": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "match_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+        },
+        "package_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+        },
+        "target_player_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "demo_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "demo_sha256"
+          ],
+          "additionalProperties": false
+        },
+        "exported_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "producer": {
+          "type": "object",
+          "properties": {
+            "app_version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "parser_version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "adapter_version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          },
+          "required": [
+            "app_version",
+            "parser_version",
+            "adapter_version"
+          ],
+          "additionalProperties": false
+        },
+        "match": {
+          "type": "object",
+          "properties": {
+            "started_at": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "started_at_source": {
+              "enum": [
+                "demo",
+                "platform",
+                "user_input",
+                "unknown"
+              ]
+            },
+            "map": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "tick_rate": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "complete": {
+              "type": "boolean"
+            },
+            "teams": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "team_id": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "score": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "team_id",
+                  "name",
+                  "score"
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 200000
+            }
+          },
+          "required": [
+            "started_at",
+            "started_at_source",
+            "map",
+            "tick_rate",
+            "complete",
+            "teams"
+          ],
+          "additionalProperties": false
+        },
+        "players": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "player_id": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "team_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "player_id",
+              "name",
+              "team_id"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 200000
+        },
+        "files": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "size_bytes": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "sha256",
+              "size_bytes"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "is_fixture": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schema_version",
+        "match_id",
+        "package_id",
+        "target_player_id",
+        "source",
+        "exported_at",
+        "producer",
+        "match",
+        "players",
+        "files"
+      ],
+      "additionalProperties": false
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "match_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+        },
+        "package_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+        },
+        "modules": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 32,
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "module_version": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "status": {
+                "enum": [
+                  "completed",
+                  "partial",
+                  "not_computed",
+                  "insufficient_data",
+                  "failed"
+                ]
+              },
+              "reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sample_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "metrics": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": true
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+                },
+                "maxItems": 200000
+              }
+            },
+            "required": [
+              "module_version",
+              "status",
+              "reason",
+              "sample_count",
+              "metrics",
+              "evidence_ids"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schema_version",
+        "match_id",
+        "package_id",
+        "modules"
+      ],
+      "additionalProperties": false
+    },
+    "rounds": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "match_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+        },
+        "package_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "round_num": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "start_tick": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "end_tick": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "winner_team_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "round_num",
+              "start_tick",
+              "end_tick",
+              "winner_team_id"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 200000
+        }
+      },
+      "required": [
+        "schema_version",
+        "match_id",
+        "package_id",
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "events": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "match_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+        },
+        "package_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+              },
+              "type": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "round_num": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1
+              },
+              "tick": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "required": [
+              "event_id",
+              "type",
+              "round_num",
+              "tick",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 200000
+        }
+      },
+      "required": [
+        "schema_version",
+        "match_id",
+        "package_id",
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "map": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "match_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+        },
+        "package_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+        },
+        "coordinate_system": {
+          "const": "source_world"
+        },
+        "asset_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "trajectories": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+              },
+              "type": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "points": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3
+                },
+                "maxItems": 200000
+              }
+            },
+            "required": [
+              "event_id",
+              "type",
+              "points"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 200000
+        }
+      },
+      "required": [
+        "schema_version",
+        "match_id",
+        "package_id",
+        "coordinate_system",
+        "asset_version",
+        "trajectories"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "manifest",
+    "metrics",
+    "rounds",
+    "events",
+    "map"
+  ],
+  "additionalProperties": false
+}

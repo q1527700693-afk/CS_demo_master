@@ -1,0 +1,46 @@
+{
+  "name": "cs-demo-master-front-end",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "dev": "node scripts/sync-training.mjs && vite --host 127.0.0.1",
+    "build": "node scripts/sync-training.mjs && vue-tsc -b && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "typecheck": "vue-tsc -b",
+    "test": "vitest run",
+    "test:training": "node tests/training-integration.cjs",
+    "test:startup": "node tests/startup-integration.cjs",
+    "test:accounts": "node tests/account-integration.cjs",
+    "test:cards": "node tests/player-card-integration.cjs",
+    "test:social": "node tests/social-backend-integration.cjs",
+    "test:analysis": "node tests/replay-analysis-integration.cjs",
+    "test:analysis:real": "node tests/replay-backend-integration.cjs",
+    "test:analysis:auto": "node tests/automatic-demo-integration.cjs",
+    "mock:init": "msw init public --save",
+    "format": "prettier --write .",
+    "training:sync": "node scripts/sync-training.mjs"
+  },
+  "dependencies": {
+    "echarts": "^6.0.0",
+    "pinia": "^3.0.3",
+    "vue": "^3.5.22",
+    "vue-router": "^4.6.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.10",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "msw": "^2.11.5",
+    "prettier": "^3.6.2",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.9",
+    "vitest": "^3.2.4",
+    "vue-tsc": "^3.1.1"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
+  }
+}

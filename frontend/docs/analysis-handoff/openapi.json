@@ -1,0 +1,1368 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CS Demo Master frontend analysis contract",
+    "version": "1.0.0",
+    "description": "Cloud backend contract pending implementation. Local v0.2 workflow: roster -> explicitly confirmed SteamID -> targeted detailed extraction -> schema 1.1 ZIP."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8000/api/v1"
+    }
+  ],
+  "security": [
+    {
+      "CloudJWT": []
+    }
+  ],
+  "paths": {
+    "/analysis-packages": {
+      "post": {
+        "summary": "Upload a processed ZIP (not raw .dem)",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AcceptedPackage"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Failure (400/401/404/409/413/500)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/matches/{match_id}/analyses": {
+      "post": {
+        "summary": "Create or reuse an analysis task",
+        "responses": {
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AnalysisRun"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Failure (400/401/404/409/413/500)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "match_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,120}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAnalysis"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List analysis history",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/AnalysisRun"
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Failure (400/401/404/409/413/500)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "match_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          }
+        ]
+      }
+    },
+    "/analyses/{analysis_id}": {
+      "get": {
+        "summary": "Poll analysis task",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AnalysisRun"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Failure (400/401/404/409/413/500)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          }
+        ]
+      }
+    },
+    "/analyses/{analysis_id}/report": {
+      "get": {
+        "summary": "Download completed or partial report",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Report"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Failure (400/401/404/409/413/500)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          }
+        ]
+      }
+    },
+    "/matches": {
+      "get": {
+        "summary": "List owned matches",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/MatchRecord"
+                          }
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "pageSize": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "page",
+                        "pageSize",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Failure (400/401/404/409/413/500)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 100
+            }
+          }
+        ]
+      }
+    },
+    "/analysis-packages/{package_id}/evidence": {
+      "get": {
+        "summary": "Read events and grenade map data",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Evidence"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Failure (400/401/404/409/413/500)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          }
+        ]
+      }
+    },
+    "/local/health": {
+      "get": {
+        "summary": "Local parser availability",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "string"
+                        },
+                        "awpy_available": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "awpy_available"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Failure (400/401/404/409/413/500)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8877"
+          }
+        ],
+        "security": [
+          {
+            "LocalToken": []
+          }
+        ]
+      }
+    },
+    "/local/jobs": {
+      "post": {
+        "summary": "Send raw demo ONLY to loopback parser",
+        "responses": {
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "job_id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        }
+                      },
+                      "required": [
+                        "job_id"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Failure (400/401/404/409/413/500)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8877"
+          }
+        ],
+        "security": [
+          {
+            "LocalToken": []
+          }
+        ]
+      }
+    },
+    "/local/jobs/{job_id}": {
+      "get": {
+        "summary": "Poll local parsing",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "const": 0
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "job_id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "status": {
+                          "enum": [
+                            "queued",
+                            "running",
+                            "completed",
+                            "failed"
+                          ]
+                        },
+                        "stage": {
+                          "type": "string"
+                        },
+                        "percent": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "players": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "player_id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "player_id",
+                              "name"
+                            ]
+                          }
+                        },
+                        "stats": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        "map": {
+                          "type": "string"
+                        },
+                        "round_count": {
+                          "type": "integer"
+                        },
+                        "match_id": {
+                          "type": "string"
+                        },
+                        "active_target_player_id": {
+                          "type": "string"
+                        },
+                        "summary": {
+                          "type": "object",
+                          "properties": {
+                            "events": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "player_samples": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "keyframes": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "size_bytes": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "job_id",
+                        "status",
+                        "stage",
+                        "percent",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Failure (400/401/404/409/413/500)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          }
+        ],
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8877"
+          }
+        ],
+        "security": [
+          {
+            "LocalToken": []
+          }
+        ]
+      }
+    },
+    "/local/jobs/{job_id}/package": {
+      "get": {
+        "summary": "Download local ZIP",
+        "responses": {
+          "200": {
+            "description": "ZIP bytes; Content-Length recommended",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Failure (400/401/404/409/413/500)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "target_player_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{17}$"
+            }
+          }
+        ],
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8877"
+          }
+        ],
+        "security": [
+          {
+            "LocalToken": []
+          }
+        ]
+      }
+    },
+    "/local/jobs/{job_id}/exports": {
+      "post": {
+        "summary": "Confirm player and start detailed local extraction",
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8877"
+          }
+        ],
+        "security": [
+          {
+            "LocalToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "target_player_id",
+                  "nickname_query",
+                  "identity_confirmed"
+                ],
+                "properties": {
+                  "target_player_id": {
+                    "type": "string"
+                  },
+                  "nickname_query": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "identity_confirmed": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Same local job queued/running; poll until stage=exported and active_target_player_id matches"
+          },
+          "400": {
+            "description": "Unconfirmed or nonexistent player"
+          },
+          "409": {
+            "description": "Local worker busy"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "CloudJWT": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "LocalToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Local session token, NOT cloud JWT"
+      }
+    },
+    "schemas": {
+      "AcceptedPackage": {
+        "type": "object",
+        "properties": {
+          "match_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "package_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "target_player_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "uploaded_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reused": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "match_id",
+          "package_id",
+          "target_player_id",
+          "uploaded_at"
+        ]
+      },
+      "AnalysisRun": {
+        "type": "object",
+        "properties": {
+          "match_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "package_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "target_player_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "analysis_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "partial",
+              "failed"
+            ]
+          },
+          "stage": {
+            "type": "string"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "report_available": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "analyzed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "match_id",
+          "package_id",
+          "target_player_id",
+          "analysis_id",
+          "status",
+          "stage",
+          "progress",
+          "message",
+          "report_available"
+        ]
+      },
+      "Match": {
+        "type": "object",
+        "properties": {
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "started_at_source": {
+            "enum": [
+              "demo",
+              "platform",
+              "user_input",
+              "unknown"
+            ]
+          },
+          "map": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "tick_rate": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "teams": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "team_id": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "score": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "team_id",
+                "name",
+                "score"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 200000
+          }
+        },
+        "required": [
+          "started_at",
+          "started_at_source",
+          "map",
+          "tick_rate",
+          "complete",
+          "teams"
+        ],
+        "additionalProperties": false
+      },
+      "MatchRecord": {
+        "type": "object",
+        "properties": {
+          "match_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "match": {
+            "$ref": "#/components/schemas/Match"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "latest_analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisRun"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latest_available_analysis_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "adr": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "rating": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "player_team_id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "adr",
+                  "rating",
+                  "player_team_id",
+                  "status"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "match_id",
+          "match",
+          "created_at",
+          "latest_analysis",
+          "latest_available_analysis_id",
+          "summary"
+        ]
+      },
+      "CreateAnalysis": {
+        "type": "object",
+        "properties": {
+          "package_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "target_player_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "package_id",
+          "target_player_id"
+        ]
+      },
+      "Report": {
+        "$ref": "./report.schema.json"
+      },
+      "Evidence": {
+        "type": "object",
+        "properties": {
+          "match_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "package_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "event_id": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+                },
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "round_num": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1
+                },
+                "tick": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "data": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "required": [
+                "event_id",
+                "type",
+                "round_num",
+                "tick",
+                "data"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 200000
+          },
+          "map": {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "const": "1.0.0"
+              },
+              "match_id": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+              },
+              "package_id": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+              },
+              "coordinate_system": {
+                "const": "source_world"
+              },
+              "asset_version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "trajectories": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+                    },
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "points": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 3,
+                        "maxItems": 3
+                      },
+                      "maxItems": 200000
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "type",
+                    "points"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 200000
+              }
+            },
+            "required": [
+              "schema_version",
+              "match_id",
+              "package_id",
+              "coordinate_system",
+              "asset_version",
+              "trajectories"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "match_id",
+          "package_id",
+          "events",
+          "map"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ]
+      },
+      "DetailedProcessedPackage": {
+        "$ref": "./package-v1.1.schema.json"
+      }
+    }
+  }
+}

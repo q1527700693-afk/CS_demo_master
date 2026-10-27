@@ -1,0 +1,10 @@
+node_modules
+dist
+pnpm-lock.yaml
+public/mockServiceWorker.js
+public/vector-trainer
+public/training-loader.js
+public/games
+src/features/training/games
+*.zip
+*.tsbuildinfo

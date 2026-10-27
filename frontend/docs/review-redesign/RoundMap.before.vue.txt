@@ -1,0 +1,270 @@
+<script setup lang="ts">
+import { computed, onUnmounted, ref, watch } from 'vue'
+import { getRoundMap } from './analysis-api'
+import { errorMessage } from '@/api/http'
+import { numberText } from './report-data'
+import type { ReplayMapItem } from './contracts'
+const props = defineProps<{ analysisId: string; round: number }>()
+const items = ref<ReplayMapItem[]>([]),
+  loading = ref(false),
+  error = ref('')
+const showContext = ref(false),
+  showPlayer = ref(true),
+  showUtility = ref(true),
+  tick = ref<number | null>(null)
+let controller: AbortController | undefined
+let generation = 0
+async function load() {
+  const current = ++generation
+  controller?.abort()
+  controller = new AbortController()
+  items.value = []
+  error.value = ''
+  loading.value = true
+  tick.value = null
+  try {
+    const collected: ReplayMapItem[] = []
+    let offset: number | null = 0
+    while (offset !== null) {
+      const page = await getRoundMap(props.analysisId, props.round, offset, controller.signal)
+      if (current !== generation) return
+      collected.push(...page.items)
+      if (page.next_offset !== null && page.next_offset <= offset)
+        throw new Error('地图分页未前进，请重试')
+      offset = page.next_offset
+    }
+    if (current === generation) {
+      items.value = collected
+      tick.value = tickExtent.value.max
+    }
+  } catch (e) {
+    if (current === generation) error.value = errorMessage(e)
+  } finally {
+    if (current === generation) loading.value = false
+  }
+}
+watch(() => [props.analysisId, props.round], load, { immediate: true })
+onUnmounted(() => {
+  generation++
+  controller?.abort()
+})
+const samples = computed(() =>
+  items.value
+    .filter(
+      (i) =>
+        i.kind === 'player_samples' &&
+        i.state?.health !== 0 &&
+        typeof i.state?.x === 'number' &&
+        typeof i.state?.y === 'number',
+    )
+    .sort((a, b) => (a.tick ?? 0) - (b.tick ?? 0)),
+)
+const targetUtility = computed(() =>
+  items.value.filter((i) => i.kind === 'trajectories' && i.points?.length),
+)
+const contextUtility = computed(() =>
+  items.value.filter((i) => i.kind === 'unattributed_trajectories' && i.points?.length),
+)
+const tickExtent = computed(() => {
+  let min = Infinity,
+    max = -Infinity
+  for (const item of items.value) {
+    for (const value of [item.tick, item.start_tick, item.end_tick]) {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        min = Math.min(min, value)
+        max = Math.max(max, value)
+      }
+    }
+  }
+  return { min: Number.isFinite(min) ? min : 0, max: Number.isFinite(max) ? max : 0 }
+})
+// Keep one coordinate scale while layers and the time cursor change.
+const bounds = computed(() => {
+  const points: number[][] = [
+    ...samples.value.map((i) => [i.state!.x!, i.state!.y!]),
+    ...[...targetUtility.value, ...contextUtility.value].flatMap((i) => i.points || []),
+  ]
+  if (!points.length) return null
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity
+  for (const p of points) {
+    minX = Math.min(minX, p[0]!)
+    maxX = Math.max(maxX, p[0]!)
+    minY = Math.min(minY, p[1]!)
+    maxY = Math.max(maxY, p[1]!)
+  }
+  const scale = Math.min(640 / Math.max(1, maxX - minX), 320 / Math.max(1, maxY - minY))
+  return {
+    minX,
+    maxX,
+    minY,
+    maxY,
+    scale,
+    padX: 40 + (640 - (maxX - minX) * scale) / 2,
+    padY: 30 + (320 - (maxY - minY) * scale) / 2,
+  }
+})
+function point(x: number, y: number): string {
+  const b = bounds.value!
+  return `${b.padX + (x - b.minX) * b.scale},${b.padY + (b.maxY - y) * b.scale}`
+}
+const visibleSamples = computed(() =>
+  samples.value.filter((i) => tick.value === null || (i.tick ?? 0) <= tick.value),
+)
+// Render each sampled segment separately; missing/dead intervals do not become a route.
+const segments = computed(() =>
+  visibleSamples.value.slice(1).flatMap((s, index) => {
+    const previous = visibleSamples.value[index]!
+    if ((s.tick ?? 0) - (previous.tick ?? 0) > 64) return []
+    return [point(previous.state!.x!, previous.state!.y!) + ' ' + point(s.state!.x!, s.state!.y!)]
+  }),
+)
+const cursor = computed(() => visibleSamples.value.at(-1))
+const utilityLines = computed(() =>
+  (showContext.value ? [...targetUtility.value, ...contextUtility.value] : targetUtility.value)
+    .filter((i) => (i.start_tick ?? 0) <= (tick.value ?? Infinity))
+    .map((i) => ({
+      ...i,
+      line: (i.points || [])
+        .filter((_p, n) => !i.point_ticks || i.point_ticks[n]! <= (tick.value ?? Infinity))
+        .map((p) => point(p[0], p[1]))
+        .join(' '),
+    })),
+)
+</script>
+<template>
+  <div class="map-controls">
+    <label><input v-model="showPlayer" type="checkbox" />目标玩家路径</label>
+    <label
+      ><input v-model="showUtility" type="checkbox" />目标道具（{{ targetUtility.length }}）</label
+    >
+    <label
+      ><input v-model="showContext" type="checkbox" />显示归属未知的道具（{{
+        contextUtility.length
+      }}）</label
+    >
+  </div>
+  <p class="muted small-text">
+    世界坐标二维投影 ·
+    橙色为目标玩家，虚线为归属未知的道具。位置采样不代表视角可见，未叠加雷达底图。
+  </p>
+  <p v-if="loading" role="status">正在读取第 {{ round }} 回合地图…</p>
+  <div v-else-if="error" role="alert" class="error-text">
+    {{ error }} <button class="button secondary compact" @click="load">重试地图</button>
+  </div>
+  <template v-else-if="bounds">
+    <svg
+      class="coordinate-map"
+      viewBox="0 0 720 400"
+      role="img"
+      :aria-label="`第 ${round} 回合玩家位置与道具轨迹图`"
+      data-testid="round-map"
+    >
+      <defs>
+        <pattern id="map-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#2a3034" stroke-width="1" />
+        </pattern>
+      </defs>
+      <rect width="720" height="400" fill="#12181d" />
+      <rect x="20" y="10" width="680" height="370" fill="url(#map-grid)" />
+      <g v-if="showPlayer">
+        <polyline
+          v-for="(line, index) in segments"
+          :key="index"
+          :points="line"
+          fill="none"
+          stroke="#ed9a60"
+          stroke-width="2"
+          opacity=".8"
+        />
+      </g>
+      <g v-if="showUtility || showContext">
+        <polyline
+          v-for="line in utilityLines.filter((i) =>
+            i.kind === 'unattributed_trajectories' ? showContext : showUtility,
+          )"
+          :key="line.event_id"
+          :points="line.line"
+          fill="none"
+          :stroke="line.kind === 'unattributed_trajectories' ? '#7e98b0' : '#90bcac'"
+          :stroke-dasharray="line.kind === 'unattributed_trajectories' ? '4 4' : undefined"
+          stroke-width="2"
+        >
+          <title>
+            {{ line.type }} ·
+            {{ line.kind === 'unattributed_trajectories' ? '投掷者未知' : '目标玩家' }}
+          </title>
+        </polyline>
+      </g>
+      <circle
+        v-if="showPlayer && cursor"
+        :cx="point(cursor.state!.x!, cursor.state!.y!).split(',')[0]"
+        :cy="point(cursor.state!.x!, cursor.state!.y!).split(',')[1]"
+        r="5"
+        fill="#ffd3a6"
+        stroke="#ed9a60"
+        stroke-width="3"
+      />
+      <text x="25" y="393" fill="#93989e" font-size="12">
+        X {{ numberText(bounds.minX, 0) }} … {{ numberText(bounds.maxX, 0) }} / Y
+        {{ numberText(bounds.minY, 0) }} … {{ numberText(bounds.maxY, 0) }}
+      </text>
+    </svg>
+    <label v-if="tickExtent.max > tickExtent.min" class="time-slider"
+      >回合时间游标 · tick {{ tick }}
+      <input
+        v-model.number="tick"
+        type="range"
+        :min="tickExtent.min"
+        :max="tickExtent.max"
+        step="1"
+        aria-label="地图时间游标"
+      />
+    </label>
+    <p class="muted small-text">
+      {{ samples.length }} 个存活状态采样 · 最近存活采样生命
+      {{ numberText(cursor?.state?.health, 0) }} · 空的目标轨迹不表示没有投掷道具。
+    </p>
+  </template>
+  <p v-else class="muted">该回合没有可绘制的坐标数据。</p>
+</template>
+<style scoped>
+.coordinate-map {
+  display: block;
+  width: 100%;
+  max-height: 460px;
+  margin: 14px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.map-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+  margin-bottom: 12px;
+}
+.map-controls label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.map-controls input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--orange);
+}
+.time-slider {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 14px 0;
+}
+.time-slider input {
+  padding: 0;
+  accent-color: var(--orange);
+}
+</style>

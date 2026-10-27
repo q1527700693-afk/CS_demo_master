@@ -1,0 +1,199 @@
+{
+  "schema_version": "1.1.0",
+  "match_id": "09a1429f-5539-4982-94d6-b9f8a0f7b3fa",
+  "package_id": "39fa6786-de7c-45ef-8edb-7eb16738e875",
+  "target_player_id": "76561199836146468",
+  "source": {
+    "demo_sha256": "0e87742c28df696baec54f03ab1310f0acb148da1f11aa4344b8c79a63ead839"
+  },
+  "exported_at": "2026-10-23T12:05:08.563292+00:00",
+  "producer": {
+    "app_version": "0.2.0",
+    "parser_version": "3.1.1",
+    "adapter_version": "2.0.1"
+  },
+  "match": {
+    "started_at": null,
+    "started_at_source": "unknown",
+    "map": "de_mirage",
+    "tick_rate": 64.0,
+    "complete": false,
+    "teams": [
+      {
+        "team_id": "team_counter-terrorist",
+        "name": "队伍 1",
+        "score": 10
+      },
+      {
+        "team_id": "team_terrorist",
+        "name": "队伍 2",
+        "score": 13
+      }
+    ]
+  },
+  "players": [
+    {
+      "player_id": "76561198784906570",
+      "name": "tuguofdk4",
+      "team_id": "team_counter-terrorist"
+    },
+    {
+      "player_id": "76561199836146468",
+      "name": "Pose",
+      "team_id": "team_counter-terrorist"
+    },
+    {
+      "player_id": "76561198732229480",
+      "name": "15286741569",
+      "team_id": "team_counter-terrorist"
+    },
+    {
+      "player_id": "76561198763953479",
+      "name": "真的假的",
+      "team_id": "team_counter-terrorist"
+    },
+    {
+      "player_id": "76561198738312429",
+      "name": "dmu775",
+      "team_id": "team_counter-terrorist"
+    },
+    {
+      "player_id": "76561199782319828",
+      "name": "kevin",
+      "team_id": "team_terrorist"
+    },
+    {
+      "player_id": "76561199198822126",
+      "name": "aminuosi11",
+      "team_id": "team_terrorist"
+    },
+    {
+      "player_id": "76561199706992432",
+      "name": "Alen",
+      "team_id": "team_terrorist"
+    },
+    {
+      "player_id": "76561198749448814",
+      "name": "艌薏",
+      "team_id": "team_terrorist"
+    },
+    {
+      "player_id": "76561199877630520",
+      "name": "按然",
+      "team_id": "team_terrorist"
+    }
+  ],
+  "is_fixture": false,
+  "files": {
+    "metrics.json": {
+      "sha256": "0e42ccec34683b9770e85f3f94e5c0572263551a8504371c4c39f25a33cd8dc7",
+      "size_bytes": 12287
+    },
+    "rounds.json": {
+      "sha256": "73d1896113a1f5ec24f289548274719e8ee3762758a3cb71b889f7c5cca33b53",
+      "size_bytes": 45823
+    },
+    "events.json": {
+      "sha256": "3b27d1f2d16ce6a27cff525539da1fbf7e2824c6201cab05423ed743d2a2be59",
+      "size_bytes": 858315
+    },
+    "map.json": {
+      "sha256": "e93423c882b392068ce431246538defc06426f7d5c2c93fca3d5958cf902e1dc",
+      "size_bytes": 8428309
+    }
+  },
+  "data_quality": {
+    "dataset_coverage": {
+      "stats": {
+        "status": "available",
+        "source_rows": 10,
+        "retained_source_rows": 1
+      },
+      "kills": {
+        "status": "available",
+        "source_rows": 167,
+        "retained_source_rows": 166
+      },
+      "damages": {
+        "status": "available",
+        "source_rows": 707,
+        "retained_source_rows": 199
+      },
+      "shots": {
+        "status": "available",
+        "source_rows": 2868,
+        "retained_source_rows": 443
+      },
+      "blinds": {
+        "status": "available",
+        "source_rows": 52,
+        "retained_source_rows": 15
+      },
+      "bomb": {
+        "status": "available",
+        "source_rows": 100,
+        "retained_source_rows": 97
+      },
+      "item_events": {
+        "status": "available",
+        "source_rows": 867,
+        "retained_source_rows": 166
+      },
+      "round_economy": {
+        "status": "available",
+        "source_rows": 46,
+        "retained_source_rows": 46
+      },
+      "grenades": {
+        "status": "available",
+        "source_rows": 15004,
+        "retained_source_rows": 15004
+      },
+      "smokes": {
+        "status": "available",
+        "source_rows": 40,
+        "retained_source_rows": 40
+      },
+      "fires": {
+        "status": "available",
+        "source_rows": 34,
+        "retained_source_rows": 34
+      }
+    },
+    "sampling": {
+      "periodic_interval_ticks": 32,
+      "periodic_interval_seconds": 0.5,
+      "combat_offsets_ticks": [
+        -1,
+        0,
+        1
+      ],
+      "nearby_radius_world_units": 800,
+      "nearby_limit_per_tick": 6,
+      "visibility": "not_evaluated",
+      "scope": "target_player_and_related_context"
+    },
+    "warnings": [
+      "Some events/states may be absent in the recording; null is unknown.",
+      "Reaction time, visibility, utility correctness and custom Rating are not computed.",
+      "Projectile owner fields are missing; unattributed trajectories are context only."
+    ]
+  },
+  "units": {
+    "time": "seconds from demo tick zero",
+    "tick": "original Demo tick",
+    "position": "Source Hammer world units, Z up",
+    "angles": "degrees",
+    "damage": "health/armor points from source events",
+    "ratios": "percent 0..100",
+    "snapshot_inventory": "awpy raw comma-separated item names"
+  },
+  "analysis_scope": {
+    "target_player_id": "76561199836146468",
+    "target_player_name": "Pose",
+    "nickname_query": "Pose",
+    "identity_confirmation": "user_confirmed_roster_selection",
+    "identity_verified": false,
+    "scope": "target_player_and_related_context"
+  }
+}
