@@ -16,7 +16,7 @@ export function normalizeConfig(config = {}) {
     mode: MODES.some(m => m.id === config.mode) ? config.mode : DEFAULT_CONFIG.mode,
     duration: [30, 60, 90].includes(config.duration) ? config.duration : 30,
     difficulty: config.mode === 'reaction' ? 'normal' : Object.hasOwn(DIFFICULTIES, config.difficulty) ? config.difficulty : 'normal',
-    input: config.input === 'pointer' ? 'pointer' : 'locked',
+    input: 'locked',
     sensitivity: Number.isFinite(Number(config.sensitivity)) ? Math.round(clamp(Number(config.sensitivity), 0.1, 5) * 100) / 100 : 1,
     fov: Number.isFinite(Number(config.fov)) ? Math.round(clamp(Number(config.fov), 50, 100)) : 64,
     graphicsQuality: config.graphicsQuality === 'detail' ? 'detail' : 'performance',
@@ -35,7 +35,7 @@ function numeric(value, min, max, fallback) { return Number.isFinite(Number(valu
 export function comparisonKey(config) {
   const c = normalizeConfig(config);
   if(c.mode==='reaction')return [`v${config.rulesVersion||1}`,c.mode,c.duration,config.rulesVersion>=3?'color-click':'arena-signal'].join(':');
-  return [`v${config.rulesVersion || 1}`, c.mode, c.duration, c.difficulty, c.input, c.input === 'locked' ? c.sensitivity : 1, config.rulesVersion === 2 ? c.fov : 'legacy'].join(':');
+  return [`v${config.rulesVersion || 1}`, c.mode, c.duration, c.difficulty, 'locked', c.sensitivity, config.rulesVersion === 2 ? c.fov : 'legacy'].join(':');
 }
 export const modeById = id => MODES.find(mode => mode.id === id) || MODES[0];
 export function primaryMetric(session) {

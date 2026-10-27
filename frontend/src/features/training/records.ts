@@ -20,7 +20,7 @@ export interface TrainingSession {
     mode: TrainingMode
     duration: number
     difficulty: 'easy' | 'normal' | 'hard'
-    input: 'locked' | 'pointer'
+    input: 'locked'
     sensitivity: number
     fov: number
   }
@@ -72,7 +72,7 @@ export function parseTrainingSession(value: unknown): TrainingSession | null {
     !TRAINING_MODES.some((mode) => mode.id === c.mode) ||
     ![30, 60, 90].includes(c.duration) ||
     !['easy', 'normal', 'hard'].includes(c.difficulty) ||
-    !['locked', 'pointer'].includes(c.input) ||
+    c.input !== 'locked' ||
     !finite(c.sensitivity) ||
     c.sensitivity < 0.1 ||
     c.sensitivity > 5 ||
@@ -132,16 +132,15 @@ export function trainingComparisonKey(c: TrainingSession['config']): string {
     c.mode,
     c.duration,
     c.difficulty,
-    c.input,
-    c.input === 'locked' ? c.sensitivity : 1,
+    'locked',
+    c.sensitivity,
     c.fov,
   ].join(':')
 }
 export function trainingGroupLabel(c: TrainingSession['config']): string {
   if (c.mode === 'reaction') return `${c.duration} 秒 · 变色反应`
   const difficulty = { easy: '入门', normal: '标准', hard: '挑战' }[c.difficulty]
-  const input = c.input === 'locked' ? `第一人称 · 灵敏度 ${c.sensitivity}` : '自由指针'
-  return `${c.duration} 秒 · ${difficulty} · ${input} · FOV ${c.fov}`
+  return `${c.duration} 秒 · ${difficulty} · 第一人称 · 灵敏度 ${c.sensitivity} · FOV ${c.fov}`
 }
 export function trainingStorageKey(owner: TrainingOwner): string {
   return PREFIX + encodeURIComponent(JSON.stringify([owner.id, owner.username, owner.createdAt]))

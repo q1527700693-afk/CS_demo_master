@@ -11,13 +11,6 @@ export function targetWorld(target) {
 export function lookRay(look) {
   return { x: -Math.sin(look.yaw) * Math.cos(look.pitch), y: Math.sin(look.pitch), z: -Math.cos(look.yaw) * Math.cos(look.pitch) };
 }
-export function pointerRay(cursor, aspect, fov) {
-  const tangent = Math.tan(radians(fov) / 2);
-  const x = (cursor.x / 1000 * 2 - 1) * tangent * aspect;
-  const y = (1 - cursor.y / 562.5 * 2) * tangent;
-  const length = Math.hypot(x, y, 1);
-  return { x: x / length, y: y / length, z: -1 / length };
-}
 export function rayHitsSphere(ray, target) {
   const center = targetWorld(target), y = center.y - EYE_HEIGHT;
   const along = center.x * ray.x + y * ray.y + center.z * ray.z;

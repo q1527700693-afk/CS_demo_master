@@ -1,5 +1,5 @@
 import { WIDTH, HEIGHT, normalizeConfig, DIFFICULTIES, clamp } from './modes.js';
-import { DEGREES_PER_COUNT, radians, lookRay, pointerRay, rayHitsSphere } from './spatial.js';
+import { DEGREES_PER_COUNT, radians, lookRay, rayHitsSphere } from './spatial.js';
 
 /** Pure training state. No DOM, storage or animation-frame dependency. Times are monotonic ms. */
 export class TrainingEngine {
@@ -16,9 +16,7 @@ export class TrainingEngine {
     this.countdownMs = 0;
     this.lastTime = null;
     this.targets = [];
-    this.cursor = { x: WIDTH / 2, y: HEIGHT / 2 };
     this.look = { yaw: 0, pitch: 0 };
-    this.aspect = 16 / 9;
     this.parametersChanged = false;
     this.shots = 0;
     this.hits = 0;
@@ -79,10 +77,6 @@ export class TrainingEngine {
     this.effects = this.effects.filter(effect => this.elapsedMs - effect.at < 350);
     if (this.elapsedMs >= this.config.duration * 1000) this.finish();
   }
-  move(x, y) {
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-    this.cursor = { x: clamp(x, 0, WIDTH), y: clamp(y, 0, HEIGHT) };
-  }
   relativeMove(dx, dy) {
     if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
     const scale = radians(DEGREES_PER_COUNT * this.config.sensitivity);
@@ -90,7 +84,7 @@ export class TrainingEngine {
     this.look.yaw = Math.atan2(Math.sin(this.look.yaw), Math.cos(this.look.yaw));
     this.look.pitch = clamp(this.look.pitch - dy * scale, radians(-85), radians(85));
   }
-  aimRay() { return this.config.input === 'locked' ? lookRay(this.look) : pointerRay(this.cursor, this.aspect, this.config.fov); }
+  aimRay() { return lookRay(this.look); }
   targetHit(target) { return rayHitsSphere(this.aimRay(), target); }
   pause(time = this.now()) {
     if (!['running', 'countdown'].includes(this.state)) return;
@@ -162,8 +156,8 @@ export class TrainingEngine {
     this.shots++;
     const index = this.targets.findIndex(target => this.targetHit(target));
     const hit = index !== -1;
-    if (this.events.length < 2500) this.events.push({ x: this.cursor.x, y: this.cursor.y, hit, at: this.elapsedMs });
-    this.effects.push({ x: this.cursor.x, y: this.cursor.y, hit, at: this.elapsedMs });
+    if (this.events.length < 2500) this.events.push({ x: WIDTH / 2, y: HEIGHT / 2, hit, at: this.elapsedMs });
+    this.effects.push({ x: WIDTH / 2, y: HEIGHT / 2, hit, at: this.elapsedMs });
     if (hit) {
       this.hits++;
       this.combo++;

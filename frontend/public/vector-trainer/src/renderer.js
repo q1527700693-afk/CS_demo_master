@@ -12,7 +12,7 @@ export class ArenaRenderer {
     this.renderer.shadowMap.enabled=false;
     this.scene=new THREE.Scene();this.scene.background=new THREE.Color('#e1e3e5');this.scene.fog=new THREE.Fog('#e1e3e5',45,110);
     this.camera=new THREE.PerspectiveCamera(64,16/9,.08,150);this.camera.position.set(0,EYE_HEIGHT,0);this.camera.rotation.order='YXZ';
-    this.targets=new Map();this.targetGeometry=new THREE.SphereGeometry(1,24,16);
+    this.targets=new Map();this.targetScene=new THREE.Scene();this.targetGeometry=new THREE.SphereGeometry(1,24,16);
     this.targetMaterial=new THREE.MeshStandardMaterial({color:0xe5773e,roughness:.47,metalness:.1,emissive:0x47200b,emissiveIntensity:.15});
     this.activeMaterial=new THREE.MeshStandardMaterial({color:0xa8db63,roughness:.5,emissive:0x416215,emissiveIntensity:.3});
     this.buildRange();
@@ -20,7 +20,9 @@ export class ArenaRenderer {
     const environmentCanvas=document.createElement('canvas');environmentCanvas.width=256;environmentCanvas.height=128;
     const envContext=environmentCanvas.getContext('2d'),gradient=envContext.createLinearGradient(0,0,0,128);
     gradient.addColorStop(0,'#f2ead3');gradient.addColorStop(.48,'#b6c2bc');gradient.addColorStop(.55,'#737d73');gradient.addColorStop(1,'#303a33');envContext.fillStyle=gradient;envContext.fillRect(0,0,256,128);envContext.fillStyle='#fff9e6';envContext.fillRect(25,15,48,8);envContext.fillRect(150,24,65,7);
-    this.environment=new THREE.CanvasTexture(environmentCanvas);this.environment.mapping=THREE.EquirectangularReflectionMapping;this.environment.colorSpace=THREE.SRGBColorSpace;this.weaponScene.environment=this.environment;this.scene.environment=this.environment;
+    this.environment=new THREE.CanvasTexture(environmentCanvas);this.environment.mapping=THREE.EquirectangularReflectionMapping;this.environment.colorSpace=THREE.SRGBColorSpace;this.weaponScene.environment=this.environment;this.scene.environment=this.environment;this.targetScene.environment=this.environment;
+    this.targetScene.add(new THREE.HemisphereLight(0xf3f5f7,0x8e949b,2.3));
+    const targetKey=new THREE.DirectionalLight(0xffffff,2);targetKey.position.set(-12,25,8);this.targetScene.add(targetKey);
     this.weapon={root:new THREE.Group(),fire(){},update(){}};this.weaponScene.add(this.weapon.root);
     const rangeReady=this.ready;this.ready=Promise.all([rangeReady,createValveViewmodel()]).then(([,weapon])=>{if(this.disposed){this.disposeScene(weapon.root);for(const source of weapon.sources||[])this.disposeScene(source);return;}this.weaponScene.remove(this.weapon.root);this.weapon=weapon;this.weaponScene.add(weapon.root);this.assetsReady=true;});
     this.weaponScene.add(new THREE.HemisphereLight(0xe4e8ed,0x42474c,2.0));
@@ -102,24 +104,24 @@ export class ArenaRenderer {
     const look=engine.config.input==='locked'?engine.look:{yaw:0,pitch:0};this.camera.rotation.set(look.pitch,look.yaw,0,'YXZ');
     const preview=['idle','finished'].includes(engine.state);
     const list=preview?(engine.config.mode==='gridshot'?[{id:1,x:330,y:141,radius:27},{id:2,x:670,y:281,radius:27},{id:3,x:500,y:421,radius:27}]:[{id:1,x:500,y:250,radius:engine.config.mode==='microshot'?12:30}]):engine.targets;
-    const ids=new Set(list.map(t=>t.id));for(const[id,mesh]of this.targets)if(!ids.has(id)){this.scene.remove(mesh);this.targets.delete(id);}
-    for(const target of list){let mesh=this.targets.get(target.id);if(!mesh){mesh=new THREE.Mesh(this.targetGeometry,this.targetMaterial);mesh.castShadow=false;this.scene.add(mesh);this.targets.set(target.id,mesh);}const p=targetWorld(target);mesh.position.set(p.x,p.y,p.z);mesh.scale.setScalar(p.radius);mesh.material=engine.config.mode==='tracking'&&!preview&&engine.targetHit(target)?this.activeMaterial:this.targetMaterial;mesh.visible=engine.config.mode!=='reaction';}
+    const ids=new Set(list.map(t=>t.id));for(const[id,mesh]of this.targets)if(!ids.has(id)){this.targetScene.remove(mesh);this.targets.delete(id);}
+    for(const target of list){let mesh=this.targets.get(target.id);if(!mesh){mesh=new THREE.Mesh(this.targetGeometry,this.targetMaterial);mesh.castShadow=false;this.targetScene.add(mesh);this.targets.set(target.id,mesh);}const p=targetWorld(target);mesh.position.set(p.x,p.y,p.z);mesh.scale.setScalar(p.radius);mesh.material=engine.config.mode==='tracking'&&!preview&&engine.targetHit(target)?this.activeMaterial:this.targetMaterial;mesh.visible=engine.config.mode!=='reaction';}
     const dt=Math.min(.1,Math.max(0,(time-this.lastTime)/1000));this.lastTime=time;this.recoil=Math.max(0,this.recoil-dt*7);
     const breath=reducedMotion?0:Math.sin(time*.0016)*.0015;
     this.weapon.root.position.set(.12,-.14+breath+this.recoil*.008,-.34+this.recoil*.025);
-    const pointer=engine.config.input==='pointer'&&!preview;
-    this.weaponAim.set(pointer?engine.cursor.x/500-1:0,pointer?1-engine.cursor.y/281.25:0,.5).unproject(this.weaponCamera);
+    this.weaponAim.set(0,0,.5).unproject(this.weaponCamera);
     this.weaponAim.multiplyScalar(12/-this.weaponAim.z);this.weapon.aimAt?.(this.weaponAim);this.weapon.update(dt,this.recoil);
     this.renderer.setRenderTarget(null);this.renderer.render(this.scene,this.camera);
-    this.renderer.autoClear=false;this.renderer.clearDepth();this.renderer.render(this.weaponScene,this.weaponCamera);this.renderer.autoClear=true;
+    this.renderer.autoClear=false;this.renderer.clearDepth();this.renderer.render(this.weaponScene,this.weaponCamera);
+    // Targets are the interaction layer: draw them last so the viewmodel can never hide a ball.
+    this.renderer.clearDepth();this.renderer.render(this.targetScene,this.camera);this.renderer.autoClear=true;
   }
   project(target){const p=targetWorld(target),v=new THREE.Vector3(p.x,p.y,p.z).project(this.camera),r=this.canvas.getBoundingClientRect();return{x:r.left+(v.x+1)/2*r.width,y:r.top+(1-v.y)/2*r.height};}
   dispose(loseContext=false){
     this.disposed=true;
     this.canvas.removeEventListener('webglcontextlost',this.onContextLost);
     const geometries=new Set(),materials=new Set(),textures=new Set();
-    for(const scene of[this.scene,this.weaponScene,...(this.assetSources||[]),...(this.weapon.sources||[])])scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);for(const material of Array.isArray(object.material)?object.material:object.material?[object.material]:[]){materials.add(material);for(const value of Object.values(material))if(value?.isTexture)textures.add(value);}});
+    for(const scene of[this.scene,this.targetScene,this.weaponScene,...(this.assetSources||[]),...(this.weapon.sources||[])])scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);for(const material of Array.isArray(object.material)?object.material:object.material?[object.material]:[]){materials.add(material);for(const value of Object.values(material))if(value?.isTexture)textures.add(value);}});
     for(const g of geometries)g.dispose();for(const t of textures){t.dispose();t.source?.data?.close?.();}for(const m of materials)m.dispose();this.environment.dispose();this.targetGeometry.dispose();this.targetMaterial.dispose();this.activeMaterial.dispose();this.renderer.dispose();if(loseContext)this.renderer.forceContextLoss();
   }
 }
-export function canvasPoint(canvas,clientX,clientY){const r=canvas.getBoundingClientRect();return{x:(clientX-r.left)/r.width*1000,y:(clientY-r.top)/r.height*562.5};}

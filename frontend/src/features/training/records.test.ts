@@ -83,7 +83,7 @@ describe('account-owned training personal bests', () => {
     )
     expect(JSON.parse(storage.getItem('vector.trainer.sessions.v1')!)[0].id).toBe('old-shared')
   })
-  it('separates duration, difficulty, input and first-person parameters; ignores aim parameters for reaction', () => {
+  it('separates duration, difficulty and first-person parameters; ignores aim parameters for reaction', () => {
     const storage = store()
     const normal = session('normal')
     const longer = session('longer')
@@ -97,7 +97,7 @@ describe('account-owned training personal bests', () => {
     expect(getTrainingBests(owner, storage)).toHaveLength(4)
     const reaction = session('reaction', 'reaction', 200)
     expect(trainingComparisonKey(reaction.config)).toBe(
-      trainingComparisonKey({ ...reaction.config, fov: 90, sensitivity: 3, input: 'pointer' }),
+      trainingComparisonKey({ ...reaction.config, fov: 90, sensitivity: 3 }),
     )
   })
   it('excludes changed-parameter, incomplete/legacy, missing-metric and corrupt sessions, strips input events', () => {
@@ -115,6 +115,7 @@ describe('account-owned training personal bests', () => {
     noReaction.metrics.reactionMs = null
     expect(recordTrainingSession(owner, noReaction, storage)).toBe('ignored')
     expect(parseTrainingSession(null)).toBeNull()
+    expect(parseTrainingSession({ ...session('old-pointer'), config: { ...session('old-pointer').config, input: 'pointer' } })).toBeNull()
     const extra = { ...session('valid'), events: [{ privateInput: 'omitted' }] }
     recordTrainingSession(owner, extra, storage)
     expect(storage.getItem(trainingStorageKey(owner))).not.toContain('privateInput')
