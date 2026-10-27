@@ -1,6 +1,7 @@
 import { apiBase, TOKEN_KEY } from '@/app/config'
 import { useAuthStore } from '@/stores/auth'
 import type { AnalysisReport, ReplayDetails, AnalysisRun, MatchInfo } from './contracts'
+import { canUseLocalReplayLibrary } from './browser-capabilities'
 
 export interface LocalResult {
   analysis_id: string
@@ -19,6 +20,7 @@ export interface LocalResult {
 
 // Account namespace on this machine, not a cloud credential. JWTs never go to the companion.
 export async function libraryOwner() {
+  if (!canUseLocalReplayLibrary()) throw new Error('本地复盘资料库仅在本机前端服务中可用')
   const token = localStorage.getItem(TOKEN_KEY)
   if (!token) throw new Error('请先登录再读取本地复盘')
   const payload = JSON.parse(atob(token.split('.')[1]!.replace(/-/g, '+').replace(/_/g, '/')))
@@ -51,6 +53,7 @@ export async function listLocalResults(): Promise<LocalResult[]> {
   return (await local<{ items: LocalResult[] }>(`/local/library/${owner}`)).items
 }
 export async function localResource<T>(key: string): Promise<T | undefined> {
+  if (!canUseLocalReplayLibrary()) return undefined
   try {
     const token = localStorage.getItem(TOKEN_KEY)
     const owner = await libraryOwner()

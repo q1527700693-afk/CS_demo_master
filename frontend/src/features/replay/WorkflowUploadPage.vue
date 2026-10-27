@@ -17,6 +17,7 @@ import {
   localBase,
 } from './analysis-api'
 import type { AcceptedPackage, StageProgress } from './contracts'
+import { newRequestKey } from './browser-capabilities'
 
 const mode = ref<'zip' | 'demo'>('zip'),
   file = ref<File | null>(null)
@@ -32,7 +33,7 @@ const cloudFailed = ref(false)
 let disposed = false,
   accepted: AcceptedPackage | null = null,
   generatedFile: File | null = null
-let requestKey = crypto.randomUUID()
+let requestKey = newRequestKey()
 const stages = ref<StageProgress[]>([])
 function reset() {
   stages.value = [
@@ -88,7 +89,7 @@ function select(candidate: File | null) {
   ready.value = false
   cloudFailed.value = false
   error.value = ''
-  requestKey = crypto.randomUUID()
+  requestKey = newRequestKey()
   reset()
 }
 const wait = () => new Promise((resolve) => setTimeout(resolve, 1000))
@@ -228,7 +229,7 @@ async function retryCloud() {
   error.value = ''
   try {
     const old = await getAnalysis(analysisId.value)
-    const run = await startAnalysis(old, crypto.randomUUID())
+    const run = await startAnalysis(old, newRequestKey())
     analysisId.value = run.analysis_id
     cloudFailed.value = false
     sessionStorage.setItem(pendingKey(), run.analysis_id)

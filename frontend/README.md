@@ -1,6 +1,8 @@
 # CS Demo Master 前端框架
 
-> 本文件夹为 `front_end_v1.0` 交接版。独立启动方法和外部服务边界见 [HANDOFF.md](HANDOFF.md)；下文保留原工作区开发说明。
+## 服务器部署说明
+
+从 v1.0.1 起，公网部署的“我的复盘”读取后端保存的比赛和报告；仅本机 `localhost` / `127.0.0.1` 开发环境使用 `/local` 解析服务和本地资料库。公网 HTTP 页面没有 `crypto.subtle`，因此不能把本机资料库流程直接用于服务器页面。服务器仍建议配置 HTTPS；上传 ZIP 和云端复盘通过 `/api/v1` 访问后端。
 
 面向软件工程课程小组独立开发的 Vue 3 + Vite + TypeScript 前端。代码集中在 `front_end`。登录、个人资料、好友、车队和 Demo 均已对接真实后端，训练仍是本地原游戏。好友与车队最新说明见 [好友车队联调](docs/SOCIAL-LOBBY-INTEGRATION.md)。
 

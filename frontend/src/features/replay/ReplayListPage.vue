@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import LiveReplayList from './LocalReplayLibrary.vue'
+import LocalReplayLibrary from './LocalReplayLibrary.vue'
+import LiveReplayList from './LiveReplayList.vue'
+import { canUseLocalReplayLibrary } from './browser-capabilities'
 </script>
 <template>
-  <LiveReplayList />
+  <LocalReplayLibrary v-if="canUseLocalReplayLibrary()" />
+  <LiveReplayList v-else />
 </template>
