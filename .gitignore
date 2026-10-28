@@ -1,4 +1,4 @@
-﻿# Python
+# Python
 __pycache__/
 *.py[cod]
 .venv/
@@ -12,6 +12,12 @@ env/
 node_modules/
 dist/
 .vite/
+.npm-cache/
+
+# Native demo parser runtime: wheels, scratch demos and extracted dependencies
+parser/.pydeps/
+parser/wheels/
+parser/.tmp/
 
 # Database
 *.db
@@ -35,6 +41,7 @@ data/logs/
 # Test leftovers
 tests/_tmp/
 backend/tests/replay-tmp-*/
+backend/tests/demo-tmp-*/
 backend/data/replays/
 *.db-shm
 *.db-wal

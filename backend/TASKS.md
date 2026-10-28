@@ -164,10 +164,10 @@ Authorization: Bearer <token>
 
 | 接口 | 文件 | 要求 | 状态 |
 |---|---|---|---|
-| POST `/api/v1/demos` | `src/routes/demos.js` | 上传 Demo 日志并创建分析任务 | TODO |
-| GET `/api/v1/demos` | `src/routes/demos.js` | 查询自己的分析历史 | TODO |
-| GET `/api/v1/demos/:id/status` | `src/routes/demos.js` | 查询分析状态 | TODO |
-| GET `/api/v1/demos/:id/report` | `src/routes/demos.js` | 获取 AI 报告 | TODO |
+| POST `/api/v1/demos` | `src/routes/demos.js` | 上传 Demo 日志并创建分析任务（旧 ZIP 兼容） | DONE（旧客户端，仅 ZIP） |
+| GET `/api/v1/demos` | `src/routes/demos.js` | 查询自己的分析历史 | DONE |
+| GET `/api/v1/demos/:id/status` | `src/routes/demos.js` | 查询分析状态 | DONE（`GET /api/v1/demos/:id`） |
+| GET `/api/v1/demos/:id/report` | `src/routes/demos.js` | 获取 AI 报告 | DONE |
 | POST `/api/v1/demos/:id/analyze` | `src/routes/demos.js` | 重新触发分析 | TODO |
 
 AI 分析先调外部 LLM API，不在服务器本地跑大模型。
@@ -182,6 +182,37 @@ AI 分析先调外部 LLM API，不在服务器本地跑大模型。
 - 环境变量：`DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`、`AI_TIMEOUT_MS`、`AI_MAX_TOKENS`、`AI_PROMPT_VERSION`。
 - 未配置 Key 时返回 `50300`，不影响基础报告。
 - 当前为同步调用；后续可加独立 AI 队列、缓存和前端 AI 卡片。
+
+#### 4.6.1 原始 Demo 文件（新增，已实现）
+
+服务端直接接收 CS2 `.dem`，用 awpy 解析后再生成规则报告与 AI 解读：
+
+| 接口 | 文件 | 说明 | 状态 |
+|---|---|---|---|
+| GET `/api/v1/demo-analyses/parser` | `src/routes/demoAnalyses.js` | 解析器/AI 就绪状态 | DONE |
+| POST `/api/v1/demo-analyses` | 同上 | 上传 `.dem`（≤512 MiB），可选 `target_player_id` | DONE |
+| GET `/api/v1/demo-analyses` | 同上 | 我的 Demo 分析列表 | DONE |
+| GET `/api/v1/demo-analyses/:id` | 同上 | 状态：parsing/analyzing/reporting/completed/failed | DONE |
+| GET `/api/v1/demo-analyses/:id/report` | 同上 | 标准报告 | DONE |
+| GET `/api/v1/demo-analyses/:id/details` | 同上 | 扩展报告（模块/规则/回合/走位） | DONE |
+| GET `/api/v1/demo-analyses/:id/rounds/:round` | 同上 | 单回合事件与规则命中 | DONE |
+| GET `/api/v1/demo-analyses/:id/rounds/:round/map` | 同上 | 分页点位/轨迹 | DONE |
+| GET `/api/v1/demo-analyses/:id/evidence/:event` | 同上 | 单条证据 | DONE |
+| GET/POST `/api/v1/demo-analyses/:id/ai` | 同上 | 读取/生成 AI 教练解读（独立 AI 任务） | DONE |
+| DELETE `/api/v1/demo-analyses/:id` | 同上 | 删除分析与 AI 任务 | DONE |
+
+| 组件 | 文件 | 说明 | 状态 |
+|---|---|---|---|
+| Demo 解析器 | `../parser/parse_demo.py` | awpy 抽事实，契约 `demo-parse-1.0.0` | DONE |
+| 解析器桥接 | `src/services/demoParser.js` | 探测解释器、子进程、超时、错误映射 | DONE |
+| Demo 规则与报告 | `src/services/demoAnalysis.js` | 模块、规则、报告、地图 JSONL、证据 | DONE |
+| 任务执行体 | `src/services/replayJobRunner.js` | import/analysis/demo/ai 统一入口 | DONE |
+| AI 演示事实 | `src/services/aiAnalysis.js` | `buildDemoFacts` / `analyzeDemo` | DONE |
+| 离线验收 | `scripts/analyze-demo.js` | 不经过 JWT/队列跑真实 Demo | DONE |
+
+- 新增环境变量：`DEMO_PARSER_PYTHON`、`DEMO_PARSER_SCRIPT`、`DEMO_PARSER_PYTHONPATH`、`DEMO_PARSER_TIMEOUT_MS`、`AI_AUTO_ANALYZE`。
+- 新增错误码：`50310`（解析器不可用）。
+- 设计文档：`../docs/ai-demo-analysis-design.md`。
 
 ### 4.7 小游戏模块
 

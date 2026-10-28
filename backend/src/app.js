@@ -10,6 +10,7 @@ const userRoutes = require('./routes/users');
 const lobbyRoutes = require('./routes/lobbies');
 const friendRoutes = require('./routes/friends');
 const demoRoutes = require('./routes/demos');
+const demoAnalysisRoutes = require('./routes/demoAnalyses');
 const errorHandler = require('./middlewares/errorHandler');
 const { success } = require('./utils/response');
 
@@ -44,6 +45,7 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/lobbies', lobbyRoutes);
 app.use('/api/v1/friends', friendRoutes);
 app.use('/api/v1/demos', demoRoutes);
+app.use('/api/v1/demo-analyses', demoAnalysisRoutes);
 app.use('/api/v1', require('./routes/analysis'));
 
 app.use((request, response) =>

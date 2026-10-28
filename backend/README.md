@@ -195,6 +195,60 @@ Behavior:
 - AI failure does not modify or invalidate the base rule report.
 - The current call is synchronous; a separate AI task queue can be added later.
 
+## Implemented: Raw Demo File Analysis (`.dem` → rules → AI)
+
+The ZIP APIs above assume the demo was already parsed on the user's machine. This
+module removes that assumption: the server accepts a raw CS2 `.dem`, parses it with
+[awpy](../parser/README.md), builds the same report shapes and can generate the AI
+coach from the parsed facts.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/v1/demo-analyses/parser` | yes | Parser availability, awpy version, AI configuration |
+| POST | `/api/v1/demo-analyses` | yes | Upload `.dem` (multipart `file`, ≤512 MiB), optional `target_player_id` |
+| GET | `/api/v1/demo-analyses` | yes | My demo analyses |
+| GET | `/api/v1/demo-analyses/:id` | yes | Status: `queued/parsing/analyzing/reporting/completed/failed` |
+| GET | `/api/v1/demo-analyses/:id/report` | yes | Standard report (`report.schema.json`) |
+| GET | `/api/v1/demo-analyses/:id/details` | yes | Extended report (modules, findings, rounds, movement) |
+| GET | `/api/v1/demo-analyses/:id/rounds/:round` | yes | One round with its events and finding ids |
+| GET | `/api/v1/demo-analyses/:id/rounds/:round/map` | yes | Paginated map JSONL (`offset`, `limit`) |
+| GET | `/api/v1/demo-analyses/:id/evidence/:event` | yes | One evidence event (`kill_0001`, `death_0001`, …) |
+| GET | `/api/v1/demo-analyses/:id/ai` | yes | AI result or `not_generated` / `not_configured` + `last_error` |
+| POST | `/api/v1/demo-analyses/:id/ai` | yes | Queue AI coaching (`?force=true` regenerates) |
+| DELETE | `/api/v1/demo-analyses/:id` | yes | Delete the analysis and its AI jobs |
+
+Design notes:
+
+- The upload sniffs the CS2 magic (`PBDEMS2`). CS:GO demos (`HL2DEMO`) and
+  gzip archives are rejected with 400 instead of being parsed as garbage.
+- Parsing happens in the queue's child process through
+  `parser/parse_demo.py`; the API process never decodes a demo.
+- `target_player_id` is optional. Without it the top fragger is used and
+  `target_selection` reports `auto_top_fragger`; with it the value is
+  `explicit`. The resolved player appears in the report and in the status
+  payload after parsing.
+- Job stages are `parsing → analyzing → reporting`. Parsing gets a 600 s budget,
+  the AI job 180 s; both are separate row kinds in `replay_jobs`.
+- Findings are deterministic (`death_reloading`, `death_holding_utility`,
+  `death_unused_utility`, `untraded_death`, `self_flash`, `team_flash`,
+  `opening_death`, `eco_loss`) and each one carries real evidence ids.
+- Modules without data are omitted rather than reported as `insufficient_data`,
+  so an ordinary match is not labelled `partial` just because it had no clutch.
+- `POST /ai` enqueues a `kind='ai'` job: a slow provider never blocks the parse
+  queue, and an AI failure leaves the rule report untouched. Set
+  `AI_AUTO_ANALYZE=true` to generate it automatically once a report is ready.
+- `GET /ai` exposes `queued`, `stage` and `last_error` so the frontend can show
+  progress or the failure reason.
+
+Full design, contracts and failure matrix: [ai-demo-analysis-design.md](../docs/ai-demo-analysis-design.md).
+Parser installation and CLI: [parser/README.md](../parser/README.md).
+
+Offline acceptance on a real demo (no JWT, no queue):
+
+```bash
+node scripts/analyze-demo.js match.dem data/demo-acceptance
+```
+
 ## Tests
 
 ```bash
@@ -219,9 +273,17 @@ pagination, and friend removal/re-request.
 
 `tests/replay.test.js` covers ZIP validation, queueing, idempotency, reports,
 evidence, ownership, deletion and lease recovery. `tests/aiAnalysis.test.js`
-covers the disabled state, compact-fact provider call, output schema validation
-and rejection of unknown evidence IDs. All files use an in-memory SQLite
-database and temporary directories; the suite currently has 94 tests.
+covers the disabled state, compact-fact provider call, output schema validation,
+rejection of unknown evidence IDs and the demo-specific facts/validation.
+`tests/demoAnalysis.test.js` covers demo normalization, rules, map JSONL, the
+standard report schema and artifact writing. `tests/demoAnalyses.test.js` covers
+the demo HTTP pipeline end to end (upload, magic-byte rejection, target
+selection, rounds/map/evidence, AI success, AI failure, ownership, deletion and
+an unavailable parser).
+
+Note: the demo HTTP tests and the ZIP suites run the queue through
+`startQueue({ runner: runJob })`, because some sandboxes forbid spawning child
+processes. Production always forks `replayWorker.js`.
 
 ## Layout
 
@@ -238,13 +300,18 @@ backend/
     routes/lobbies.js        lobby hall routes
     routes/friends.js        friend request / friend list routes
     routes/analysis.js       ZIP replay APIs + AI coaching routes
+    routes/demoAnalyses.js   raw .dem upload, status, report, map, evidence, AI
+    routes/demos.js          legacy /demos ZIP compatibility
     services/authService.js
     services/profileService.js   card validation, Steam ids, avatar resizing
     services/lobbyService.js     team-code posts, claims, expiry, deletion
     services/friendService.js    search, requests, friendships
     services/replayImport.js     ZIP extraction, Schema and cross-file validation
     services/replayAnalysis.js   deterministic rule analysis and evidence
-    services/replayQueue.js      persistent single-worker queue
+    services/replayQueue.js      persistent single-worker queue (+ inline test runner)
+    services/replayJobRunner.js  what a job does, independent of how it runs
+    services/demoParser.js       python/awpy bridge: probe, spawn, timeout, errors
+    services/demoAnalysis.js     demo rules, modules, reports, map JSONL, evidence
     services/aiAnalysis.js       optional provider call and AI output validation
     utils/response.js        { code, message, data } envelope + ApiError
   tests/profile.test.js
@@ -252,7 +319,11 @@ backend/
   tests/friends.test.js
   tests/replay.test.js
   tests/aiAnalysis.test.js
-  tests/friends.test.js
+  tests/demoAnalysis.test.js
+  tests/demoAnalyses.test.js
+  tests/fixtures/demo-parse-sample.js   parser payload fixture
+  tests/fixtures/stub-parser.js         CLI-compatible parser stand-in
+  scripts/analyze-demo.js  offline .dem acceptance run
   uploads/avatars/           runtime, git ignored
   uploads/demo-logs/         runtime, git ignored
   data/                      SQLite file, git ignored

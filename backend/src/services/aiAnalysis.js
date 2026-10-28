@@ -147,7 +147,7 @@ function buildFacts(details, analysisId = null) {
     };
 }
 
-function knownEvidenceIds(details) {
+function knownEvidenceIds(details, extra = []) {
     const ids = new Set();
     const add = (values) => {
         if (!Array.isArray(values)) return;
@@ -156,6 +156,7 @@ function knownEvidenceIds(details) {
         }
     };
 
+    add(extra);
     for (const module of Object.values(details?.statistics?.modules || {})) {
         add(module?.evidence_ids);
     }
@@ -178,13 +179,15 @@ function parseModelJson(content) {
     }
 }
 
-function validateAiResult(result, details) {
+function validateAiResult(result, details, allowedEvidenceIds = null) {
     if (!validateResponse(result)) {
         const reason = validateResponse.errors?.[0]?.message || 'Invalid AI response';
         throw upstreamError(`AI response failed validation: ${reason}`);
     }
 
-    const known = knownEvidenceIds(details);
+    const known = allowedEvidenceIds instanceof Set
+        ? allowedEvidenceIds
+        : knownEvidenceIds(details, allowedEvidenceIds || []);
     const areas = [...result.improvement_areas, ...result.strengths];
     for (const area of areas) {
         for (const evidenceId of area.evidence_ids || []) {
@@ -224,7 +227,7 @@ const SYSTEM_PROMPT = `你是 CS2 教练。
   "data_limitations": ["string"]
 }`;
 
-async function callDeepSeek(facts, config) {
+async function callDeepSeek(facts, config, systemPrompt = SYSTEM_PROMPT) {
     let response;
     try {
         response = await fetch(`${config.baseUrl}/chat/completions`, {
@@ -236,7 +239,7 @@ async function callDeepSeek(facts, config) {
             body: JSON.stringify({
                 model: config.model,
                 messages: [
-                    { role: 'system', content: SYSTEM_PROMPT },
+                    { role: 'system', content: systemPrompt },
                     { role: 'user', content: JSON.stringify(facts) }
                 ],
                 temperature: 0.2,
@@ -277,8 +280,15 @@ async function analyze(details, options = {}) {
     }
 
     const analysisId = options.analysisId || details?.analysis_id || null;
-    const facts = buildFacts(details, analysisId);
-    const result = validateAiResult(await callDeepSeek(facts, config), details);
+    const facts = options.facts || buildFacts(details, analysisId);
+    const allowed = options.allowedEvidenceIds
+        ? knownEvidenceIds(details, options.allowedEvidenceIds)
+        : null;
+    const result = validateAiResult(
+        await callDeepSeek(facts, config, options.systemPrompt || SYSTEM_PROMPT),
+        details,
+        allowed
+    );
     return {
         ai_status: 'completed',
         analysis_id: analysisId,
@@ -289,12 +299,130 @@ async function analyze(details, options = {}) {
     };
 }
 
+/**
+ * Compact facts for a demo-file analysis. The model never receives raw points,
+ * the full event stream or the demo binary, only what the rules measured.
+ */
+function buildDemoFacts(details, analysisId = null) {
+    const source = details && typeof details === 'object' ? details : {};
+    const modules = {};
+    for (const [name, module] of Object.entries(source.statistics?.modules || {})) {
+        modules[name] = compactModule(module);
+    }
+    const rounds = (source.rounds || []).slice(0, 60).map((round) => ({
+        round_num: round.round_num,
+        winner_side: round.winner_side ?? null,
+        buy: round.buy ? {
+            ct: round.buy.ct?.buy_type ?? null,
+            t: round.buy.t?.buy_type ?? null
+        } : null,
+        target: {
+            kills: round.target?.kills ?? 0,
+            deaths: round.target?.deaths ?? 0,
+            damage: round.target?.damage ?? 0,
+            buy_type: round.target?.buy_type ?? null,
+            equipment_value: round.target?.equipment_value ?? null
+        }
+    }));
+    return {
+        kind: 'demo_file',
+        analysis_id: analysisId,
+        match: source.match ? {
+            map: source.match.map,
+            score: source.match.score,
+            rounds_played: source.match.rounds_played,
+            complete: source.match.complete,
+            tick_rate: source.match.tick_rate
+        } : null,
+        target: {
+            player_id: source.target_player_id || null,
+            name: source.target_player?.name ?? null,
+            team: source.target_player?.team ?? null,
+            selection: source.target_selection || null,
+            teammates: (source.target_player?.teammates || []).map((player) => player.name)
+        },
+        modules,
+        rounds,
+        findings: (source.findings || []).slice(0, 80).map((finding) => ({
+            finding_id: finding.finding_id,
+            rule_id: finding.rule_id,
+            round_num: finding.round_num,
+            evidence_ids: finding.evidence_ids || [],
+            observation: finding.observation
+        })),
+        key_rounds: (source.key_rounds || []).slice(0, 20),
+        movement: source.movement || null,
+        data_quality: source.data_quality || null,
+        limitations: source.limitations || []
+    };
+}
+
+const DEMO_SYSTEM_PROMPT = `你是 CS2 教练，正在解读一份从用户上传的 Demo 文件自动解析出的比赛数据。
+你只能使用输入 JSON 中出现的回合、数值、玩家、经济和证据 ID，不能编造击杀、时间、位置、经济或因果关系。
+你不曾观看比赛画面，只能依据解析数据推断；不要声称看过 Demo 或视频，不要输出综合评分。
+每条 improvement_area 和 strength 至少引用一个输入中真实存在的 evidence_ids；如果某个想法在输入里找不到证据，就不要输出该条。
+优先给出可训练、可验证的行为建议：道具有无使用、死亡位置、经济局目标、首杀/首死的对枪选择、换人配合。
+只返回严格 JSON，结构必须是：
+{
+  "summary": "string",
+  "improvement_areas": [
+    {
+      "priority": "high|medium|low",
+      "category": "utility|aim|movement|decision_making|teamwork|economy|other",
+      "title": "string",
+      "evidence_ids": ["string"],
+      "explanation": "string",
+      "training": ["string"]
+    }
+  ],
+  "strengths": [
+    {
+      "title": "string",
+      "evidence_ids": ["string"],
+      "explanation": "string"
+    }
+  ],
+  "data_limitations": ["string"]
+}`;
+
+/**
+ * AI coaching for a demo-file analysis. Evidence is the union of the report's
+ * own ids and the ids the caller knows from the evidence index, so the model can
+ * cite any measured event of this demo and nothing else.
+ */
+async function analyzeDemo(details, options = {}) {
+    const config = configuration();
+    if (!config.apiKey) throw notConfiguredError();
+    const analysisId = options.analysisId || details?.source?.match_id || null;
+    const facts = options.facts || buildDemoFacts(details, analysisId);
+    const allowed = knownEvidenceIds(details, options.evidenceIds || []);
+    const result = validateAiResult(await callDeepSeek(facts, config, DEMO_SYSTEM_PROMPT), details, allowed);
+    return {
+        ai_status: 'completed',
+        analysis_id: analysisId,
+        source: {
+            kind: 'demo_file',
+            match_id: details?.source?.match_id || null,
+            demo_sha256: details?.source?.demo?.sha256 || null,
+            target_player_id: details?.target_player_id || null
+        },
+        model: config.model,
+        prompt_version: `${config.promptVersion}-demo`,
+        generated_at: new Date().toISOString(),
+        ...result
+    };
+}
+
 module.exports = {
     analyze,
+    analyzeDemo,
     buildFacts,
+    buildDemoFacts,
     isConfigured,
     configuration,
     validateAiResult,
     knownEvidenceIds,
-    PROMPT_VERSION: DEFAULT_PROMPT_VERSION
+    PROMPT_VERSION: DEFAULT_PROMPT_VERSION,
+    SYSTEM_PROMPT,
+    DEMO_SYSTEM_PROMPT
 };

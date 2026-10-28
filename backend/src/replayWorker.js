@@ -1,16 +1,16 @@
 'use strict';
-const { analyze } = require('./services/replayAnalysis');
-const fs = require('node:fs/promises');
-const path = require('node:path');
-const { importPackage, saveCloudReport } = require('./services/cloudReplay');
-// Also bound orphaned workers if the API process exits unexpectedly.
-setTimeout(() => process.exit(1), 120000).unref();
-async function work() {
-    const dir = process.argv[2], kind = process.argv[3];
-    if (kind === 'import') return importPackage(dir);
-    const report = await analyze(dir, stage => process.send?.({ stage }));
-    if (kind === 'analysis') await saveCloudReport(dir, report, JSON.parse(await fs.readFile(path.join(dir, 'task.json'), 'utf8')));
-}
-work()
+
+const { runJob } = require('./services/replayJobRunner');
+
+// The queue also kills the child; this watchdog covers a hung parse that ignores
+// the budget (for example while a native decoder is stuck inside a thread).
+const budget = Number(process.argv[4]) || 120_000;
+setTimeout(() => process.exit(1), budget + 15_000).unref();
+
+runJob(process.argv[2], process.argv[3], (message) => process.send?.(message))
     .then(() => { process.send?.({ ready: true }); process.disconnect?.(); })
-    .catch(error => { process.send?.({ error: error.message.slice(0, 300) }); process.exitCode = 1; process.disconnect?.(); });
+    .catch((error) => {
+        process.send?.({ error: String(error.message).slice(0, 300) });
+        process.exitCode = 1;
+        process.disconnect?.();
+    });

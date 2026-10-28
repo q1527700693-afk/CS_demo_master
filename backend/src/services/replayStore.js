@@ -14,6 +14,9 @@ db.exec(`CREATE TABLE IF NOT EXISTS replay_jobs (
  UNIQUE(owner_id,digest,version));
  CREATE INDEX IF NOT EXISTS replay_queue ON replay_jobs(status,created_at);`);
 if (!db.prepare('PRAGMA table_info(replay_jobs)').all().some(c => c.name === 'kind')) db.exec("ALTER TABLE replay_jobs ADD COLUMN kind TEXT NOT NULL DEFAULT 'legacy'");
+// Demo-file jobs keep their small metadata (target player, summary, file name)
+// next to the job row; larger artifacts stay in the private directory.
+if (!db.prepare('PRAGMA table_info(replay_jobs)').all().some(c => c.name === 'meta')) db.exec('ALTER TABLE replay_jobs ADD COLUMN meta TEXT');
 db.exec(`CREATE TABLE IF NOT EXISTS analysis_packages (
  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  package_id TEXT NOT NULL, match_id TEXT NOT NULL, target_player_id TEXT NOT NULL,

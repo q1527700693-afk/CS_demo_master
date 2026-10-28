@@ -13,6 +13,7 @@ const CODES = Object.freeze({
     INTERNAL_ERROR: 50000,
     AI_UPSTREAM_ERROR: 50200,
     AI_NOT_CONFIGURED: 50300,
+    DEMO_PARSER_UNAVAILABLE: 50310,
 });
 
 const HTTP_STATUS = {
@@ -26,6 +27,7 @@ const HTTP_STATUS = {
     [CODES.INTERNAL_ERROR]: 500,
     [CODES.AI_UPSTREAM_ERROR]: 502,
     [CODES.AI_NOT_CONFIGURED]: 503,
+    [CODES.DEMO_PARSER_UNAVAILABLE]: 503,
 };
 
 /** An error that is safe to show to the client. */

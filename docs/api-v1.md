@@ -798,7 +798,132 @@ GET /api/v1/analysis-packages/{packageId}/events
 - All three return `404` when the analysis/package does not belong to the caller.
 
 
-## 8. AI Coaching (optional)
+## 8. Demo File Analysis (raw `.dem`)
+
+These endpoints accept a raw CS2 demo instead of a parsed ZIP. The server runs
+`parser/parse_demo.py` (awpy) in a queued child process, then builds the same
+report shapes as the ZIP pipeline and can generate the AI coach from the parsed
+facts. Design and failure matrix: [ai-demo-analysis-design.md](ai-demo-analysis-design.md).
+
+Every endpoint requires `Authorization: Bearer <access_token>`.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/v1/demo-analyses/parser` | Parser availability, awpy version, AI configuration |
+| POST | `/api/v1/demo-analyses` | Upload a `.dem` (multipart `file`, ≤512 MiB) |
+| GET | `/api/v1/demo-analyses` | My demo analyses (`page`, `pageSize` ≤100) |
+| GET | `/api/v1/demo-analyses/{demoId}` | Status and summary |
+| GET | `/api/v1/demo-analyses/{demoId}/report` | Standard report (`report.schema.json`) |
+| GET | `/api/v1/demo-analyses/{demoId}/details` | Extended report (modules, findings, rounds, movement) |
+| GET | `/api/v1/demo-analyses/{demoId}/rounds/{round}` | One round with events and finding ids |
+| GET | `/api/v1/demo-analyses/{demoId}/rounds/{round}/map` | Paginated map JSONL (`offset`, `limit` ≤500) |
+| GET | `/api/v1/demo-analyses/{demoId}/evidence/{eventId}` | One evidence event |
+| GET | `/api/v1/demo-analyses/{demoId}/ai` | AI result, or status + `queued`/`last_error` |
+| POST | `/api/v1/demo-analyses/{demoId}/ai` | Queue AI coaching (`?force=true` regenerates) |
+| DELETE | `/api/v1/demo-analyses/{demoId}` | Delete the analysis and its AI jobs |
+
+### POST /api/v1/demo-analyses
+
+`multipart/form-data`:
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `file` | binary | yes | CS2 demo, magic `PBDEMS2`; `.dem` extension not enforced |
+| `target_player_id` | string | no | SteamID64; defaults to the top fragger |
+
+The file must be a CS2 (Source 2) demo. `HL2DEMO` (CS:GO) and gzip-compressed
+files are rejected with `40000`.
+
+```json
+{
+  "demo_id": "4f1c2f7e-5a5c-4d5a-9f2f-4c1f0f2a7b11",
+  "status": "queued",
+  "stage": "queued",
+  "progress": null,
+  "report_available": false,
+  "target_player_id": null,
+  "target_selection": "auto_top_fragger",
+  "file_name": "match.dem",
+  "size_bytes": 60601900,
+  "ai_status": "not_configured",
+  "created_at": "2026-10-28T12:00:00.000Z"
+}
+```
+
+HTTP `202` for a new job, `200` when an identical upload (same bytes, same
+target) is reused. Uploading the same demo with a different `target_player_id`
+creates a separate analysis.
+
+### GET /api/v1/demo-analyses/{demoId}
+
+```json
+{
+  "demo_id": "4f1c2f7e-…",
+  "status": "completed",
+  "stage": "ready",
+  "progress": 100,
+  "message": "报告已保存",
+  "report_available": true,
+  "target_player_id": "76561197964020430",
+  "target_selection": "auto_top_fragger",
+  "map": "de_mirage",
+  "score": { "terrorist": 8, "counter-terrorist": 2 },
+  "rounds": 10,
+  "ai_status": "completed",
+  "created_at": "2026-10-28T12:00:00.000Z",
+  "analyzed_at": "2026-10-28T12:00:03.000Z"
+}
+```
+
+`status` is one of `queued`, `parsing`, `analyzing`, `reporting`, `completed`,
+`failed`. `progress` is `null` until completion because parse time depends on
+demo size. `ai_status` is `not_configured`, `not_generated`, `queued`,
+`completed` or `failed`.
+
+### POST /api/v1/demo-analyses/{demoId}/ai
+
+Queues a `kind=ai` job and returns `202`:
+
+```json
+{
+  "demo_id": "4f1c2f7e-…",
+  "ai_job_id": "8b2d…",
+  "ai_status": "queued",
+  "message": "AI 教练解读已排队，请轮询 GET /demo-analyses/{id}/ai"
+}
+```
+
+If a result already exists the stored object is returned with `200`; use
+`?force=true` to discard it and regenerate. AI failure never modifies
+`report.json` / `cloud-report.json`. `GET /ai` exposes `queued`, `stage` and
+`last_error` while a job runs or after it fails.
+
+Set `AI_AUTO_ANALYZE=true` to queue the coach automatically once a demo report is
+ready.
+
+Errors:
+
+| Code | HTTP | When |
+|---|---|---|
+| 40000 | 400 | Not a CS2 demo, CS:GO demo, gzip, bad `target_player_id` or pagination |
+| 40002 | 401 | Missing / invalid token |
+| 40400 | 404 | Demo not found or not owned by caller |
+| 40900 | 409 | Report not ready, capacity reached, AI already running |
+| 41300 | 413 | Demo exceeds 512 MiB |
+| 50200 | 502 | AI provider error, invalid JSON or unknown evidence ID |
+| 50300 | 503 | `DEEPSEEK_API_KEY` is not configured |
+| 50310 | 503 | Demo parser unavailable (no Python/awpy) |
+
+Server configuration for the parser:
+
+```env
+DEMO_PARSER_PYTHON=
+DEMO_PARSER_SCRIPT=
+DEMO_PARSER_PYTHONPATH=
+DEMO_PARSER_TIMEOUT_MS=300000
+```
+
+## 9. AI Coaching (optional)
 
 AI coaching reads an already-ready rule report and calls an OpenAI-compatible
 provider. It never receives the full map, raw events or the original ZIP. The
@@ -875,7 +1000,7 @@ Errors:
 | 50200 | 502 | Provider error, timeout, invalid JSON or unknown evidence ID |
 | 50300 | 503 | `DEEPSEEK_API_KEY` is not configured |
 
-## 9. Error Codes
+## 10. Error Codes
 
 | Code | HTTP | Description |
 |---:|---:|---|
@@ -890,8 +1015,9 @@ Errors:
 | 50000 | 500 | Internal server error |
 | 50200 | 502 | AI provider error, invalid AI JSON or unknown evidence ID |
 | 50300 | 503 | AI analysis is not configured |
+| 50310 | 503 | Demo parser unavailable (no Python/awpy) |
 
-## 10. Changelog
+## 11. Changelog
 
 | Version | Date | Author | Description |
 |---|---|---|---|
@@ -902,3 +1028,4 @@ Errors:
 | v1.4 | 2026-10-23 | CS Demo Master Team | Added owner depart (发车) and claimant kick: departed posts are owner-only and stop claims; kicked users are removed from claimants and cannot re-claim |
 | v1.5 | 2026-10-23 | CS Demo Master Team | Added mutual friend requests, accept/reject/cancel, private friend list, remove friend, and authenticated user search with relationship states |
 | v1.6 | 2026-10-24 | CS Demo Master Team | Added optional AI coaching endpoints backed by a server-side DeepSeek/OpenAI-compatible provider; disabled without `DEEPSEEK_API_KEY` |
+| v1.7 | 2026-10-28 | CS Demo Master Team | Added raw `.dem` upload and analysis (`/api/v1/demo-analyses`): server-side awpy parsing, rule report, map points, evidence and queued demo-grounded AI coaching; new code `50310` |

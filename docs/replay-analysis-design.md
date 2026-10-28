@@ -10,6 +10,8 @@
 
 本机解析工具处理原始 `.dem`，由用户确认名单中的目标 SteamID 后导出 ZIP。云端接收 ZIP，不再次运行 awpy，也不接收原始 Demo 来完成解析。
 
+> 另有独立的「原始 Demo 文件」链路：`POST /api/v1/demo-analyses` 直接接收 CS2 `.dem`，在服务端用 awpy 解析后复用本文的报告与 AI 契约，见 [ai-demo-analysis-design.md](ai-demo-analysis-design.md)。本文描述的 ZIP 协议不变。
+
 ```text
 分析包.zip
 ├── manifest.json  身份、版本、玩家名单、文件大小与摘要、数据质量

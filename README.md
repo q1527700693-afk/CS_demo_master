@@ -15,17 +15,37 @@ Implemented:
 - Team lobby hall: team-code sharing, virtual claimants, owner depart/kick, expiry cleanup (no chat)
 - Friend list: user search, mutual friend requests, accept/reject/cancel, remove friend
 - ZIP replay packages (schema 1.1.0 / 1.2.0): validation, queued rule analysis, reports, evidence, history and deletion
+- Raw CS2 `.dem` upload: server-side awpy parsing, rule report, per-round map points, evidence and history
 - Global v1.2 data: all-player statistics, events, sampled positions and full utility trajectories with round pagination
 - Optional AI coaching analysis API (DeepSeek/OpenAI-compatible; disabled when `DEEPSEEK_API_KEY` is empty)
 - AI coach tab in the replay report: improvement areas, evidence references and training suggestions
+- Demo-file AI coaching queued as its own job, grounded on the parsed demo facts only
 
 Not implemented yet:
 
 - Mini-game APIs
 
+## Demo File Analysis
+
+`POST /api/v1/demo-analyses` takes a raw CS2 demo (multipart `file`, up to 512 MiB)
+and runs the full chain on the server:
+
+```text
+.dem → parser/parse_demo.py (awpy) → rules → report + rounds + map points + evidence
+                                              ↘ AI coach (POST /demo-analyses/:id/ai)
+```
+
+Server requirements: Python 3.11+ with `awpy` installed for the interpreter the
+backend probes (or set `DEMO_PARSER_PYTHON`). `GET /api/v1/demo-analyses/parser`
+reports whether the parser and the AI provider are ready.
+
+Design, contracts and failure matrix: [docs/ai-demo-analysis-design.md](docs/ai-demo-analysis-design.md).
+Parser installation and CLI: [parser/README.md](parser/README.md).
+
 ## Replay Analysis Documentation
 
 - [Architecture, implementation, APIs and future LLM integration (中文)](docs/replay-analysis-design.md)
+- [Demo file parsing and demo AI design (中文)](docs/ai-demo-analysis-design.md)
 - [Backend usage and integration](backend/REPLAY.md)
 - [Global v1.2 integration and pagination](backend/REPLAY_V12.md)
 - [Acceptance results and deployment checks](backend/REPLAY_ACCEPTANCE.md)
@@ -41,7 +61,7 @@ continues to work normally.
 ```text
 frontend/   Vue 3 web frontend
 backend/    Node.js + Express API
-parser/     Demo parsing and log generation
+parser/     Demo parsing (Python + awpy) and the .dem → JSON contract
 ai/         AI analysis prompts and service layer
 docs/       API and design documents
 deploy/     Deployment configuration
@@ -76,6 +96,17 @@ Health check:
 ```text
 GET http://localhost:8000/api/v1/health
 ```
+
+Raw demo uploads (`/api/v1/demo-analyses`) additionally need the Python parser:
+
+```bash
+python -m venv parser/.venv
+parser/.venv/Scripts/python.exe -m pip install awpy    # Windows
+parser/.venv/bin/python -m pip install awpy           # macOS / Linux
+```
+
+Without it the API still starts; only demo uploads answer `50310`. See
+[parser/README.md](parser/README.md).
 
 Copy `backend/.env.example` to `backend/.env` if you need to override `PORT`,
 `JWT_SECRET`, `DB_PATH`, `UPLOAD_DIR`, `LOBBY_TTL_HOURS` or the optional
