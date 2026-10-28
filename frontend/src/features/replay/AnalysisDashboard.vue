@@ -18,12 +18,17 @@ import type { ReplayEvent } from './contracts'
 import ReviewOverview from './ReviewOverview.vue'
 import ReviewRounds from './ReviewRounds.vue'
 import ReviewUtility from './ReviewUtility.vue'
+import ReviewAi from './ReviewAi.vue'
 import ReviewData from './ReviewData.vue'
 import MetricHint from './MetricHint.vue'
 import './review.css'
 const route = useRoute(),
   router = useRouter()
 const {
+  ai,
+  aiError,
+  aiLoading,
+  generateAi,
   report,
   details,
   events,
@@ -206,7 +211,12 @@ watch(rows, (value) => {
         <div v-if="rows.length" class="round-strip-panel">
           <div class="round-strip-heading">
             <span>回合走势 <small>点击回合进入地图</small></span>
-            <div><i class="win-dot" />获胜<i class="loss-dot" />失利</div>
+            <div>
+              <i class="win-dot" />获胜<i class="loss-dot" />失利
+              <template v-if="rows.some((round) => round.outcome === '未知')">
+                <i class="unknown-dot" />未记录
+              </template>
+            </div>
           </div>
           <div class="round-strip" aria-label="回合胜负时间线">
             <button
@@ -296,7 +306,19 @@ watch(rows, (value) => {
           :report="report"
           :details="details"
           :focuses="focuses"
+          :events="events"
+          :events-available="!eventsError"
           @focus="selectFocus"
+        />
+        <ReviewAi
+          v-else-if="active === 'ai'"
+          :ai="ai"
+          :loading="aiLoading"
+          :error="aiError"
+          :legacy="!!details?.analysis_version && /^rules-1\.[01]\./.test(details.analysis_version)"
+          :retrying="retrying"
+          @reanalyze="reanalyze"
+          @generate="generateAi"
         />
         <template v-else
           ><ReviewData

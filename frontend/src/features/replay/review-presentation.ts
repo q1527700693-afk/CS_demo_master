@@ -1,4 +1,5 @@
 import type { AnalysisReport, ReplayDetails, ReplayEvent } from './contracts'
+import { combatRelation, MIN_EFFECTIVE_BLIND_SECONDS } from './combat-facts'
 import { numberText } from './report-data'
 
 // Presentation registry: backend keys never become user-facing labels by accident.
@@ -6,6 +7,7 @@ export const reviewTabs = [
   { id: 'overview', label: '比赛概览', icon: 'overview' },
   { id: 'rounds', label: '回合复盘', icon: 'map' },
   { id: 'utility', label: '道具与生存', icon: 'shield' },
+  { id: 'ai', label: 'AI 教练', icon: 'bolt' },
   { id: 'data', label: '详细数据', icon: 'replay' },
 ] as const
 export type ReviewTab = (typeof reviewTabs)[number]['id']
@@ -110,6 +112,11 @@ export interface ReviewFocus {
 }
 type RuleCopy = { title: string; action: string; priority: number }
 export const reviewRules: Record<string, RuleCopy> = {
+  team_kill: {
+    title: '误杀队友（TK）',
+    action: '回看交火路线、队友位置与开火时机，避免误伤。',
+    priority: 5,
+  },
   death_reloading: {
     title: '换弹时阵亡',
     action: '定位阵亡前 5 秒，检查剩余弹药、掩体与换弹时机。',
@@ -152,7 +159,36 @@ export function reviewFocus(
       observation: f.description,
       evidence_ids: f.evidence_ids,
     }))
-  return findings
+  const teamKills = events.filter(
+    (e) =>
+      e.type === 'kill' &&
+      combatRelation(e.data.record || {}) === 'team' &&
+      (e.data.record?.attacker_steamid === report.target_player_id ||
+        e.data.record?.victim_steamid === report.target_player_id),
+  )
+  const allFindings = [
+    ...findings,
+    ...teamKills
+      .filter(
+        (e) =>
+          !findings.some((f) => f.rule_id === 'team_kill' && f.evidence_ids.includes(e.event_id)),
+      )
+      .map((e) => ({
+        finding_id: `team_kill:${e.event_id}`,
+        rule_id: 'team_kill',
+        round_num: e.round_num,
+        tick: e.tick,
+        observation: `${e.data.record?.attacker_name || '队友'} 误杀 ${e.data.record?.victim_name || '队友'}`,
+        evidence_ids: [e.event_id],
+      })),
+  ]
+  return allFindings
+    .filter((f) => {
+      if (!['team_flash', 'self_flash'].includes(f.rule_id)) return true
+      const e = f.evidence_ids.map((id) => index.get(id)).find(Boolean)
+      const duration = e?.data.record?.duration ?? e?.data.duration_seconds
+      return typeof duration !== 'number' || duration >= MIN_EFFECTIVE_BLIND_SECONDS
+    })
     .map((f) => {
       const event = f.evidence_ids.map((id) => index.get(id)).find(Boolean)
       const copy = reviewRules[f.rule_id]
@@ -213,7 +249,7 @@ export function eventSentence(e: ReplayEvent) {
   const r = e.data.record || {},
     name = (key: string) => (typeof r[key] === 'string' ? String(r[key]) : '未记录玩家')
   if (e.type === 'kill')
-    return `${name('attacker_name')} 击杀 ${name('victim_name')} · ${weaponName(r.weapon)}${r.headshot === true ? ' · 爆头' : ''}`
+    return `${name('attacker_name')} ${combatRelation(r) === 'team' ? '误杀队友' : combatRelation(r) === 'self' ? '自杀' : '击杀'} ${name('victim_name')} · ${weaponName(r.weapon)}${r.headshot === true ? ' · 爆头' : ''}`
   if (e.type === 'damage')
     return `${name('attacker_name')} → ${name('victim_name')} · ${valueText(r.dmg_health, 0)} 原始伤害 · ${weaponName(r.weapon)}`
   if (e.type === 'blind')

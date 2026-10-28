@@ -4,15 +4,26 @@ import { errorMessage } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import { mockModules } from '@/app/config'
 import {
+  getAiReport,
+  generateAiReport,
   cachedReport,
   downloadReport,
   getReportEvents,
   getHistory,
   getReportDetails,
+  getRound,
   startAnalysis,
 } from './analysis-api'
-import type { AnalysisReport, AnalysisRun, ReplayDetails, ReplayEvent } from './contracts'
-import { assertDetailsIdentity, roundRows } from './report-data'
+import { reconcileCombat } from './combat-facts'
+import { normalizeAiReport } from './ai-report'
+import type {
+  AiCoachReport,
+  AnalysisReport,
+  AnalysisRun,
+  ReplayDetails,
+  ReplayEvent,
+} from './contracts'
+import { assertDetailsIdentity, completeRoundSides, roundRows } from './report-data'
 import { reviewFocus } from './review-presentation'
 import { newRequestKey } from './browser-capabilities'
 
@@ -31,7 +42,12 @@ export function useReplayReport() {
     historyError = ref(''),
     actionError = ref(''),
     retrying = ref(false)
-  let generation = 0
+  const ai = ref<AiCoachReport | null>(null),
+    aiError = ref(''),
+    aiLoading = ref(false)
+  let aiController: AbortController | undefined
+  let generation = 0,
+    aiRevision = 0
   const rows = computed(() => (details.value ? roundRows(details.value) : []))
   const focuses = computed(() =>
     report.value ? reviewFocus(report.value, details.value, events.value) : [],
@@ -39,6 +55,11 @@ export function useReplayReport() {
   async function load() {
     const current = ++generation,
       id = String(route.params.id)
+    aiController?.abort()
+    aiRevision++
+    ai.value = null
+    aiError.value = ''
+    aiLoading.value = false
     loading.value = true
     for (const state of [error, detailsError, eventsError, historyError, actionError])
       state.value = ''
@@ -50,6 +71,7 @@ export function useReplayReport() {
       const value = cachedReport(id) || (await downloadReport(id, () => {}))
       if (current !== generation) return
       report.value = value
+      void loadAi(id, current)
       const results = await Promise.allSettled([
         getReportEvents(value.package_id),
         getHistory(value.match_id),
@@ -70,16 +92,56 @@ export function useReplayReport() {
       if (detailResult.status === 'fulfilled' && detailResult.value) {
         try {
           assertDetailsIdentity(detailResult.value, value)
-          details.value = detailResult.value
+          const signal = AbortSignal.timeout(8_000)
+          const completed = await completeRoundSides(detailResult.value, (round) =>
+            getRound(value.analysis_id, round, signal),
+          )
+          if (current !== generation) return
+          details.value = completed
         } catch (e) {
           detailsError.value = errorMessage(e)
         }
       } else if (detailResult.status === 'rejected')
         detailsError.value = errorMessage(detailResult.reason)
+      if (eventResult.status === 'fulfilled' && !eventsError.value) {
+        const reconciled = reconcileCombat(value, details.value, events.value)
+        report.value = reconciled.report
+        details.value = reconciled.details
+      }
     } catch (e) {
       if (current === generation) error.value = errorMessage(e)
     } finally {
       if (current === generation) loading.value = false
+    }
+  }
+  async function loadAi(id: string, current: number) {
+    const revision = ++aiRevision
+    try {
+      const result = normalizeAiReport(await getAiReport(id), id)
+      if (current === generation && revision === aiRevision && !aiLoading.value) ai.value = result
+    } catch (e) {
+      if (current === generation && revision === aiRevision && !aiLoading.value)
+        aiError.value = errorMessage(e)
+    }
+  }
+  async function generateAi() {
+    if (!report.value || aiLoading.value) return
+    const current = generation,
+      id = report.value.analysis_id
+    aiRevision++
+    aiLoading.value = true
+    aiError.value = ''
+    const controller = new AbortController()
+    aiController = controller
+    const timeout = setTimeout(() => controller.abort(), 90_000)
+    try {
+      const result = normalizeAiReport(await generateAiReport(id, controller.signal), id)
+      if (current === generation) ai.value = result
+    } catch (e) {
+      if (current === generation) aiError.value = errorMessage(e)
+    } finally {
+      clearTimeout(timeout)
+      if (current === generation) aiLoading.value = false
     }
   }
   async function reanalyze() {
@@ -110,8 +172,15 @@ export function useReplayReport() {
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
   watch(() => [route.params.id, auth.user?.id], load, { immediate: true })
-  onUnmounted(() => generation++)
+  onUnmounted(() => {
+    generation++
+    aiController?.abort()
+  })
   return {
+    ai,
+    aiError,
+    aiLoading,
+    generateAi,
     report,
     details,
     events,

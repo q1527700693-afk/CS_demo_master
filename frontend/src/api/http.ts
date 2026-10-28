@@ -34,7 +34,9 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
       headers,
       signal: options.signal ?? AbortSignal.timeout(20_000),
     })
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && ['TimeoutError', 'AbortError'].includes(error.name))
+      throw new ApiError('请求超时或已取消，请稍后重试', 50000, 504)
     throw new ApiError('无法连接服务，请检查网络或后端地址')
   }
   let body: ApiResponse<T>
@@ -49,9 +51,15 @@ export function upload<T>(
   path: string,
   file: File,
   onProgress: (value: number | null) => void,
+  signal?: AbortSignal,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
+    const abort = () => xhr.abort()
+    const cleanup = () => signal?.removeEventListener('abort', abort)
+    signal?.addEventListener('abort', abort, { once: true })
+    xhr.onloadend = cleanup
+    xhr.onabort = () => reject(new DOMException('上传已取消', 'AbortError'))
     xhr.open('POST', `${apiBase}${path}`)
     // Import validation can wait in the backend queue for up to 150 seconds.
     xhr.timeout = 180_000
@@ -75,6 +83,11 @@ export function upload<T>(
     xhr.ontimeout = () => reject(new ApiError('上传超时，请检查网络后重试'))
     const form = new FormData()
     form.append('file', file)
+    if (signal?.aborted) {
+      cleanup()
+      reject(new DOMException('上传已取消', 'AbortError'))
+      return
+    }
     xhr.send(form)
   })
 }

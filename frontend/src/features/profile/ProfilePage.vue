@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import DemoShowcase from '@/features/player/DemoShowcase.vue'
 import AsyncState from '@/components/AsyncState.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
@@ -293,6 +294,13 @@ onMounted(() => trackStartup(load()))
         </form>
       </section>
     </div>
+    <DemoShowcase
+      v-if="auth.user"
+      :key="auth.user.id"
+      :own="true"
+      :user-id="auth.user.id"
+      style="margin-top: 22px"
+    />
   </AsyncState>
 </template>
 <style scoped>

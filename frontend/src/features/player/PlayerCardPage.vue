@@ -189,7 +189,7 @@ onBeforeUnmount(() => {
         </section>
       </div>
       <TrainingBests :records="records" :own="own" />
-      <DemoShowcase :own="own" />
+      <DemoShowcase :key="String(player?.user_id)" :own="own" :user-id="String(player?.user_id)" />
     </div>
   </AsyncState>
 </template>

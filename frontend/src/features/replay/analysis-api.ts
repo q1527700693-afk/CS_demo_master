@@ -2,6 +2,7 @@ import { apiBase, TOKEN_KEY, mockModules } from '@/app/config'
 import { ApiError, request, upload } from '@/api/http'
 import type { ApiResponse, Page } from '@/types'
 import type {
+  AiCoachReport,
   AcceptedPackage,
   AnalysisRun,
   AnalysisReport,
@@ -43,9 +44,13 @@ async function analysisRequest<T>(path: string, options?: RequestInit): Promise<
   }
   return request<T>(path, options)
 }
-export const uploadPackage = async (file: File, progress: (n: number | null) => void) => {
+export const uploadPackage = async (
+  file: File,
+  progress: (n: number | null) => void,
+  signal?: AbortSignal,
+) => {
   await prepareAnalysisTransport()
-  return upload<AcceptedPackage>('/analysis-packages', file, progress)
+  return upload<AcceptedPackage>('/analysis-packages', file, progress, signal)
 }
 export const startAnalysis = async (
   p: Pick<AcceptedPackage, 'match_id' | 'package_id' | 'target_player_id'>,
@@ -259,4 +264,12 @@ export const localStatus = (id: string, token: string) =>
 export const localPackage = (id: string, token: string) =>
   transfer<Blob>(`${localBase}/local/jobs/${encodeURIComponent(id)}/package`, token, () => {}, {
     blob: true,
+  })
+
+export const getAiReport = (id: string, signal?: AbortSignal) =>
+  analysisRequest<AiCoachReport>(`/analyses/${encodeURIComponent(id)}/ai`, { signal })
+export const generateAiReport = (id: string, signal?: AbortSignal) =>
+  analysisRequest<AiCoachReport>(`/analyses/${encodeURIComponent(id)}/ai`, {
+    method: 'POST',
+    signal: signal ?? AbortSignal.timeout(90_000),
   })

@@ -12,6 +12,7 @@ import {
   utilityStyle,
   UTILITY_STYLES,
 } from './map-presentation'
+import { combatRelation, MIN_EFFECTIVE_BLIND_SECONDS } from './combat-facts'
 import UtilitySymbol from './UtilitySymbol.vue'
 const props = defineProps<{
   analysisId: string
@@ -261,7 +262,7 @@ const kills = computed(() => {
         {
           event: e,
           ...point(x, y),
-          own: r.attacker_steamid === props.playerId,
+          own: r.attacker_steamid === props.playerId && combatRelation(r) === 'enemy',
           target: r.victim_steamid === props.playerId,
         },
       ]
@@ -272,7 +273,9 @@ const keyEvents = computed(() =>
     .filter(
       (e) =>
         e.type === 'kill' ||
-        (e.type === 'blind' && e.data.record?.attacker_steamid === props.playerId),
+        (e.type === 'blind' &&
+          e.data.record?.attacker_steamid === props.playerId &&
+          Number(e.data.record?.duration) >= MIN_EFFECTIVE_BLIND_SECONDS),
     )
     .filter((e) => e.tick >= extent.value.min && e.tick <= extent.value.max),
 )
@@ -551,15 +554,15 @@ onUnmounted(() => {
               :fill="selfColor"
             />
             <text y="-24" text-anchor="middle" class="player-label target-label">
-              {{ playerName }}（本人）
+              {{ cursor.state?.name || playerName }}
             </text>
           </g>
         </svg>
         <div class="radar-legend">
           <span><i :style="{ background: PLAYER_COLORS.ct }" />警</span>
           <span><i :style="{ background: PLAYER_COLORS.t }" />匪</span>
-          <span><i :style="{ background: PLAYER_COLORS.selfCt }" />本人（警）</span>
-          <span><i :style="{ background: PLAYER_COLORS.selfT }" />本人（匪）</span
+          <span><i :style="{ background: PLAYER_COLORS.selfCt }" />{{ playerName }}（警）</span>
+          <span><i :style="{ background: PLAYER_COLORS.selfT }" />{{ playerName }}（匪）</span
           ><span>× 阵亡位置</span>
         </div>
       </div>

@@ -3,6 +3,7 @@ import type {
   DetailedRound,
   ReplayDetails,
   ReplayEvent,
+  RoundDetail,
   RoundStatistics,
 } from './contracts'
 
@@ -85,6 +86,50 @@ export function assertDetailsIdentity(details: ReplayDetails, report: AnalysisRe
   )
     throw new Error('扩展详情与当前报告身份不一致，已停止接收')
 }
+type PlayerSide = 'terrorist' | 'counter-terrorist'
+function knownSide(value: unknown): PlayerSide | null {
+  return value === 'terrorist' || value === 'counter-terrorist' ? value : null
+}
+function targetSide(round: DetailedRound, playerId: string): PlayerSide | null {
+  const direct = knownSide(round.target_side)
+  if (direct) return direct
+  const start = round.target_start_state
+  if (start?.steamid && start.steamid !== playerId) return null
+  return knownSide(start?.side)
+}
+
+/** Older reports omit the target side in summaries but keep it in the round artifact. */
+export async function completeRoundSides(
+  details: ReplayDetails,
+  readRound: (round: number) => Promise<RoundDetail>,
+): Promise<ReplayDetails> {
+  const rounds = [...details.rounds]
+  const missing = rounds
+    .map((round, index) => ({ round, index }))
+    .filter(({ round }) => !targetSide(round, details.target_player_id) || !knownSide(round.winner_side))
+  let next = 0
+  async function worker() {
+    while (next < missing.length) {
+      const { round, index } = missing[next++]!
+      try {
+        const full = await readRound(round.round_num)
+        if (full.round_num !== round.round_num) continue
+        if (full.target_start_state?.steamid && full.target_start_state.steamid !== details.target_player_id) continue
+        const side = targetSide(full, details.target_player_id)
+        rounds[index] = {
+          ...round,
+          target_side: targetSide(round, details.target_player_id) || side,
+          winner_side: knownSide(round.winner_side) || knownSide(full.winner_side),
+          team_economy: round.team_economy ?? full.team_economy,
+        }
+      } catch {
+        // Keep genuinely unavailable results unknown, without blocking the report.
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(4, missing.length) }, worker))
+  return { ...details, rounds }
+}
 export function roundRows(
   details: ReplayDetails,
 ): (DetailedRound & {
@@ -96,7 +141,8 @@ export function roundRows(
   const table = new Map(details.statistics.tables?.per_round?.map((row) => [row.round_num, row]))
   return details.rounds
     .map((round) => {
-      const side = round.target_side
+      const side = targetSide(round, details.target_player_id)
+      const winner = knownSide(round.winner_side)
       const own = side ? round.team_economy?.find((row) => row.side === side) : undefined
       const enemySide =
         side === 'terrorist'
@@ -109,10 +155,11 @@ export function roundRows(
         : undefined
       return {
         ...round,
+        target_side: side,
         stats: table.get(round.round_num) || round.target_summary || { round_num: round.round_num },
         ownEconomy: own?.equipment_value ?? null,
         enemyEconomy: enemy?.equipment_value ?? null,
-        outcome: !side || !round.winner_side ? '未知' : round.winner_side === side ? '胜' : '负',
+        outcome: !side || !winner ? '未知' : winner === side ? '胜' : '负',
       }
     })
     .sort((a, b) => a.round_num - b.round_num)
