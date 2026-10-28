@@ -18,6 +18,7 @@ import type { ReplayEvent } from './contracts'
 import ReviewOverview from './ReviewOverview.vue'
 import ReviewRounds from './ReviewRounds.vue'
 import ReviewUtility from './ReviewUtility.vue'
+import ReviewAi from './ReviewAi.vue'
 import ReviewData from './ReviewData.vue'
 import MetricHint from './MetricHint.vue'
 import './review.css'
@@ -35,6 +36,10 @@ const {
   detailsError,
   eventsError,
   historyError,
+  ai,
+  aiError,
+  aiLoading,
+  generateAi,
   actionError,
   retrying,
   load,
@@ -297,6 +302,13 @@ watch(rows, (value) => {
           :details="details"
           :focuses="focuses"
           @focus="selectFocus"
+        />
+        <ReviewAi
+          v-else-if="active === 'ai'"
+          :ai="ai"
+          :loading="aiLoading"
+          :error="aiError"
+          @generate="generateAi"
         />
         <template v-else
           ><ReviewData

@@ -1,4 +1,4 @@
-# 前端 v1.0.2 交接说明
+# 前端 v1.0.3 交接说明
 
 此文件夹包含完整的前端源码和训练小游戏运行文件；已包含 v1.0.1 的公网 HTTP 复盘页修复。
 
@@ -11,8 +11,8 @@
 
 ## 更新到仓库和服务器
 
-把**本文件夹里面的内容**复制到仓库的 `frontend/` 目录并覆盖同名文件，提交到 `front_end` 分支。不要把 `front_end_v1.0.2` 整个文件夹再嵌套进 `frontend/`。
+把**本文件夹里面的内容**复制到仓库的 `frontend/` 目录并覆盖同名文件，提交到 `front_end` 分支。不要把 `front_end_v1.0.3` 整个文件夹再嵌套进 `frontend/`。
 
-后端同学拉取新提交后，在 `frontend/` 运行 `pnpm install --frozen-lockfile` 和 `pnpm build`，用新 `dist/` 替换服务器前端静态文件。请确认服务器没有继续使用旧静态资源缓存，浏览器刷新后测试五个模式的结算、ESC 和小球显示。线上验证通过后，可给该提交打 `frontend-v1.0.2` 标签；旧标签保持不变。建议服务器后续启用 HTTPS。
+后端同学拉取新提交后，在 `frontend/` 运行 `pnpm install --frozen-lockfile` 和 `pnpm build`，用新 `dist/` 替换服务器前端静态文件。请确认服务器没有继续使用旧静态资源缓存，浏览器刷新后测试五个模式的结算、ESC 和小球显示。线上验证通过后，可给该提交打 `frontend-v1.0.3` 标签；旧标签保持不变。建议服务器后续启用 HTTPS。
 
 此包不含 `node_modules`、`dist`、`.env.local`、测试输出和后端服务。无需复制原工作区的 `training` 目录；`public/vector-trainer/` 已包含完整的训练运行副本。其他启动和联调说明见 [README.md](README.md)。

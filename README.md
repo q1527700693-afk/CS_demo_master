@@ -17,10 +17,10 @@ Implemented:
 - ZIP replay packages (schema 1.1.0 / 1.2.0): validation, queued rule analysis, reports, evidence, history and deletion
 - Global v1.2 data: all-player statistics, events, sampled positions and full utility trajectories with round pagination
 - Optional AI coaching analysis API (DeepSeek/OpenAI-compatible; disabled when `DEEPSEEK_API_KEY` is empty)
+- AI coach tab in the replay report: improvement areas, evidence references and training suggestions
 
 Not implemented yet:
 
-- AI result UI integration
 - Mini-game APIs
 
 ## Replay Analysis Documentation

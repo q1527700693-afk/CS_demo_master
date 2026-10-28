@@ -9,9 +9,17 @@ import {
   getReportEvents,
   getHistory,
   getReportDetails,
+  getAiReport,
+  generateAiReport,
   startAnalysis,
 } from './analysis-api'
-import type { AnalysisReport, AnalysisRun, ReplayDetails, ReplayEvent } from './contracts'
+import type {
+  AiCoachReport,
+  AnalysisReport,
+  AnalysisRun,
+  ReplayDetails,
+  ReplayEvent,
+} from './contracts'
 import { assertDetailsIdentity, roundRows } from './report-data'
 import { reviewFocus } from './review-presentation'
 import { newRequestKey } from './browser-capabilities'
@@ -23,14 +31,17 @@ export function useReplayReport() {
   const report = ref<AnalysisReport | null>(null),
     details = ref<ReplayDetails | null>(null)
   const events = ref<ReplayEvent[]>([]),
-    history = ref<AnalysisRun[]>([])
+    history = ref<AnalysisRun[]>([]),
+    ai = ref<AiCoachReport | null>(null)
   const loading = ref(true),
     error = ref(''),
     detailsError = ref(''),
     eventsError = ref(''),
     historyError = ref(''),
+    aiError = ref(''),
     actionError = ref(''),
-    retrying = ref(false)
+    retrying = ref(false),
+    aiLoading = ref(false)
   let generation = 0
   const rows = computed(() => (details.value ? roundRows(details.value) : []))
   const focuses = computed(() =>
@@ -40,12 +51,13 @@ export function useReplayReport() {
     const current = ++generation,
       id = String(route.params.id)
     loading.value = true
-    for (const state of [error, detailsError, eventsError, historyError, actionError])
+    for (const state of [error, detailsError, eventsError, historyError, aiError, actionError])
       state.value = ''
     report.value = null
     details.value = null
     events.value = []
     history.value = []
+    ai.value = null
     try {
       const value = cachedReport(id) || (await downloadReport(id, () => {}))
       if (current !== generation) return
@@ -54,9 +66,10 @@ export function useReplayReport() {
         getReportEvents(value.package_id),
         getHistory(value.match_id),
         mockModules.replay ? Promise.resolve(null) : getReportDetails(id),
+        getAiReport(id),
       ])
       if (current !== generation) return
-      const [eventResult, historyResult, detailResult] = results
+      const [eventResult, historyResult, detailResult, aiResult] = results
       if (eventResult.status === 'fulfilled') {
         if (
           eventResult.value.match_id !== value.match_id ||
@@ -67,6 +80,8 @@ export function useReplayReport() {
       } else eventsError.value = errorMessage(eventResult.reason)
       if (historyResult.status === 'fulfilled') history.value = historyResult.value.items
       else historyError.value = errorMessage(historyResult.reason)
+      if (aiResult.status === 'fulfilled') ai.value = aiResult.value
+      else aiError.value = errorMessage(aiResult.reason)
       if (detailResult.status === 'fulfilled' && detailResult.value) {
         try {
           assertDetailsIdentity(detailResult.value, value)
@@ -80,6 +95,18 @@ export function useReplayReport() {
       if (current === generation) error.value = errorMessage(e)
     } finally {
       if (current === generation) loading.value = false
+    }
+  }
+  async function generateAi() {
+    if (!report.value || aiLoading.value) return
+    aiLoading.value = true
+    aiError.value = ''
+    try {
+      ai.value = await generateAiReport(report.value.analysis_id)
+    } catch (e) {
+      aiError.value = errorMessage(e)
+    } finally {
+      aiLoading.value = false
     }
   }
   async function reanalyze() {
@@ -123,8 +150,12 @@ export function useReplayReport() {
     detailsError,
     eventsError,
     historyError,
+    aiError,
     actionError,
     retrying,
+    ai,
+    aiLoading,
+    generateAi,
     load,
     reanalyze,
     exportReport,

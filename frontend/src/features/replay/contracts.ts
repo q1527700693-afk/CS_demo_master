@@ -198,3 +198,33 @@ export interface RoundDetail extends DetailedRound {
   events: ReplayEvent[]
   finding_ids: string[]
 }
+
+
+export type AiStatus = 'completed' | 'not_generated' | 'not_configured'
+
+export interface AiImprovementArea {
+  priority: 'high' | 'medium' | 'low'
+  category: string
+  title: string
+  evidence_ids: string[]
+  explanation: string
+  training: string[]
+}
+
+export interface AiStrength {
+  title: string
+  evidence_ids: string[]
+  explanation: string
+}
+
+export interface AiCoachReport {
+  ai_status: AiStatus
+  analysis_id?: string
+  model?: string
+  prompt_version?: string
+  generated_at?: string
+  summary?: string
+  improvement_areas?: AiImprovementArea[]
+  strengths?: AiStrength[]
+  data_limitations?: string[]
+}

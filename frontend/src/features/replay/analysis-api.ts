@@ -11,6 +11,7 @@ import type {
   ReplayMapItem,
   RoundDetail,
   ReplayEvent,
+  AiCoachReport,
 } from './contracts'
 import { assertReportIdentity, type ReportIdentity } from './report-identity'
 import { localResource, listLocalResults, localRun, saveLocalResult } from './local-library'
@@ -97,6 +98,16 @@ export const getHistory = async (id: string) => {
 }
 export const getReportDetails = (id: string) =>
   analysisRequest<ReplayDetails>(`/analyses/${encodeURIComponent(id)}/details`)
+export const getAiReport = (id: string) =>
+  analysisRequest<AiCoachReport>(`/analyses/${encodeURIComponent(id)}/ai`, {
+    signal: AbortSignal.timeout(20_000),
+  })
+
+export const generateAiReport = (id: string) =>
+  analysisRequest<AiCoachReport>(`/analyses/${encodeURIComponent(id)}/ai`, {
+    method: 'POST',
+    signal: AbortSignal.timeout(90_000),
+  })
 export const getRound = (id: string, round: number, signal?: AbortSignal) =>
   analysisRequest<RoundDetail>(`/analyses/${encodeURIComponent(id)}/rounds/${round}`, { signal })
 export const getRoundMap = (id: string, round: number, offset: number, signal?: AbortSignal) =>

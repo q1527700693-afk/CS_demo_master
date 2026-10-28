@@ -6,6 +6,7 @@ export const reviewTabs = [
   { id: 'overview', label: '比赛概览', icon: 'overview' },
   { id: 'rounds', label: '回合复盘', icon: 'map' },
   { id: 'utility', label: '道具与生存', icon: 'shield' },
+  { id: 'ai', label: 'AI 教练', icon: 'bolt' },
   { id: 'data', label: '详细数据', icon: 'replay' },
 ] as const
 export type ReviewTab = (typeof reviewTabs)[number]['id']

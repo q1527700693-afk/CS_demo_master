@@ -34,7 +34,13 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
       headers,
       signal: options.signal ?? AbortSignal.timeout(20_000),
     })
-  } catch {
+  } catch (error) {
+    if (
+      error instanceof DOMException &&
+      (error.name === 'AbortError' || error.name === 'TimeoutError')
+    ) {
+      throw new ApiError('请求超时，请稍后重试', 50000, 504)
+    }
     throw new ApiError('无法连接服务，请检查网络或后端地址')
   }
   let body: ApiResponse<T>
