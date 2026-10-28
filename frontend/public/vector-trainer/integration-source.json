@@ -3,8 +3,8 @@
   "files": [
     {
       "path": "src/app.js",
-      "bytes": 43634,
-      "sha256": "cb7ed82aa162dfdbc29fb909a5b7b4478ec110f93619a4225f3e95f0eff1209a"
+      "bytes": 41750,
+      "sha256": "11ff6b4a5ca693c949468afae4e3dc7d8899faf048add3fef5c10003ac139320"
     },
     {
       "path": "src/audio.js",
@@ -13,8 +13,8 @@
     },
     {
       "path": "src/engine.js",
-      "bytes": 8839,
-      "sha256": "b0bb078e6ee0063d223f40f614c5aefbebcb4c18bf222fc3bd90d84aac6774ab"
+      "bytes": 8499,
+      "sha256": "acee1896ac55239e5f88800a4620658924d0c39807d128dab4ba263c7ae60bed"
     },
     {
       "path": "src/icons.js",
@@ -23,28 +23,33 @@
     },
     {
       "path": "src/modes.js",
-      "bytes": 4919,
-      "sha256": "886ab3eae6f77553766d5a4631a4fcd3729798d28159dfc3681b32d6dadb5e45"
+      "bytes": 4852,
+      "sha256": "c5fe1e174d6e8476507aaaee242d1f6ca29da602e6627e5a96efc164f91ba1f5"
     },
     {
       "path": "src/offline.js",
-      "bytes": 1425,
-      "sha256": "f773536c426345e37f51db920ab0baffbd83a70fc50c41006c4c2b0a03718d40"
+      "bytes": 1419,
+      "sha256": "403c2d0dbfc2b1c50a3b65adab82b5a1f3cf07f1019bda18368a57a55a912578"
     },
     {
       "path": "src/renderer.js",
-      "bytes": 12794,
-      "sha256": "92c10ffca0afe699121de44fad0f443772bfe75fcbb1437ccb424a5ffa3951f4"
+      "bytes": 12997,
+      "sha256": "164c49e72396527509032e66dd34faccf37a10c1c6e47bb22fd68df1b7114742"
+    },
+    {
+      "path": "src/session-id.js",
+      "bytes": 492,
+      "sha256": "aa4e6bd837e1d1134fc901ece36d4da1a5d49363ea74cfbd36cd831ec9032727"
     },
     {
       "path": "src/spatial.js",
-      "bytes": 1480,
-      "sha256": "fd4424f9980490f72d15e071e3ed351a07b26059cc391d2128f86d5de8b38cf5"
+      "bytes": 1177,
+      "sha256": "91429f1251c62baa1fe250a7d43c141c6a73abfbd871749fbc1a10ae5632bbfc"
     },
     {
       "path": "src/storage.js",
-      "bytes": 3521,
-      "sha256": "9b09fcb6fe8918f912ca3edb409be21e202643449da559ade88d449c988d1bcf"
+      "bytes": 3502,
+      "sha256": "cb9c5aa7c882d94cb70c6fab4b687b5d2bfb55b2e2577ba6136490e4ac875979"
     },
     {
       "path": "src/weapon.js",

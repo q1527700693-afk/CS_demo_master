@@ -9,6 +9,7 @@ import { companion, validateAnalysisFile, type AutomaticLocalJob } from './autom
 import type { AcceptedPackage, StageProgress } from './contracts'
 import type { RosterPlayer } from './player-identity'
 import ProgressStages from './ProgressStages.vue'
+import { newRequestKey } from './browser-capabilities'
 
 const router = useRouter(),
   auth = useAuthStore()
@@ -31,7 +32,7 @@ let disposed = false,
   controller = new AbortController(),
   generated: File | null = null
 let accepted: AcceptedPackage | null = null,
-  requestKey = crypto.randomUUID(),
+  requestKey = newRequestKey(),
   cloudFailed = false
 let resolvePlayer: ((value: string) => void) | undefined
 function resetStages(isDemo = true) {
@@ -176,7 +177,7 @@ async function process() {
   try {
     if (analysisId.value && cloudFailed) {
       const previous = await getAnalysis(analysisId.value)
-      const run = await startAnalysis(previous, crypto.randomUUID())
+      const run = await startAnalysis(previous, newRequestKey())
       analysisId.value = run.analysis_id
       cloudFailed = false
       sessionStorage.setItem(pendingKey(), run.analysis_id)
@@ -232,7 +233,7 @@ function selectFile(candidate: File | null) {
   analysisId.value = ''
   cloudFailed = false
   error.value = ''
-  requestKey = crypto.randomUUID()
+  requestKey = newRequestKey()
   sessionStorage.removeItem(pendingKey())
   resetStages(candidate.name.toLowerCase().endsWith('.dem'))
   void process()

@@ -3,8 +3,8 @@ import { TrainingStore } from './storage.js';
 import { MODES, DIFFICULTIES, normalizeConfig, modeById, primaryMetric, comparisonKey, isBetter } from './modes.js';
 import { icon } from './icons.js';
 import { playFeedback } from './audio.js';
+import { newSessionId } from './session-id.js';
 // Reaction tests have no graphics dependency. Load the arena only for aiming modes.
-const canvasPoint=(canvas,x,y)=>{const r=canvas.getBoundingClientRect();return{x:(x-r.left)/r.width*1000,y:(y-r.top)/r.height*562.5};};
 
 const styleURL=new URL('../styles.css',import.meta.url).href;
 const activeStates=['running','countdown','paused'];
@@ -12,7 +12,7 @@ const percent=value=>value==null?'—':`${(value*100).toFixed(1)}%`;
 const number=value=>value==null?'—':Math.round(value).toLocaleString('zh-CN');
 const dateFormat=new Intl.DateTimeFormat('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
 const ruleLabel=config=>config.mode==='reaction'&&config.rulesVersion>=3?'变色点击':config.rulesVersion===2?'3D':'旧版 2D';
-const inputLabel=config=>config.mode==='reaction'?'变色点击':config.input==='locked'?'第一人称':'自由指针';
+const inputLabel=config=>config.mode==='reaction'?'变色点击':'第一人称';
 const escapeHTML=value=>String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const crosshairHTML=()=>'<div class="crosshair"><i class="left"></i><i class="right"></i><i class="top"></i><i class="bottom"></i><i class="dot"></i></div>';
 
@@ -40,7 +40,7 @@ export class VectorTrainer extends HTMLElement {
               <div class="arena-overlay" id="arena-overlay"></div><div class="stage-bottom"><span><kbd>ESC</kbd> 菜单 <kbd>TAB</kbd> 设置</span><span class="fps-readout" id="hud-fps">— FPS</span><span class="weapon-label">USP-S <b>∞</b></span></div>
             </section><div class="mode-grid" aria-label="选择训练模式">${MODES.map(mode=>`<button class="mode-card" data-mode="${mode.id}" aria-label="${mode.name} ${mode.english}"><small>${mode.number}</small><span>${mode.name}</span><em>${mode.english}</em></button>`).join('')}</div></div>
             <div id="config-dock">${this.settingsHTML()}</div>
-          </div><p class="mobile-note">推荐桌面鼠标。触屏可使用自由指针。</p></section>
+          </div><p class="mobile-note">瞄准训练需要桌面鼠标；反应测试可使用触屏。</p></section>
           <section id="history-view" hidden></section><section id="guide-view" hidden>${this.guideHTML()}</section>
         </main>
       </div><div id="settings-root"></div><div id="dialog-root"></div><div class="toast" id="toast" role="status" aria-live="polite" hidden></div><div class="sr-only" id="announcer" role="status" aria-live="polite"></div>`;
@@ -82,7 +82,6 @@ export class VectorTrainer extends HTMLElement {
     return `<aside class="config-panel" id="config-panel" aria-label="训练配置"><div class="config-title"><h2>设置</h2><button class="icon-button settings-close" data-action="close-settings" aria-label="关闭设置">${icon('close',18)}</button></div><div class="config-tabs"><button data-config-tab="aim" class="active">瞄准</button><button data-config-tab="crosshair">准星</button></div>
       <div id="aim-settings"><div class="control-group"><label class="setting-label">时长</label><div class="segmented">${[30,60,90].map(v=>`<button data-duration="${v}">${v} 秒</button>`).join('')}</div></div>
       <div class="control-group"><label class="setting-label">难度</label><div class="segmented">${Object.entries(DIFFICULTIES).map(([key,value])=>`<button data-difficulty="${key}">${value.label}</button>`).join('')}</div></div>
-      <div class="control-group"><label class="setting-label" for="input-mode">操控</label><select id="input-mode" data-setting="input"><option value="locked">第一人称 · 鼠标转向</option><option value="pointer">自由指针</option></select></div>
       <div class="control-group"><label class="setting-label" for="sensitivity">灵敏度<input id="sensitivity-number" data-setting="sensitivity" type="number" min="0.1" max="5" step="0.01" aria-label="灵敏度数值"></label><input id="sensitivity" class="input-range" type="range" min="0.1" max="5" step="0.01" data-setting="sensitivity" aria-label="鼠标灵敏度"><span class="setting-hint" id="sensitivity-hint">0.022° × 灵敏度 / 鼠标计数</span></div>
       <div class="control-group">${range('视野','fov',50,100,1,'64°')}</div><div class="control-group"><label class="setting-label" for="graphicsQuality">画面</label><select id="graphicsQuality" data-setting="graphicsQuality"><option value="performance">流畅</option><option value="detail">细节</option></select></div>
       <label class="check-row"><span>射击音效</span><input id="sound-toggle" data-setting="sound" type="checkbox"></label><button class="text-button reset-aim" data-action="reset-aim">恢复瞄准默认值</button></div>
@@ -116,19 +115,15 @@ export class VectorTrainer extends HTMLElement {
     this.shadowRoot.addEventListener('change',event=>{if(event.target.tagName==='SELECT'||event.target.type==='number')setting(event);},options);
     this.canvas.addEventListener('pointerdown',event=>{
       if(event.button!==0||this.engine.state!=='running'||this.settingsOpen)return;event.preventDefault();
-      if(!this.hasLock()){const p=canvasPoint(this.canvas,event.clientX,event.clientY);this.engine.move(p.x,p.y);}
+      if(!this.hasLock())return;
       const shot=this.engine.shoot();if(shot){this.graphics?.fire();if(shot.type!=='early')this.beep(shot.type==='hit');}
       this.updateHUD();
     },options);
     this.canvas.addEventListener('contextmenu',event=>event.preventDefault(),options);
-    this.canvas.addEventListener('pointerleave',()=>{if(this.engine.config.input==='pointer')this.pause();},options);
     document.addEventListener('mousemove',event=>{
       if(!['running','countdown'].includes(this.engine.state))return;
       if(this.hasLock())this.engine.relativeMove(event.movementX,event.movementY);
-      else if(event.composedPath().includes(this.canvas)){const p=canvasPoint(this.canvas,event.clientX,event.clientY);this.engine.move(p.x,p.y);}
-      this.updateCrosshairPosition();
     },options);
-    this.canvas.addEventListener('pointermove',event=>{if(event.pointerType==='mouse'||this.hasLock()||!['running','countdown'].includes(this.engine.state))return;const p=canvasPoint(this.canvas,event.clientX,event.clientY);this.engine.move(p.x,p.y);this.updateCrosshairPosition();},options);
     document.addEventListener('pointerlockchange',()=>{
       if(this.hasLock()){
         if(this.lockPending){clearTimeout(this.lockTimer);this.lockPending=false;this.launchSession();}
@@ -177,7 +172,7 @@ export class VectorTrainer extends HTMLElement {
   changeConfig(patch){
     if(this.lockPending)return;
     const current=this.engine.state,active=activeStates.includes(current),keys=Object.keys(patch);
-    if(active&&keys.some(key=>['mode','duration','difficulty','input'].includes(key))){this.syncConfig();return;}
+    if(active&&keys.some(key=>['mode','duration','difficulty'].includes(key))){this.syncConfig();return;}
     if(['running','countdown'].includes(current))this.pause();
     const next=normalizeConfig({...this.config,...patch});
     if(active&&this.engine.elapsedMs>0&&['sensitivity','fov'].some(key=>key in patch&&next[key]!==this.config[key]))this.engine.parametersChanged=true;
@@ -205,9 +200,7 @@ export class VectorTrainer extends HTMLElement {
     for(const b of this.$$('[data-difficulty]')){b.classList.toggle('selected',b.dataset.difficulty===this.config.difficulty);b.disabled=busy||this.config.mode==='reaction';}
     for(const b of this.$$('[data-mode]')){const selected=b.dataset.mode===this.config.mode;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));b.disabled=busy;}
     for(const node of this.$$('[data-setting]')){const key=node.dataset.setting;if(node.type==='number'&&this.shadowRoot.activeElement===node)continue;if(node.type==='checkbox')node.checked=this.config[key];else node.value=this.config[key];}
-    this.$('#input-mode').disabled=busy;
-    this.$('#sensitivity').disabled=this.$('#sensitivity-number').disabled=this.config.input==='pointer';
-    this.$('#sensitivity-hint').textContent=this.config.input==='pointer'?'自由指针使用系统鼠标速度':'0.022° × 灵敏度 / 鼠标计数';
+    this.$('#sensitivity-hint').textContent='0.022° × 灵敏度 / 鼠标计数';
     for(const key of ['fov','crosshairLength','crosshairGap','crosshairThickness','crosshairOpacity'])this.$(`#${key}-value`).textContent=key==='fov'?`${this.config[key]}°`:key==='crosshairOpacity'?`${Math.round(this.config[key]*100)}%`:this.config[key];
     const mode=modeById(this.config.mode);this.$('#arena-title').textContent=mode.name;this.$('#arena-english').textContent=mode.english;
     this.$('#pause-button').disabled=!activeStates.includes(this.engine.state);
@@ -222,28 +215,26 @@ export class VectorTrainer extends HTMLElement {
       node.style.setProperty('--hair-color',c.crosshair);node.style.setProperty('--hair-length',`${c.crosshairLength}px`);node.style.setProperty('--hair-gap',`${c.crosshairGap}px`);node.style.setProperty('--hair-width',`${c.crosshairThickness}px`);node.style.opacity=c.crosshairOpacity;
       node.classList.toggle('has-dot',c.crosshairDot||c.crosshairStyle==='dot');node.classList.toggle('outlined',c.crosshairOutline);node.classList.toggle('t-style',c.crosshairStyle==='t');node.classList.toggle('dot-style',c.crosshairStyle==='dot');
     }
-    this.$('#aim-layer').hidden=this.config.mode==='reaction'||!['countdown','running'].includes(this.engine.state);this.updateCrosshairPosition();
+    this.$('#aim-layer').hidden=this.config.mode==='reaction'||!['countdown','running'].includes(this.engine.state);
   }
-  updateCrosshairPosition(){const node=this.$('#aim-layer'),pointer=this.config.input==='pointer';node.style.left=`${pointer?this.engine.cursor.x/10:50}%`;node.style.top=`${pointer?this.engine.cursor.y/562.5*100:50}%`;}
   hasLock(){return this.shadowRoot.pointerLockElement===this.canvas||document.pointerLockElement===this.canvas;}
   releaseLock(){if(this.hasLock())document.exitPointerLock?.();}
   requestStart(){
     if((this.config.mode!=='reaction'&&(this.graphicsError||!this.graphics||this.graphicsLoading))||this.lockPending||['running','countdown'].includes(this.engine.state))return;
     this.closeSettings();this.initAudio();
-    if(this.config.mode==='reaction'||this.config.input==='pointer'){this.launchSession();return;}
+    if(this.config.mode==='reaction'){this.launchSession();return;}
     if(!this.canvas.requestPointerLock){this.lockFailed(true);return;}
     this.lockPending=true;this.syncConfig();this.renderOverlay();
     const request=raw=>{
       try{const promise=this.canvas.requestPointerLock(raw?{unadjustedMovement:true}:undefined);this.lockPromise=!!promise?.catch;
-        if(promise?.catch)promise.catch(error=>{if(!this.lockPending)return;if(raw&&error.name==='NotSupportedError')request(false);else this.lockFailed();});
-      }catch(error){if(raw&&error.name==='NotSupportedError')request(false);else this.lockFailed();}
+        if(promise?.catch)promise.catch(()=>{if(!this.lockPending)return;if(raw)request(false);else this.lockFailed();});
+      }catch{if(raw)request(false);else this.lockFailed();}
     };
     request(true);this.lockTimer=setTimeout(()=>{if(this.lockPending)this.lockFailed();},2500);
   }
   lockFailed(force=false){
-    if(!this.lockPending&&!force)return;clearTimeout(this.lockTimer);this.lockPending=false;this.config.input='pointer';
-    if(this.engine.state==='paused'){this.engine.config.input='pointer';this.engine.parametersChanged=true;}
-    this.store.saveSettings(this.config);this.syncConfig();this.renderOverlay();this.toast('鼠标锁定不可用，已切换自由指针。再次点击开始。');
+    if(!this.lockPending&&!force)return;clearTimeout(this.lockTimer);this.lockPending=false;
+    this.syncConfig();this.renderOverlay();this.toast('鼠标锁定未成功，请点击开始重试。');
   }
   launchSession(){this.lockPending=false;if(this.engine.state==='paused')this.engine.resume();else{this.lastResult=null;this.engine.start(this.config);}this.lastState='';this.syncConfig();this.renderOverlay();if(this.config.mode!=='reaction')this.canvas.focus({preventScroll:true});}
   pause(){
@@ -300,7 +291,7 @@ export class VectorTrainer extends HTMLElement {
   }
   complete(result){
     const best=this.store.best(result.config);this.newBest=!result.parametersChanged&&isBetter(result.config.mode,primaryMetric(result),best?primaryMetric(best):null);
-    const session={...result,id:crypto.randomUUID(),completedAt:new Date().toISOString(),syncStatus:'local'};this.saved=this.store.save(session);this.lastResult=session;this.releaseLock();this.updateSummary();this.syncConfig();this.renderOverlay();
+    const session={...result,id:newSessionId(),completedAt:new Date().toISOString(),syncStatus:'local'};this.saved=this.store.save(session);this.lastResult=session;this.releaseLock();this.updateSummary();this.syncConfig();this.renderOverlay();
     this.dispatchEvent(new CustomEvent('training-complete',{detail:structuredClone(session),bubbles:true,composed:true}));this.announce('训练完成');requestAnimationFrame(()=>this.$('[data-action="retry"]')?.focus({preventScroll:true}));
   }
   metricText(session){const value=primaryMetric(session);return value==null?'—':session.config.mode==='reaction'?`${number(value)} ms`:session.config.mode==='tracking'?`${value.toFixed(1)}%`:`${number(value)} 分`;}
@@ -327,7 +318,7 @@ export class VectorTrainer extends HTMLElement {
     const x=i=>50+(series.length===1?400:i/(series.length-1)*800),y=v=>130-(v-low)/(high-low)*100,axis=v=>series[0].config.mode==='tracking'?`${v.toFixed(1)}%`:number(v),path=values.map((v,i)=>`${i?'L':'M'}${x(i)},${y(v)}`).join(' ');
     return`<svg class="trend-chart" viewBox="0 0 900 160" role="img" aria-label="同参数成绩趋势"><path d="M50 25H860M50 78H860M50 132H860" stroke="#ffffff15" fill="none"/><text x="4" y="29" fill="#a9b1ac" font-size="10">${axis(high)}</text><text x="4" y="136" fill="#a9b1ac" font-size="10">${axis(low)}</text><path d="${path}" fill="none" stroke="#d6c58a" stroke-width="2"/>${values.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="#d6c58a"><title>${this.metricText(series[i])}</title></circle>`).join('')}</svg>`;
   }
-  guideHTML(){return`<div class="guide-grid"><section class="guide-panel"><h2>操作</h2><dl><dt>鼠标</dt><dd>第一人称转向，左键射击</dd><dt>Esc / 空格</dt><dd>暂停并释放鼠标</dd><dt>Tab</dt><dd>暂停并打开设置</dd><dt>F / 大屏</dt><dd>切换大屏；浏览器限制时使用窗口大屏</dd></dl><p>暂停后可继续、调整准星与灵敏度，或直接退出。未完成的训练不保存。</p></section><section class="guide-panel"><h2>训练模式</h2><ul><li>网格点射：切换三个靶球。</li><li>反应测试：等待色块变绿后点击，提前点击算抢跑。可用空格或回车响应。</li><li>大幅甩枪：命中远距离出现的靶球。</li><li>精准微调：命中较小靶球。</li><li>平滑跟枪：准星跟随靶球，无需开火。</li></ul></section><section class="guide-panel"><h2>准星与灵敏度</h2><p>设置 → 准星：调整样式、颜色、长度、间距、粗细、中心点与轮廓。</p><p>第一人称使用 0.022° × 灵敏度 / 鼠标计数，不随窗口尺寸变化。自由指针使用系统鼠标速度。浏览器输入不是 CS2 的完整灵敏度校准。</p><p>训练中调整灵敏度或视野会标记本轮，不加入个人最佳比较。</p></section><section class="guide-panel"><h2>成绩与数据</h2><p>点射分数 = 命中数 × 100 × 命中率；反应看平均毫秒，跟枪看在靶时长占比。</p><p>成绩仅存本机，最多 500 轮。可导出或清除。显示“离线就绪”后可断网刷新。</p></section></div>`;}
+  guideHTML(){return`<div class="guide-grid"><section class="guide-panel"><h2>操作</h2><dl><dt>鼠标</dt><dd>第一人称转向，左键射击</dd><dt>Esc / 空格</dt><dd>暂停并释放鼠标</dd><dt>Tab</dt><dd>暂停并打开设置</dd><dt>F / 大屏</dt><dd>切换大屏；浏览器限制时使用窗口大屏</dd></dl><p>暂停后可继续、调整准星与灵敏度，或直接退出。未完成的训练不保存。</p></section><section class="guide-panel"><h2>训练模式</h2><ul><li>网格点射：切换三个靶球。</li><li>反应测试：等待色块变绿后点击，提前点击算抢跑。可用空格或回车响应。</li><li>大幅甩枪：命中远距离出现的靶球。</li><li>精准微调：命中较小靶球。</li><li>平滑跟枪：准星跟随靶球，无需开火。</li></ul></section><section class="guide-panel"><h2>准星与灵敏度</h2><p>设置 → 准星：调整样式、颜色、长度、间距、粗细、中心点与轮廓。</p><p>第一人称使用 0.022° × 灵敏度 / 鼠标计数，不随窗口尺寸变化。浏览器输入不是 CS2 的完整灵敏度校准。</p><p>训练中调整灵敏度或视野会标记本轮，不加入个人最佳比较。</p></section><section class="guide-panel"><h2>成绩与数据</h2><p>点射分数 = 命中数 × 100 × 命中率；反应看平均毫秒，跟枪看在靶时长占比。</p><p>成绩仅存本机，最多 500 轮。可导出或清除。显示“离线就绪”后可断网刷新。</p></section></div>`;}
   initAudio(){if(!this.config.sound)return;try{const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;this.audio??=new Audio();if(this.audio.state==='suspended')this.audio.resume().catch(()=>{});}catch{}}
   beep(hit){if(this.config.sound&&this.audio)playFeedback(this.audio,hit);}
   confirm(title,message,callback,label='确认'){this.restoreFocus=this.shadowRoot.activeElement;this.dialogCallback=callback;this.$('#dialog-root').innerHTML=`<div class="dialog-backdrop"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><h2 id="dialog-title">${escapeHTML(title)}</h2><p>${escapeHTML(message)}</p><div class="button-group"><button class="secondary" data-action="confirm-cancel">取消</button><button class="primary" data-action="confirm-ok">${escapeHTML(label)}</button></div></div></div>`;this.$('.shell').inert=true;this.$('[data-action="confirm-cancel"]').focus();}

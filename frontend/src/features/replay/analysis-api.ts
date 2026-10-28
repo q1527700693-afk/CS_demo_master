@@ -14,6 +14,7 @@ import type {
 } from './contracts'
 import { assertReportIdentity, type ReportIdentity } from './report-identity'
 import { localResource, listLocalResults, localRun, saveLocalResult } from './local-library'
+import { canUseLocalReplayLibrary } from './browser-capabilities'
 
 export const localBase = (import.meta.env.VITE_LOCAL_PARSER_URL || 'http://127.0.0.1:8877').replace(
   /\/$/,
@@ -75,9 +76,10 @@ export const getAnalysis = async (id: string) => {
 export const listMatches = (page = 1) =>
   analysisRequest<Page<MatchRecord>>(`/matches?page=${page}&pageSize=100`)
 export const getHistory = async (id: string) => {
-  const saved = mockModules.replay
-    ? []
-    : (await listLocalResults().catch(() => [])).filter((r) => r.match_id === id).map(localRun)
+  const saved =
+    mockModules.replay || !canUseLocalReplayLibrary()
+      ? []
+      : (await listLocalResults().catch(() => [])).filter((r) => r.match_id === id).map(localRun)
   try {
     const remote = await analysisRequest<{ items: AnalysisRun[] }>(
       `/matches/${encodeURIComponent(id)}/analyses`,
@@ -233,7 +235,8 @@ export const downloadReport = async (
   if (token !== (localStorage.getItem(TOKEN_KEY) || ''))
     throw new ApiError('登录状态已改变，请重新读取报告')
   assertReportIdentity(report, { ...expected, analysis_id: id })
-  if (!mockModules.replay) await saveLocalResult(report, (key) => request(key), saveProgress)
+  if (!mockModules.replay && canUseLocalReplayLibrary())
+    await saveLocalResult(report, (key) => request(key), saveProgress)
   rememberReport(report)
   return report
 }

@@ -5,7 +5,7 @@ const validNumber = value => typeof value === 'number' && Number.isFinite(value)
 export function validSession(item) {
   return item?.schemaVersion === 1 && typeof item.id === 'string' && typeof item.completedAt === 'string' && Number.isFinite(Date.parse(item.completedAt))
     && MODES.some(m => m.id === item.config?.mode) && [30, 60, 90].includes(item.config.duration)
-    && Object.hasOwn(DIFFICULTIES, item.config.difficulty) && ['locked', 'pointer'].includes(item.config.input)
+    && Object.hasOwn(DIFFICULTIES, item.config.difficulty) && item.config.input === 'locked'
     && validNumber(item.durationMs) && item.durationMs === item.config.duration * 1000
     && item.metrics && validNumber(item.metrics.hits) && validNumber(item.metrics.shots)
     && item.metrics.hits <= item.metrics.shots

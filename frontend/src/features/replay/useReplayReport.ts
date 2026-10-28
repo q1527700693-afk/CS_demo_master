@@ -14,6 +14,7 @@ import {
 import type { AnalysisReport, AnalysisRun, ReplayDetails, ReplayEvent } from './contracts'
 import { assertDetailsIdentity, roundRows } from './report-data'
 import { reviewFocus } from './review-presentation'
+import { newRequestKey } from './browser-capabilities'
 
 export function useReplayReport() {
   const route = useRoute(),
@@ -86,7 +87,7 @@ export function useReplayReport() {
     retrying.value = true
     actionError.value = ''
     try {
-      const run = await startAnalysis(report.value, crypto.randomUUID())
+      const run = await startAnalysis(report.value, newRequestKey())
       sessionStorage.setItem(`csdm.pending-analysis.${auth.user?.id || 'guest'}`, run.analysis_id)
       await router.push('/replays/new?view=cloud')
     } catch (e) {
