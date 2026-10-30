@@ -1,3 +1,17 @@
+import {
+  isCloudAnalysis,
+  cloudId,
+  cloudKey,
+  cloudPath,
+  cloudRun,
+  getCloudDemo,
+  getCloudReport,
+  getCloudDetails,
+  getCloudRound,
+  getCloudMap,
+  getCloudEvents,
+  listCloudDemos,
+} from './cloud-api'
 import { apiBase, TOKEN_KEY, mockModules } from '@/app/config'
 import { ApiError, request, upload } from '@/api/http'
 import type { ApiResponse, Page } from '@/types'
@@ -74,13 +88,28 @@ export const startAnalysis = async (
   return run
 }
 export const getAnalysis = async (id: string) => {
+  if (isCloudAnalysis(id)) return cloudRun(await getCloudDemo(id))
   const run = await analysisRequest<AnalysisRun>(`/analyses/${encodeURIComponent(id)}`)
   if (run.analysis_id !== id) throw new ApiError('返回的任务编号不一致')
   return run
 }
 export const listMatches = (page = 1) =>
   analysisRequest<Page<MatchRecord>>(`/matches?page=${page}&pageSize=100`)
-export const getHistory = async (id: string) => {
+export const getHistory = async (id: string, target?: string) => {
+  if (id.startsWith('demo-')) {
+    const items = []
+    let page = 1
+    while (true) {
+      const result = await listCloudDemos(page++)
+      items.push(
+        ...result.items
+          .filter((r) => r.demo_sha256 && `demo-${r.demo_sha256.slice(0, 12)}` === id)
+          .map(cloudRun),
+      )
+      if (!result.items.length || page > Math.ceil(result.total / 100)) break
+    }
+    return { items: items.filter((r) => !target || r.target_player_id === target) }
+  }
   const saved =
     mockModules.replay || !canUseLocalReplayLibrary()
       ? []
@@ -91,24 +120,37 @@ export const getHistory = async (id: string) => {
     )
     return {
       items: [
-        ...remote.items,
-        ...saved.filter((s) => !remote.items.some((r) => r.analysis_id === s.analysis_id)),
+        ...remote.items.filter((r) => !target || r.target_player_id === target),
+        ...saved.filter(
+          (s) =>
+            (!target || s.target_player_id === target) &&
+            !remote.items.some((r) => r.analysis_id === s.analysis_id),
+        ),
       ],
     }
   } catch (e) {
-    if (saved.length) return { items: saved }
+    if (saved.length)
+      return { items: saved.filter((r) => !target || r.target_player_id === target) }
     throw e
   }
 }
 export const getReportDetails = (id: string) =>
-  analysisRequest<ReplayDetails>(`/analyses/${encodeURIComponent(id)}/details`)
+  isCloudAnalysis(id)
+    ? getCloudDetails(id)
+    : analysisRequest<ReplayDetails>(`/analyses/${encodeURIComponent(id)}/details`)
 export const getRound = (id: string, round: number, signal?: AbortSignal) =>
-  analysisRequest<RoundDetail>(`/analyses/${encodeURIComponent(id)}/rounds/${round}`, { signal })
+  isCloudAnalysis(id)
+    ? getCloudRound(id, round, signal)
+    : analysisRequest<RoundDetail>(`/analyses/${encodeURIComponent(id)}/rounds/${round}`, {
+        signal,
+      })
 export const getRoundMap = (id: string, round: number, offset: number, signal?: AbortSignal) =>
-  analysisRequest<{ items: ReplayMapItem[]; next_offset: number | null }>(
-    `/analyses/${encodeURIComponent(id)}/rounds/${round}/map?limit=500&offset=${offset}`,
-    { signal },
-  )
+  isCloudAnalysis(id)
+    ? getCloudMap(id, round, offset, signal)
+    : analysisRequest<{ items: ReplayMapItem[]; next_offset: number | null }>(
+        `/analyses/${encodeURIComponent(id)}/rounds/${round}/map?limit=500&offset=${offset}`,
+        { signal },
+      )
 export const getGlobalMapPage = <T>(
   id: string,
   kind: 'samples' | 'trajectories' | 'events',
@@ -133,7 +175,8 @@ export const getEvidence = (id: string) =>
     }[]
     map: { trajectories: { event_id: string; type: string; points: [number, number, number][] }[] }
   }>(`/analysis-packages/${encodeURIComponent(id)}/evidence`)
-export const getReportEvents = async (id: string) => {
+export const getReportEvents = async (id: string, analysisId?: string) => {
+  if (analysisId && isCloudAnalysis(analysisId)) return getCloudEvents(analysisId)
   if (mockModules.replay) return getEvidence(id)
   return analysisRequest<{ match_id: string; package_id: string; events: ReplayEvent[] }>(
     `/analysis-packages/${encodeURIComponent(id)}/events`,
@@ -223,6 +266,12 @@ export const downloadReport = async (
   saveProgress: (message: string) => void = () => {},
 ) => {
   await prepareAnalysisTransport()
+  if (isCloudAnalysis(id)) {
+    const report = await getCloudReport(id)
+    assertReportIdentity(report, { ...expected, analysis_id: id })
+    rememberReport(report)
+    return report
+  }
   if (!mockModules.replay) {
     const saved = await localResource<AnalysisReport>(`/analyses/${id}/report`)
     if (saved) {
@@ -266,10 +315,27 @@ export const localPackage = (id: string, token: string) =>
     blob: true,
   })
 
-export const getAiReport = (id: string, signal?: AbortSignal) =>
-  analysisRequest<AiCoachReport>(`/analyses/${encodeURIComponent(id)}/ai`, { signal })
-export const generateAiReport = (id: string, signal?: AbortSignal) =>
-  analysisRequest<AiCoachReport>(`/analyses/${encodeURIComponent(id)}/ai`, {
-    method: 'POST',
-    signal: signal ?? AbortSignal.timeout(90_000),
-  })
+export const getAiReport = async (id: string, signal?: AbortSignal): Promise<AiCoachReport> => {
+  const raw = await analysisRequest<AiCoachReport>(
+    isCloudAnalysis(id) ? `${cloudPath(id)}/ai` : `/analyses/${encodeURIComponent(id)}/ai`,
+    { signal },
+  )
+  if (isCloudAnalysis(id)) {
+    if (raw.analysis_id && raw.analysis_id !== cloudId(id))
+      throw new ApiError('AI 报告与当前分析不一致')
+    return { ...raw, analysis_id: id }
+  }
+  return raw
+}
+export const generateAiReport = async (
+  id: string,
+  signal?: AbortSignal,
+): Promise<AiCoachReport> => {
+  const raw = await analysisRequest<AiCoachReport>(
+    isCloudAnalysis(id)
+      ? `${cloudPath(id)}/ai?force=true`
+      : `/analyses/${encodeURIComponent(id)}/ai`,
+    { method: 'POST', signal: signal ?? AbortSignal.timeout(90_000) },
+  )
+  return isCloudAnalysis(id) ? { ...raw, analysis_id: id } : raw
+}

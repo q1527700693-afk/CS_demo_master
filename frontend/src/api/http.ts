@@ -52,6 +52,8 @@ export function upload<T>(
   file: File,
   onProgress: (value: number | null) => void,
   signal?: AbortSignal,
+  fields: Record<string, string> = {},
+  timeoutMs = 180_000,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
@@ -62,7 +64,7 @@ export function upload<T>(
     xhr.onabort = () => reject(new DOMException('上传已取消', 'AbortError'))
     xhr.open('POST', `${apiBase}${path}`)
     // Import validation can wait in the backend queue for up to 150 seconds.
-    xhr.timeout = 180_000
+    xhr.timeout = timeoutMs
     const token = localStorage.getItem(TOKEN_KEY)
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
     xhr.upload.onprogress = (event) => {
@@ -83,6 +85,7 @@ export function upload<T>(
     xhr.ontimeout = () => reject(new ApiError('上传超时，请检查网络后重试'))
     const form = new FormData()
     form.append('file', file)
+    for (const [key, value] of Object.entries(fields)) form.append(key, value)
     if (signal?.aborted) {
       cleanup()
       reject(new DOMException('上传已取消', 'AbortError'))

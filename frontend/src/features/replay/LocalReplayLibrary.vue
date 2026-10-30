@@ -4,6 +4,7 @@ import { listMatches, getHistory, downloadReport } from './analysis-api'
 import { listLocalResults, type LocalResult } from './local-library'
 import { errorMessage } from '@/api/http'
 import { mockModules } from '@/app/config'
+import { analysisName } from './analysis-name'
 import { mapName } from './review-presentation'
 const records = ref<LocalResult[]>([]),
   loading = ref(true),
@@ -83,7 +84,9 @@ onMounted(load)
     data-testid="local-replay-row"
   >
     <div>
-      <h2>{{ mapName(item.match.map) }} · {{ item.player_name || '比赛复盘' }}</h2>
+      <h2>
+        {{ analysisName(item.player_name, item.analyzed_at, item.match.map, item.analysis_id) }}
+      </h2>
       <p>{{ item.match.teams.map((t) => `${t.name} ${t.score ?? '—'}`).join(' : ') }}</p>
       <p class="muted">分析于 {{ new Date(item.analyzed_at).toLocaleString('zh-CN') }}</p>
       <small>{{ item.complete ? '已完整保存到本机' : '演示数据' }}</small>

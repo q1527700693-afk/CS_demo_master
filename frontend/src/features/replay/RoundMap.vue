@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isCloudAnalysis } from './cloud-api'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { getRound, getRoundMap, getGlobalMapPage } from './analysis-api'
 import { errorMessage } from '@/api/http'
@@ -624,7 +625,9 @@ onUnmounted(() => {
         ><span>{{
           global
             ? '全员位置 · 每 0.5 秒采样 · 存活玩家按游标时刻显示'
-            : '旧版数据仅包含本人及附近玩家；全员回放需重新上传新版 ZIP'
+            : isCloudAnalysis(analysisId)
+              ? '云端解析展示所选玩家位置与道具；不推测其他玩家的未知位置'
+              : '旧版数据仅包含本人及附近玩家；全员回放需重新上传新版 ZIP'
         }}</span>
       </div>
       <details class="map-options">

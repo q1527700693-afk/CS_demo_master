@@ -14,6 +14,8 @@ import {
   getRound,
   startAnalysis,
 } from './analysis-api'
+import { waitForQueuedAi } from './ai-queue'
+import { isCloudAnalysis } from './cloud-api'
 import { reconcileCombat } from './combat-facts'
 import { normalizeAiReport } from './ai-report'
 import type {
@@ -73,8 +75,8 @@ export function useReplayReport() {
       report.value = value
       void loadAi(id, current)
       const results = await Promise.allSettled([
-        getReportEvents(value.package_id),
-        getHistory(value.match_id),
+        getReportEvents(value.package_id, id),
+        getHistory(value.match_id, value.target_player_id),
         mockModules.replay ? Promise.resolve(null) : getReportDetails(id),
       ])
       if (current !== generation) return
@@ -117,7 +119,25 @@ export function useReplayReport() {
   async function loadAi(id: string, current: number) {
     const revision = ++aiRevision
     try {
-      const result = normalizeAiReport(await getAiReport(id), id)
+      const raw = await getAiReport(id)
+      if (raw.queued && current === generation && revision === aiRevision && !aiLoading.value) {
+        aiLoading.value = true
+        const controller = new AbortController()
+        aiController = controller
+        const timer = setTimeout(() => controller.abort(), 180_000)
+        try {
+          const completed = await waitForQueuedAi(raw, controller.signal, () =>
+            getAiReport(id, controller.signal),
+          )
+          if (current === generation && revision === aiRevision)
+            ai.value = normalizeAiReport(completed, id)
+        } finally {
+          clearTimeout(timer)
+          if (current === generation && revision === aiRevision) aiLoading.value = false
+        }
+        return
+      }
+      const result = normalizeAiReport(raw, id)
       if (current === generation && revision === aiRevision && !aiLoading.value) ai.value = result
     } catch (e) {
       if (current === generation && revision === aiRevision && !aiLoading.value)
@@ -133,9 +153,14 @@ export function useReplayReport() {
     aiError.value = ''
     const controller = new AbortController()
     aiController = controller
-    const timeout = setTimeout(() => controller.abort(), 90_000)
+    const timeout = setTimeout(() => controller.abort(), isCloudAnalysis(id) ? 180_000 : 90_000)
     try {
-      const result = normalizeAiReport(await generateAiReport(id, controller.signal), id)
+      let raw = await generateAiReport(id, controller.signal)
+      if (isCloudAnalysis(id))
+        raw = await waitForQueuedAi(raw, controller.signal, () =>
+          getAiReport(id, controller.signal),
+        )
+      const result = normalizeAiReport(raw, id)
       if (current === generation) ai.value = result
     } catch (e) {
       if (current === generation) aiError.value = errorMessage(e)
@@ -145,6 +170,10 @@ export function useReplayReport() {
     }
   }
   async function reanalyze() {
+    if (report.value && isCloudAnalysis(report.value.analysis_id)) {
+      actionError.value = '请通过分析其他玩家或重新上传 Demo 创建新的独立分析，已有记录会保留。'
+      return
+    }
     if (!report.value) return
     retrying.value = true
     actionError.value = ''

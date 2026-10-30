@@ -1,17 +1,5 @@
-# 网页版 v1.1.0
+# Frontend v1.2.0 handoff
 
-范围：网页版；desktop_app 和既有应用安装包未修改。
+Copy this folder contents into frontend/ without nesting a version folder. Build with VITE_MOCK_AUTH=false, VITE_MOCK_PROFILE=false and VITE_MOCK_REPLAY=false. Do not copy node_modules, local environment files, SSH keys or test output.
 
-- 兼容旧报告：按原始击杀事件剔除 TK，修正总击杀、逐回合/武器击杀、多杀回合及爆头比例；误杀独立重点，可定位原始证据。
-- 展示 HE、燃烧弹对敌伤害和道具队伤；不把自己或队友当敌人。
-- 有效致盲门槛 0.5 秒，短微白不进入汇总/重点/地图重点时间点；全部事件仍可查询。
-- 上传状态移至账号级 Pinia 任务，切页面不中止解析、上传和云端轮询；全局进度入口，完成后不抢走练枪页面。退出登录取消本机未完成任务。刷新后能恢复已创建的云端分析；浏览器关闭前尚未传完的本机文件无法自动续传。
-- 地图目标标记与图例使用 Demo 昵称，TK 不作为绿色个人击杀展示。
-- 接入 AI 查询和生成，处理未配置、超时、上游错误和返回格式不完整，保留重试。
-- 个人资料与自己的公开名片支持精选比赛/AI 展示草稿，默认关闭，移动端适配。公开读写接口尚待后端实现，见 BACKEND-REQUIREMENTS.md。
-
-生产构建必须关闭演示：`VITE_MOCK_AUTH=false VITE_MOCK_PROFILE=false VITE_MOCK_REPLAY=false`，API `/api/v1`。不要把 SSH 密钥或任何 Key 作为 Vite 构建变量。
-
-老报告的展示数据可由前端原始事件纠正；AI 自然语言不会自动更改。需要准确的新版 AI 输入时，先重新分析原包再生成 AI。
-
-前端源码在 `front_end/`；独立交付包保留为 `front_end_v1.1.0/`（不含依赖、环境文件、SSH 文件和开发测试数据）。部署前备份线上 dist 与变动的后端服务文件；使用暂存目录验证后替换，保留旧静态资源供已打开页面使用。
+See docs/CLOUD-DEMO-v1.2.0.md for runtime channels, independent player history, required backend interfaces, compatibility patch and validation. The raw-demo-capable backend must be deployed before browser uploads become available. ZIP imports remain supported.

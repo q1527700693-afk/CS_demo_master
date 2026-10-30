@@ -1,24 +1,94 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useUploadTask } from './upload-task'
 import ProgressStages from './ProgressStages.vue'
 const task = useUploadTask()
-const { file, busy, dragging, error, analysisId, players, choosingPlayer, stages, fileLabel } =
-  storeToRefs(task)
+const {
+  chooseEveryTime,
+  desktop,
+  cloudTarget,
+  parser,
+  checkingParser,
+  parserError,
+  file,
+  busy,
+  dragging,
+  error,
+  analysisId,
+  players,
+  choosingPlayer,
+  stages,
+  fileLabel,
+} = storeToRefs(task)
 const { selectPlayer, selectFile, drop, process } = task
 const fileInput = ref<HTMLInputElement>()
-onMounted(task.resume)
+const route = useRoute()
+onMounted(() => {
+  if (typeof route.query.target === 'string') cloudTarget.value = route.query.target
+  task.resume(typeof route.query.task === 'string' ? route.query.task : undefined)
+  if (!desktop.value) void task.checkParser()
+})
 </script>
 <template>
   <section class="page-heading">
     <div>
       <div class="eyebrow">MATCH ANALYSIS</div>
       <h1>分析一场比赛<span class="orange">.</span></h1>
-      <p>拖入 Demo，自动解析、上传并打开复盘报告。</p>
+      <p>
+        {{
+          desktop
+            ? 'Demo 在本机解析，仅上传分析数据。'
+            : '上传原始 Demo，由服务器解析并保存个人报告。'
+        }}
+      </p>
     </div>
   </section>
   <section class="panel automatic-upload">
+    <div class="analysis-channels" aria-label="Demo 解析通道">
+      <button class="channel" :class="{ selected: !desktop }" :disabled="desktop">
+        <strong>云端解析 Demo</strong
+        ><span>{{ desktop ? '应用版已关闭' : '当前可用 · 服务器解析' }}</span>
+      </button>
+      <button class="channel" :class="{ selected: desktop }" :disabled="!desktop">
+        <strong>本地解析 Demo</strong
+        ><span>{{ desktop ? '当前可用 · 原始文件留在本机' : '请在应用版中使用' }}</span>
+      </button>
+    </div>
+    <label v-if="desktop" class="local-choice"
+      ><input
+        v-model="chooseEveryTime"
+        type="checkbox"
+        :disabled="busy"
+      />每次选择要分析的玩家</label
+    >
+    <div v-if="!desktop" class="cloud-options">
+      <p v-if="checkingParser" role="status">正在检测云端解析服务…</p>
+      <p v-else-if="parserError" class="error-text" role="alert">
+        {{ parserError }}
+        <button class="button secondary compact" @click="task.checkParser">重新检测</button>
+      </p>
+      <p v-else-if="parser?.available" class="muted small-text">
+        云端解析可用 · 原始 Demo 最大 512 MiB · AI
+        {{ parser.ai?.configured ? '可用' : '暂未配置，规则报告仍可使用' }}
+      </p>
+      <label
+        >分析玩家 SteamID64（选填）<input
+          v-model="cloudTarget"
+          :disabled="busy"
+          aria-label="云端分析玩家 SteamID64"
+          inputmode="numeric"
+          maxlength="17"
+          placeholder="留空自动选择击杀最多的玩家"
+      /></label>
+      <p class="muted small-text">
+        报告生成后可从玩家名单选择其他玩家继续分析。每位玩家的记录都会保留。
+      </p>
+      <p v-if="route.query.file" class="muted small-text">
+        请重新选择 {{ route.query.file }}，生成所选玩家的新报告。
+      </p>
+    </div>
     <label
       class="drop-zone"
       :class="{ dragging, busy }"
@@ -32,7 +102,10 @@ onMounted(task.resume)
     >
       <span class="drop-symbol" aria-hidden="true">↑</span>
       <strong>{{ busy ? '正在处理比赛…' : '将 Demo 拖到这里，或点击选择文件' }}</strong>
-      <span class="muted">支持 .dem（最多 1 GB）及已有 .zip 分析包（最多 50 MB）</span>
+      <span class="muted"
+        >支持 .dem（{{ desktop ? '最多 1 GB，本机解析' : '最多 512 MiB，上传服务器' }}）及已有 .zip
+        分析包（最多 50 MB）</span
+      >
       <span v-if="fileLabel" class="selected-file">{{ fileLabel }}</span>
       <input
         ref="fileInput"
@@ -74,6 +147,54 @@ onMounted(task.resume)
   </section>
 </template>
 <style scoped>
+.local-choice {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+.local-choice input {
+  width: 16px;
+}
+.analysis-channels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.channel {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #1b2329;
+  color: #b9c4cc;
+}
+.channel span {
+  font-size: 11px;
+}
+.channel.selected {
+  border-color: #c18d59;
+  color: #f0bc87;
+  background: #29251f;
+}
+.channel:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.cloud-options {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.cloud-options label {
+  display: grid;
+  gap: 8px;
+  max-width: 430px;
+  font-size: 12px;
+}
 .automatic-upload {
   padding: 24px;
 }

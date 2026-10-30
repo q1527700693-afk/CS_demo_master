@@ -1,3 +1,15 @@
+import { isDesktopRuntime } from '@/app/runtime'
+import { ApiError } from '@/api/http'
+import {
+  cloudParserStatus,
+  uploadCloudDemo,
+  getCloudDemo,
+  getCloudReport,
+  cloudKey,
+  isCloudAnalysis,
+  type ParserStatus,
+} from './cloud-api'
+import { rememberReport } from './analysis-api'
 import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { router } from '@/app/router'
@@ -23,6 +35,15 @@ export const useUploadTask = defineStore('upload-task', () => {
     choosingPlayer = ref(false),
     target = ref('')
   const stages = ref<StageProgress[]>([])
+  const chooseEveryTime = ref(true)
+  const desktop = computed(() => isDesktopRuntime())
+  const cloudTarget = ref(''),
+    parser = ref<ParserStatus | null>(null),
+    checkingParser = ref(false),
+    parserError = ref('')
+  let lastCloudFile: File | null = null,
+    lastCloudSha = ''
+  const pendingTargetKey = () => `csdm.pending-cloud-target.${auth.user?.id || 'guest'}`
   const pendingKey = () => `csdm.pending-analysis.${auth.user?.id || 'guest'}`
   const playerKey = () => `csdm.analysis-player.${auth.user?.id || 'guest'}`
   const fileLabel = computed(() =>
@@ -106,7 +127,7 @@ export const useUploadTask = defineStore('upload-task', () => {
       }
     }
     ensureActive()
-    if (preferred && roster.some((p) => p.player_id === preferred)) {
+    if (!chooseEveryTime.value && preferred && roster.some((p) => p.player_id === preferred)) {
       target.value = preferred
       return preferred
     }
@@ -125,6 +146,7 @@ export const useUploadTask = defineStore('upload-task', () => {
     resolve(id)
   }
   async function parseDemo(source: File): Promise<File> {
+    if (!isDesktopRuntime()) throw new Error('浏览器仅支持云端解析，本地解析请使用应用')
     set(0, 'running', '正在准备解析')
     const health = await companion.health(controller.signal)
     if (!health.awpy_available) throw new Error('解析服务尚未准备好，请重新启动本机服务')
@@ -187,6 +209,13 @@ export const useUploadTask = defineStore('upload-task', () => {
     error.value = ''
     try {
       ensureActive()
+      if (
+        isCloudAnalysis(analysisId.value) ||
+        (file.value?.name.toLowerCase().endsWith('.dem') && !isDesktopRuntime())
+      ) {
+        await processCloud()
+        return
+      }
       if (analysisId.value && cloudFailed) {
         const previous = await getAnalysis(analysisId.value)
         ensureActive()
@@ -235,7 +264,12 @@ export const useUploadTask = defineStore('upload-task', () => {
   }
   function selectFile(candidate: File | null) {
     if (!candidate || busy.value) return
-    const invalid = validateAnalysisFile(candidate)
+    const invalid =
+      !isDesktopRuntime() &&
+      candidate.name.toLowerCase().endsWith('.dem') &&
+      candidate.size > 512 * 1024 ** 2
+        ? '云端 Demo 不得超过 512 MiB'
+        : validateAnalysisFile(candidate)
     if (invalid) {
       error.value = invalid
       return
@@ -253,6 +287,7 @@ export const useUploadTask = defineStore('upload-task', () => {
     requestKey = newRequestKey()
     sessionStorage.removeItem(pendingKey())
     resetStages(candidate.name.toLowerCase().endsWith('.dem'))
+    if (!isDesktopRuntime() && candidate.name.toLowerCase().endsWith('.dem')) resetCloudStages()
     void process()
   }
   function drop(event: DragEvent) {
@@ -265,9 +300,16 @@ export const useUploadTask = defineStore('upload-task', () => {
     }
     selectFile(files?.[0] || null)
   }
-  function resume() {
+  function resume(taskId?: string) {
     if (busy.value || analysisId.value) return
-    analysisId.value = sessionStorage.getItem(pendingKey()) || ''
+    analysisId.value =
+      taskId && isCloudAnalysis(taskId) ? taskId : sessionStorage.getItem(pendingKey()) || ''
+    if (isCloudAnalysis(analysisId.value)) {
+      resetCloudStages()
+      cloudTarget.value = sessionStorage.getItem(pendingTargetKey()) || ''
+      void process()
+      return
+    }
     if (analysisId.value) {
       resetStages(false)
       set(1, 'completed', '已恢复此前上传的分析任务', 100)
@@ -289,9 +331,156 @@ export const useUploadTask = defineStore('upload-task', () => {
       players.value = []
       error.value = ''
       resetStages()
+      lastCloudFile = null
+      lastCloudSha = ''
+      cloudTarget.value = ''
+      parser.value = null
+      parserError.value = ''
     },
   )
+  function resetCloudStages() {
+    stages.value = [
+      {
+        stage: 'upload',
+        label: '上传 Demo',
+        status: 'pending',
+        percent: null,
+        message: '原始 Demo 将上传至服务器',
+      },
+      {
+        stage: 'local',
+        label: '云端解析',
+        status: 'pending',
+        percent: null,
+        message: '服务器读取比赛数据',
+      },
+      {
+        stage: 'cloud',
+        label: '生成报告',
+        status: 'pending',
+        percent: null,
+        message: '按所选玩家生成独立报告',
+      },
+      {
+        stage: 'download',
+        label: '打开报告',
+        status: 'pending',
+        percent: null,
+        message: '已有分析记录会保留',
+      },
+    ]
+  }
+  async function checkParser() {
+    if (isDesktopRuntime() || checkingParser.value) return
+    const owner = auth.user?.id
+    checkingParser.value = true
+    parserError.value = ''
+    try {
+      const status = await cloudParserStatus()
+      if (owner !== auth.user?.id) return
+      parser.value = status
+      if (!status.available)
+        parserError.value = '服务器解析引擎尚未就绪，请稍后重试；仍可导入已有 ZIP 分析包。'
+    } catch (e) {
+      if (owner === auth.user?.id)
+        parserError.value =
+          e instanceof ApiError && e.status === 404
+            ? '云端 Demo 接口尚未部署，请等待服务器更新；仍可导入已有 ZIP 分析包。'
+            : errorMessage(e)
+    } finally {
+      checkingParser.value = false
+    }
+  }
+  async function processCloud() {
+    if (isDesktopRuntime()) throw new Error('应用版使用本地解析，云端 Demo 上传已关闭')
+    const requested = cloudTarget.value.trim()
+    if (requested && !/^\d{17}$/.test(requested))
+      throw new Error('请填写 17 位 SteamID64，或留空自动选择击杀最多的玩家')
+    if (!analysisId.value) {
+      await checkParser()
+      ensureActive()
+      while (checkingParser.value) {
+        await wait()
+        ensureActive()
+      }
+      if (!parser.value?.available) throw new Error(parserError.value || '云端解析服务暂时不可用')
+      if (!file.value) throw new Error('请重新选择 Demo 文件')
+      if (
+        file.value.size > Math.min(512 * 1024 ** 2, parser.value.max_size_bytes || 512 * 1024 ** 2)
+      )
+        throw new Error('Demo 超出服务器允许的上传大小')
+      set(0, 'running', '正在上传原始 Demo', 0)
+      const run = await uploadCloudDemo(
+        file.value,
+        requested,
+        (n) => set(0, 'running', n === 100 ? '上传完成，服务器正在接收' : '正在上传原始 Demo', n),
+        controller.signal,
+      )
+      ensureActive()
+      analysisId.value = cloudKey(run.demo_id)
+      sessionStorage.setItem(pendingKey(), analysisId.value)
+      sessionStorage.setItem(pendingTargetKey(), requested)
+    }
+    const deadline = Date.now() + 30 * 60_000
+    set(0, 'completed', 'Demo 已上传，后台继续处理', 100)
+    while (Date.now() < deadline) {
+      ensureActive()
+      const run = await getCloudDemo(analysisId.value, controller.signal)
+      ensureActive()
+      if (run.status === 'failed') {
+        analysisId.value = ''
+        sessionStorage.removeItem(pendingKey())
+        throw new Error(run.message || '云端解析失败，请重新上传 Demo')
+      }
+      if (run.report_available) {
+        set(1, 'completed', '云端解析完成', 100)
+        set(2, 'completed', '个人报告已生成', 100)
+        set(3, 'running', '正在读取报告')
+        const report = await getCloudReport(analysisId.value, controller.signal)
+        ensureActive()
+        if (requested && report.target_player_id !== requested)
+          throw new Error('服务器分析的玩家与所选 SteamID 不一致，已停止展示')
+        rememberReport(report)
+        lastCloudFile = file.value
+        lastCloudSha = run.demo_sha256 || ''
+        const id = analysisId.value
+        set(3, 'completed', '报告已保存，可在我的复盘中查看', 100)
+        sessionStorage.removeItem(pendingKey())
+        sessionStorage.removeItem(pendingTargetKey())
+        analysisId.value = ''
+        file.value = null
+        if (router.currentRoute.value.name === 'upload')
+          await router.replace(`/replays/${encodeURIComponent(id)}`)
+        else toast.show('云端分析完成，可在我的复盘中查看')
+        return
+      }
+      const reporting = ['analyzing', 'reporting'].includes(run.stage)
+      set(
+        1,
+        reporting ? 'completed' : 'running',
+        reporting ? '解析完成' : run.stage === 'parsing' ? '服务器正在解析 Demo' : '已排队，请稍候',
+        reporting ? 100 : null,
+      )
+      if (reporting) set(2, 'running', '正在生成个人报告')
+      await wait()
+    }
+    throw new Error('服务器仍在处理，可从我的复盘中重新打开进度；已有任务未删除')
+  }
+  function reuseCloudFile(playerId: string, sha: string) {
+    if (isDesktopRuntime() || busy.value || !lastCloudFile || lastCloudSha !== sha) return false
+    cloudTarget.value = playerId
+    selectFile(lastCloudFile)
+    return true
+  }
   return {
+    chooseEveryTime,
+    desktop,
+    cloudTarget,
+    parser,
+    checkingParser,
+    parserError,
+    checkParser,
+    reuseCloudFile,
     file,
     busy,
     dragging,

@@ -126,8 +126,15 @@ export interface DetailedRound {
 }
 export interface ReplayDetails {
   analysis_version?: string
+  players?: { player_id: string; name: string }[]
+  match?: { map?: string; tick_rate?: number }
   export_scope?: { scope: string }
-  source: { match_id: string; package_id: string }
+  source: {
+    match_id: string
+    package_id: string
+    kind?: string
+    demo?: { sha256: string; file_name?: string }
+  }
   target_player_id: string
   target_player?: { player_id: string; name: string; team_id?: string | null }
   statistics: {
@@ -196,13 +203,13 @@ export interface ReplayMapItem {
 }
 export interface RoundDetail extends DetailedRound {
   start_tick: number | null
-  end_tick: number
+  end_tick: number | null
   freeze_end_tick?: number | null
   events: ReplayEvent[]
   finding_ids: string[]
 }
 
-export type AiStatus = 'completed' | 'not_generated' | 'not_configured'
+export type AiStatus = 'completed' | 'not_generated' | 'not_configured' | 'queued'
 export interface AiImprovementArea {
   priority: 'high' | 'medium' | 'low'
   category: string
@@ -217,6 +224,9 @@ export interface AiStrength {
   explanation: string
 }
 export interface AiCoachReport {
+  queued?: boolean
+  stage?: string | null
+  last_error?: string | null
   ai_status: AiStatus
   analysis_id?: string
   model?: string

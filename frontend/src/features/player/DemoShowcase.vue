@@ -3,11 +3,12 @@ import { computed, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { ApiError, errorMessage, request } from '@/api/http'
 import {
-  listMatches,
+  downloadReport,
   getAiReport,
   getReportEvents,
   getReportDetails,
 } from '@/features/replay/analysis-api'
+import { loadAnalysisEntries } from '@/features/replay/analysis-entries'
 import { reconcileCombat } from '@/features/replay/combat-facts'
 import { normalizeAiReport } from '@/features/replay/ai-report'
 import type { AnalysisReport } from '@/features/replay/contracts'
@@ -72,22 +73,8 @@ async function loadChoices() {
   error.value = ''
   choicesLoading.value = true
   try {
-    const results: { id: string; label: string }[] = []
-    let page = 1
-    while (page <= 20) {
-      const response = await listMatches(page)
-      for (const match of response.items) {
-        const id = match.latest_available_analysis_id
-        if (id)
-          results.push({
-            id,
-            label: `${mapName(match.match.map)} · ${match.created_at ? new Date(match.created_at).toLocaleDateString('zh-CN') : '已上传比赛'} · ${id.slice(0, 8)}`,
-          })
-      }
-      if (current !== revision) return
-      if (response.items.length < 100) break
-      page++
-    }
+    const { entries } = await loadAnalysisEntries()
+    const results = entries.filter((e) => e.available).map((e) => ({ id: e.id, label: e.title }))
     if (current === revision) {
       options.value = [...new Map(results.map((r) => [r.id, r])).values()]
       if (!results.length) notice.value = '暂无可用比赛，请先上传 Demo 并生成报告。'
@@ -108,10 +95,10 @@ async function choose() {
   error.value = ''
   const mode = model.value.mode
   try {
-    const raw = await request<AnalysisReport>(`/analyses/${encodeURIComponent(id)}/report`)
+    const raw = await downloadReport(id, () => {})
     if (raw.analysis_id !== id) throw new Error('报告编号不一致')
     const [events, detail] = await Promise.all([
-      getReportEvents(raw.package_id),
+      getReportEvents(raw.package_id, id),
       getReportDetails(id),
     ])
     if (

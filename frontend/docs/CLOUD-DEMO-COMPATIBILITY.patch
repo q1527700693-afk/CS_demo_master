@@ -1,0 +1,231 @@
+--- /dev/null
++++ b/backend/src/services/combatFacts.js
+@@ -0,0 +1,59 @@
++'use strict';
++const MIN_BLIND_SECONDS = 0.5;
++function relation(r = {}) {
++    if (r.attacker_steamid && r.attacker_steamid === r.victim_steamid) return 'self';
++    const sides = ['terrorist', 'counter-terrorist'];
++    if (!sides.includes(r.attacker_side) || !sides.includes(r.victim_side)) return 'unknown';
++    return r.attacker_side === r.victim_side ? 'team' : 'enemy';
++}
++function applyCombatFacts(metrics, rounds, events, target) {
++    const kills = events.filter(e => e.type === 'kill');
++    const hostile = kills.filter(e => relation(e.data.record) === 'enemy' && (e.live_elapsed_seconds == null || e.live_elapsed_seconds >= 0));
++    const own = hostile.filter(e => e.data.record.attacker_steamid === target);
++    const team = kills.filter(e => relation(e.data.record) === 'team' && e.data.record.attacker_steamid === target);
++    if (kills.length) {
++        const basic = metrics.modules.basic_stats?.metrics;
++        if (basic) { basic.kills = own.length; basic.team_kills = team.length; basic.headshot_pct = own.every(e => typeof e.data.record.headshot === 'boolean') ? (own.length ? own.filter(e => e.data.record.headshot === true).length / own.length * 100 : 0) : null; }
++        for (const row of metrics.tables?.per_round || []) {
++            row.kills = own.filter(e => e.round_num === row.round_num).length;
++            row.team_kills = team.filter(e => e.round_num === row.round_num).length;
++            row.assists = hostile.filter(e => e.round_num === row.round_num && e.data.record.assister_steamid === target && e.data.record.attacker_steamid !== target).length;
++        }
++        for (const r of rounds) if (r.target_summary) {
++            r.target_summary.kills = own.filter(e => e.round_num === r.round_num).length;
++            r.target_summary.team_kills = team.filter(e => e.round_num === r.round_num).length;
++        }
++        for (const row of metrics.tables?.by_weapon || []) row.kills = own.filter(e => String(e.data.record.weapon).replace(/^weapon_/, '') === row.weapon).length;
++    }
++    const utility = metrics.modules.utility?.metrics;
++    if (utility) {
++        const blinds = events.filter(e => e.type === 'blind' && e.data.record?.attacker_steamid === target);
++        if (blinds.length) {
++            for (const key of ['enemies_blinded', 'teammates_blinded', 'self_blinds', 'unclassified_blinds', 'enemy_blind_seconds']) utility[key] = 0;
++            const ticks = new Set();
++            for (const e of blinds) {
++                const r = e.data.record;
++                if (!Number.isFinite(r.duration) || r.duration < MIN_BLIND_SECONDS) continue;
++                const rel = relation(r), key = { enemy: 'enemies_blinded', team: 'teammates_blinded', self: 'self_blinds', unknown: 'unclassified_blinds' }[rel];
++                utility[key]++;
++                if (rel === 'enemy') utility.enemy_blind_seconds += r.duration;
++                if (rel === 'team') ticks.add(e.tick);
++            }
++            utility.team_blinding_events = ticks.size;
++        }
++        utility.he_damage = 0; utility.fire_damage = 0; utility.utility_team_damage = 0;
++        for (const e of events) {
++            const r = e.data.record;
++            if (e.type !== 'damage' || r?.attacker_steamid !== target) continue;
++            const weapon = String(r.weapon).replace(/^weapon_/, '');
++            const key = ['hegrenade', 'he'].includes(weapon) ? 'he_damage' : ['inferno', 'molotov', 'incgrenade', 'fire', 'incendiary'].includes(weapon) ? 'fire_damage' : null;
++            const damage = r.dmg_health_real ?? r.dmg_health;
++            if (!key || !Number.isFinite(damage) || damage < 0) continue;
++            if (relation(r) === 'enemy') utility[key] += damage;
++            if (relation(r) === 'team') utility.utility_team_damage += damage;
++        }
++        utility.min_effective_blind_seconds = MIN_BLIND_SECONDS;
++    }
++    metrics.definitions = { ...metrics.definitions, combat_policy: 'web-v1.1.0: hostile kills only; TK separate; effective blinds >= 0.5s; HE/fire enemy damage separated from team damage' };
++}
++module.exports = { applyCombatFacts, relation, MIN_BLIND_SECONDS };
+--- /dev/null
++++ b/backend/src/services/demoCompatibility.js
+@@ -0,0 +1,45 @@
++ 'use strict';
++const {applyCombatFacts, relation, MIN_BLIND_SECONDS} = require('./combatFacts');
++function upgradeDemoAnalysis(details, payload, events) {
++  const target = details.target_player_id;
++  const records = events.map(e => ({...e, data: {record: e.data}}));
++  const sourceRounds = new Map(payload.rounds.map(r => [r.round_num,r]));
++  for (const e of events) { const r = sourceRounds.get(e.round_num); e.live_elapsed_seconds = r?.freeze_end_tick != null && Number.isFinite(e.tick) ? (e.tick-r.freeze_end_tick)/(payload.tick_rate || 64) : null }
++  records.forEach((e,i) => e.live_elapsed_seconds = events[i].live_elapsed_seconds);
++  const perRound = details.rounds.map(r => ({round_num:r.round_num, kills:r.target.kills, deaths:r.target.deaths, raw_health_damage_dealt:r.target.damage}));
++  const weapons = new Map();
++  for (const e of records) {
++    const r = e.data.record, weapon = String(r.weapon || '').replace(/^weapon_/, '');
++    if (!weapon || ![r.attacker_steamid,r.victim_steamid].includes(target)) continue;
++    if (!weapons.has(weapon)) weapons.set(weapon,{weapon,kills:0,deaths:0,raw_health_damage_dealt:0,raw_health_damage_received:0});
++    const row = weapons.get(weapon);
++    if (e.type === 'kill' && r.victim_steamid === target) row.deaths++;
++    if (e.type === 'damage') {
++      if (r.attacker_steamid === target) row.raw_health_damage_dealt += Math.max(0,Number(r.dmg_health)||0);
++      if (r.victim_steamid === target) row.raw_health_damage_received += Math.max(0,Number(r.dmg_health)||0);
++    }
++  }
++  details.statistics.tables = {per_round:perRound,by_weapon:[...weapons.values()]};
++  for (const r of details.rounds) {
++    const source = sourceRounds.get(r.round_num);
++    r.start_tick = source?.start_tick ?? null; r.freeze_end_tick = source?.freeze_end_tick ?? null; r.end_tick = source?.end_tick ?? null;
++    const sample = payload.target_samples.find(s => s.round_num === r.round_num && s.side);
++    const combat = records.find(e => e.round_num === r.round_num && e.data.record.attacker_steamid === target && e.data.record.attacker_side || e.round_num === r.round_num && e.data.record.victim_steamid === target && e.data.record.victim_side);
++    const rec = combat?.data.record;
++    r.target_side = sample?.side || (rec?.attacker_steamid === target ? rec.attacker_side : rec?.victim_side) || null;
++    r.target_summary = perRound.find(s => s.round_num === r.round_num);
++  }
++  applyCombatFacts(details.statistics,details.rounds,records,target);
++  const basic = details.statistics.modules.basic_stats?.metrics;
++  if (basic) { basic.kd_ratio = basic.kills / Math.max(1,basic.deaths || 0); basic.headshot_kills = records.filter(e=>e.type==='kill' && e.data.record.attacker_steamid===target && relation(e.data.record)==='enemy' && e.data.record.headshot===true).length; }
++  const utility = details.statistics.modules.utility?.metrics;
++  if (utility) { utility.enemies_flashed = utility.enemies_blinded ?? null; utility.flash_duration_dealt = utility.enemy_blind_seconds ?? null; utility.self_flashes = utility.self_blinds ?? null; utility.team_flashes = utility.teammates_blinded ?? null; }
++
++  const byId = new Map(events.map(e => [e.event_id,e]));
++  details.findings = details.findings.filter(f => !['team_flash','self_flash'].includes(f.rule_id) || f.evidence_ids.some(id => Number(byId.get(id)?.data.duration) >= MIN_BLIND_SECONDS));
++  for (const e of records) if (e.type === 'kill' && relation(e.data.record) === 'team' && [e.data.record.attacker_steamid,e.data.record.victim_steamid].includes(target)) details.findings.push({finding_id:`team_kill:${e.event_id}`,rule_id:'team_kill',rule_version:'demo-rules-1.1.0',round_num:e.round_num,tick:e.tick,live_elapsed_seconds:e.live_elapsed_seconds,evidence_ids:[e.event_id],observation:`${e.data.record.attacker_name || '队友'} 误杀 ${e.data.record.victim_name || '队友'}`,review_prompt:'回看交火路线、队友位置与开火时机。',classification:'review_candidate'});
++  const known = new Set(payload.stats.map(s => s.steamid));
++  details.players = payload.players.filter(p => known.has(p.steamid));
++  details.map = {counts:{player_samples:payload.target_samples.length}};
++}
++module.exports = {upgradeDemoAnalysis};
+--- a/backend/src/services/demoAnalysis.js
++++ b/backend/src/services/demoAnalysis.js
+@@ -14,7 +14,8 @@
+ const path = require('node:path');
+ const formal = require('./replaySchema');
+ 
+-const VERSION = 'demo-rules-1.0.0';
++const {upgradeDemoAnalysis} = require('./demoCompatibility');
++const VERSION = 'demo-rules-1.1.0';
+ const PARSE_SCHEMA = 'demo-parse-1.0.0';
+ const SIDES = ['terrorist', 'counter-terrorist'];
+ const UTILITY_WEAPONS = new Set([
+@@ -103,7 +104,7 @@
+ }
+ 
+ /** Speed is derived from consecutive position samples when the demo omits velocity. */
+-function movementSummary(samples) {
++function movementSummary(samples, tickRate = 64) {
+     const byRound = new Map();
+     let measured = 0, total = 0, peak = 0, jumping = 0, walking = 0, scoped = 0;
+     for (const sample of samples) {
+@@ -120,7 +121,7 @@
+         for (let index = 1; index < list.length; index += 1) {
+             const previous = list[index - 1], current = list[index];
+             if (![previous.x, previous.y, current.x, current.y].every(Number.isFinite)) continue;
+-            const dt = (current.tick - previous.tick) / 64;
++            const dt = (current.tick - previous.tick) / (Number(tickRate) || 64);
+             if (!(dt > 0)) continue;
+             let speed = Math.hypot(current.x - previous.x, current.y - previous.y) / dt;
+             if (Number.isFinite(current.velocity_x) && Number.isFinite(current.velocity_y)) {
+@@ -534,7 +535,7 @@
+     const rounds = payload.rounds || [];
+     const score = scoreboard(rounds);
+     const buys = buyTypesByRound(payload.round_economy || []);
+-    const samples = movementSummary(payload.target_samples || []);
++    const samples = movementSummary(payload.target_samples || [], payload.tick_rate);
+     const snapshotEvents = payload.target_death_snapshots || [];
+     const findings = [
+         ...deathFindings(payload, targetId),
+@@ -647,10 +648,12 @@
+                 .map((player) => ({ name: player.name, steamid: player.steamid }))
+         }
+     };
++    const evidence = evidenceOf(payload, targetId);
++    upgradeDemoAnalysis(details,payload,evidence);
+     return {
+         details,
+         identity,
+-        evidence: evidenceOf(payload, targetId),
++        evidence,
+         samples: payload.target_samples || [],
+         grenades: payload.grenades || [],
+         keyframes: buildKeyframes(payload, targetId)
+@@ -704,6 +707,8 @@
+             tick: sample.tick,
+             state: {
+                 steamid: analysis.details.target_player_id,
++                side: sample.side ?? null,
++                name: analysis.details.target_player.name,
+                 x: sample.x, y: sample.y, z: sample.z, yaw: sample.yaw,
+                 health: sample.health, armor: sample.armor,
+                 velocity_x: sample.velocity_x, velocity_y: sample.velocity_y,
+@@ -837,6 +842,7 @@
+             map: analysis.details.match.map,
+             score: analysis.details.match.score,
+             target_player_id: analysis.details.target_player_id,
++            target_player_name: analysis.details.target_player.name,
+             target_selection: analysis.details.target_selection,
+             demo_sha256: analysis.identity.demo_sha256,
+             rounds: analysis.details.match.rounds_played
+--- /dev/null
++++ b/backend/tests/demoCompatibility.test.js
+@@ -0,0 +1,18 @@
++const test=require('node:test'),assert=require('node:assert/strict');
++const {normalize}=require('../src/services/demoAnalysis');
++const {build,TARGET}=require('./fixtures/demo-parse-sample');
++test('cloud AI facts retain effective flash policy and distinguish TK',()=>{
++ const p=build();p.kills.push({...p.kills[0],event_id:'tk_policy',attacker_steamid:p.target_player_id,victim_steamid:'76561198000000002',attacker_side:'terrorist',victim_side:'terrorist'});
++ p.blinds.push({...p.blinds[0],event_id:'micro_policy',attacker_steamid:p.target_player_id,victim_steamid:'76561198000000002',attacker_side:'terrorist',victim_side:'terrorist',duration:0.1});
++ const r=normalize(p,{analysisId:'compatibility-test'}).details;
++ assert.ok(r.findings.some(f=>f.rule_id==='team_kill' && f.evidence_ids.includes('tk_policy')));
++ assert.ok(!r.findings.some(f=>f.evidence_ids.includes('micro_policy')));
++ assert.equal(r.statistics.modules.utility.metrics.team_flashes,r.statistics.modules.utility.metrics.teammates_blinded);
++ assert.equal(r.statistics.modules.basic_stats.metrics.team_kills,1);
++ assert.ok(r.rounds.every(row=>Object.hasOwn(row,'freeze_end_tick')));
++});
++test('perspective choices exclude accounts with no player statistics',()=>{
++ const p=build();p.players.push({steamid:'76561198099999999',name:'Spectator'});
++ const r=normalize(p,{analysisId:'roster-test'}).details;
++ assert.ok(!r.players.some(player=>player.name==='Spectator'));
++});
+--- a/backend/tests/demoAnalysis.test.js
++++ b/backend/tests/demoAnalysis.test.js
+@@ -20,7 +20,7 @@
+     const { result } = analysis();
+     const details = result.details;
+     assert.equal(details.schema_version, 'report-1.0.0');
+-    assert.equal(details.analysis_version, 'demo-rules-1.0.0');
++    assert.equal(details.analysis_version, 'demo-rules-1.1.0');
+     assert.equal(details.source.kind, 'demo_file');
+     assert.equal(details.source.match_id, `demo-${'a'.repeat(12)}`);
+     assert.equal(details.target_player_id, sample.TARGET);
+--- a/parser/parse_demo.py
++++ b/parser/parse_demo.py
+@@ -153,7 +153,7 @@
+     if explicit:
+         if any(steamid(row.get("steamid")) == explicit for row in known):
+             return explicit
+-        warnings.append(f"target player {explicit} is not in the demo roster; falling back to the top fragger")
++        raise UsageError(f"target player {explicit} is not in the demo roster")
+     if not known:
+         return None
+     best = max(known, key=lambda row: (row.get("kills") or 0, row.get("adr") or 0))
+@@ -361,6 +361,7 @@
+             "z": row.get("z"),
+             "yaw": row.get("yaw"),
+             "pitch": row.get("pitch"),
++            "side": row.get("side"),
+             "velocity": row.get("velocity"),
+             "velocity_x": row.get("velocity_x"),
+             "velocity_y": row.get("velocity_y"),

@@ -50,6 +50,9 @@ const showGenerate = computed(() => !props.ai || props.ai.ai_status === 'not_gen
         {{ retrying ? '正在创建任务…' : '按新规则重新分析' }}
       </button>
     </div>
+    <p v-if="loading" class="ai-notice" role="status">
+      AI 正在排队或生成，可先查看规则报告；生成结果会自动载入。
+    </p>
     <p v-if="error" role="alert" class="ai-alert">{{ error }}</p>
 
     <div v-if="ai?.ai_status === 'not_configured'" class="ai-notice">
