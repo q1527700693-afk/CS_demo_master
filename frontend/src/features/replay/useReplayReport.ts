@@ -171,7 +171,14 @@ export function useReplayReport() {
   }
   async function reanalyze() {
     if (report.value && isCloudAnalysis(report.value.analysis_id)) {
-      actionError.value = '请通过分析其他玩家或重新上传 Demo 创建新的独立分析，已有记录会保留。'
+      await router.push({
+        path: '/replays/new',
+        query: {
+          source: report.value.analysis_id,
+          target: report.value.target_player_id,
+          force: 'true',
+        },
+      })
       return
     }
     if (!report.value) return

@@ -9,12 +9,25 @@ export interface AnalysisEntry {
   target: string
   player: string
   map: string
-  date: string
+  sequence: number
+  adr: number | null
+  rating: number | null
+  score: [number, number] | null
+  updatedAt: string
   title: string
   available: boolean
   status: string
   source: 'cloud' | 'package' | 'local'
   message: string
+}
+function matchScore(
+  match: { complete?: boolean; teams?: { team_id: string; score: number | null }[] },
+  team?: string | null,
+): [number, number] | null {
+  if (!match.complete || !team) return null
+  const own = match.teams?.find((t) => t.team_id === team),
+    other = match.teams?.find((t) => t.team_id !== team)
+  return own?.score != null && other?.score != null ? [own.score, other.score] : null
 }
 export async function loadAnalysisEntries() {
   const entries: AnalysisEntry[] = [],
@@ -32,7 +45,20 @@ export async function loadAnalysisEntries() {
             target: run.target_player_id,
             player: run.target_player_id,
             map: match.match.map,
-            date: run.created_at || match.created_at,
+            sequence: 0,
+            adr:
+              run.analysis_id === match.latest_available_analysis_id
+                ? (match.summary?.adr ?? null)
+                : null,
+            rating:
+              run.analysis_id === match.latest_available_analysis_id
+                ? (match.summary?.rating ?? null)
+                : null,
+            score:
+              run.analysis_id === match.latest_available_analysis_id
+                ? matchScore(match.match, match.summary?.player_team_id)
+                : null,
+            updatedAt: run.analyzed_at || run.created_at || match.created_at,
             title: '',
             available: run.report_available,
             status: run.status,
@@ -52,9 +78,13 @@ export async function loadAnalysisEntries() {
           id: cloudKey(run.demo_id),
           matchId: run.demo_sha256 || run.demo_id,
           target: run.target_player_id || '',
-          player: run.summary?.target_player_name || run.target_player_id || '自动选择玩家',
+          player: run.summary?.target_player_name || run.target_player_id || '待选择玩家',
           map: run.map || '',
-          date: run.created_at,
+          sequence: 0,
+          adr: run.summary?.adr ?? null,
+          rating: null,
+          score: null,
+          updatedAt: run.analyzed_at || run.created_at,
           title: '',
           available: run.report_available,
           status: run.status,
@@ -80,7 +110,11 @@ export async function loadAnalysisEntries() {
           target: item.target_player_id,
           player: item.player_name || item.target_player_id,
           map: item.match.map,
-          date: item.analyzed_at,
+          sequence: 0,
+          adr: null,
+          rating: null,
+          score: null,
+          updatedAt: item.analyzed_at,
           title: '',
           available: true,
           status: item.status,
@@ -102,15 +136,25 @@ export async function loadAnalysisEntries() {
           item.source === 'cloud' ? await getCloudDetails(item.id) : await getReportDetails(item.id)
         item.player = details.target_player?.name || item.player
         item.target = details.target_player_id
+        const basic =
+          details.statistics?.modules?.basic_stats?.metrics ||
+          details.statistics?.source_player_stats
+        if (typeof basic?.adr === 'number' && Number.isFinite(basic.adr)) item.adr = basic.adr
+        if (typeof basic?.rating === 'number' && Number.isFinite(basic.rating))
+          item.rating = basic.rating
       } catch {
         /* A failed detail read cannot hide another player's record. */
       }
     }
   }
   await Promise.all(Array.from({ length: Math.min(4, all.length) }, worker))
-  all.forEach((item) => (item.title = analysisName(item.player, item.date, item.map, item.id)))
   all.sort(
-    (a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0) || a.id.localeCompare(b.id),
+    (a, b) =>
+      (Date.parse(b.updatedAt) || 0) - (Date.parse(a.updatedAt) || 0) || a.id.localeCompare(b.id),
   )
+  all.forEach((item, index) => {
+    item.sequence = all.length - index
+    item.title = analysisName(item.player, item.map, item.sequence)
+  })
   return { entries: all, warnings }
 }

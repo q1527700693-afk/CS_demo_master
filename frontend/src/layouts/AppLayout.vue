@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { isDesktopRuntime } from '@/app/runtime'
+const desktop = isDesktopRuntime()
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
@@ -58,7 +60,7 @@ async function signOut() {
         ><span class="brand-mark"><AppIcon name="crosshair" :size="25" /></span
         ><span>CS DEMO<span class="brand-sub">MASTER</span></span></RouterLink
       >
-      <div class="workspace-caption">PLAYER WORKSPACE <span>v1.2.0</span></div>
+      <div class="workspace-caption">PLAYER WORKSPACE <span>v1.2.1</span></div>
       <nav aria-label="主导航">
         <RouterLink
           v-for="item in nav"
@@ -77,10 +79,16 @@ async function signOut() {
       </nav>
       <div class="sidebar-bottom">
         <div class="local-note">
-          <AppIcon name="shield" /><strong>你的 Demo，留在本地。</strong>
-          <p>上传解析数据，开启下一次进步。</p>
+          <AppIcon name="shield" /><strong>{{
+            desktop ? '你的 Demo，留在本地。' : '上传 Demo，云端复盘。'
+          }}</strong>
+          <p>
+            {{
+              desktop ? '上传解析数据，开启下一次进步。' : '选择比赛中的玩家，回看每个关键回合。'
+            }}
+          </p>
         </div>
-        <div class="team-credit"><span class="online-dot" /> SOFTWARE_CLAN <span>1.2.0</span></div>
+        <div class="team-credit"><span class="online-dot" /> SOFTWARE_CLAN <span>1.2.1</span></div>
       </div>
     </aside>
     <div class="workspace-main">

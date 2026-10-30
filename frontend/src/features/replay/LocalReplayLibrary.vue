@@ -78,17 +78,16 @@ onMounted(load)
     共 {{ records.length }} 份复盘 · 同场比赛的多次分析均保留
   </p>
   <article
-    v-for="item in records"
+    v-for="(item, index) in records"
     :key="item.analysis_id"
     class="panel match-row"
     data-testid="local-replay-row"
   >
     <div>
       <h2>
-        {{ analysisName(item.player_name, item.analyzed_at, item.match.map, item.analysis_id) }}
+        {{ analysisName(item.player_name, item.match.map, records.length - index) }}
       </h2>
       <p>{{ item.match.teams.map((t) => `${t.name} ${t.score ?? '—'}`).join(' : ') }}</p>
-      <p class="muted">分析于 {{ new Date(item.analyzed_at).toLocaleString('zh-CN') }}</p>
       <small>{{ item.complete ? '已完整保存到本机' : '演示数据' }}</small>
       <details v-if="item.directory" class="folder-location">
         <summary>本地文件位置</summary>

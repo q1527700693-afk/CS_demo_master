@@ -127,7 +127,7 @@ export interface DetailedRound {
 export interface ReplayDetails {
   analysis_version?: string
   players?: { player_id: string; name: string }[]
-  match?: { map?: string; tick_rate?: number }
+  match?: { map?: string; tick_rate?: number; started_at?: string | null }
   export_scope?: { scope: string }
   source: {
     match_id: string
@@ -138,6 +138,7 @@ export interface ReplayDetails {
   target_player_id: string
   target_player?: { player_id: string; name: string; team_id?: string | null }
   statistics: {
+    modules?: Record<string, AnalysisModule>
     tables?: { per_round?: RoundStatistics[]; by_weapon?: WeaponStatistics[] }
     source_player_stats?: Record<string, number | null>
     definitions?: Record<string, string>

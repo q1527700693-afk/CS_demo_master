@@ -1,0 +1,626 @@
+--- a/backend/src/routes/analysis.js
++++ b/backend/src/routes/analysis.js
+@@ -12,6 +12,7 @@
+ const { db, root, directory, VERSION } = require('../services/replayStore');
+ const { readGlobalPage } = require('../services/replayGlobal');
+ const aiAnalysis = require('../services/aiAnalysis');
++const {pruneAnalysisPackage} = require('../services/replayCleanup');
+ const router = express.Router();
+ router.use(['/analysis-packages','/analyses','/matches'], authenticate);
+ const wrap = fn => (req,res,next) => Promise.resolve(fn(req,res)).catch(next);
+@@ -23,7 +24,7 @@
+ }
+ async function discard(id) {
+     db.prepare('DELETE FROM replay_jobs WHERE id=?').run(id);
+-    await fs.promises.rm(directory(id),{recursive:true,force:true});
++    await fs.promises.rm(directory(id),{recursive:true,force:true,maxRetries:5,retryDelay:80});
+ }
+ function getPackage(owner,id) {
+     const p = db.prepare('SELECT * FROM analysis_packages WHERE owner_id=? AND package_id=?').get(owner,id);
+@@ -63,7 +64,7 @@
+             await fs.promises.mkdir(dir); await fs.promises.rename(req.file.path,path.join(dir,'package.zip'));
+             try { db.prepare("INSERT INTO replay_jobs(id,owner_id,digest,version,kind,created_at,updated_at) VALUES(?,?,?,'import-1.2.0','import',?,?)").run(id,req.user.id,digest,now,now); }
+             catch(e) {
+-                await fs.promises.rm(dir,{recursive:true,force:true});
++                await fs.promises.rm(dir,{recursive:true,force:true,maxRetries:5,retryDelay:80});
+                 if (!db.prepare("SELECT id FROM replay_jobs WHERE owner_id=? AND digest=? AND version='import-1.2.0'").get(req.user.id,digest)) throw e;
+             }
+             job=db.prepare("SELECT * FROM replay_jobs WHERE owner_id=? AND digest=? AND version='import-1.2.0'").get(req.user.id,digest);
+@@ -100,7 +101,8 @@
+ }));
+ router.post('/matches/:match/analyses',wrap(async(req,res)=>{
+     const key=req.get('Idempotency-Key'), body=req.body;
+-    if (!/^[a-zA-Z0-9_-]{1,120}$/.test(key||'') || !body || typeof body.package_id!=='string' || typeof body.target_player_id!=='string' || Object.keys(body).some(k=>!['package_id','target_player_id'].includes(k))) throw errors.invalidParameter('Idempotency-Key, package_id and target_player_id are required');
++    if (!/^[a-zA-Z0-9_-]{1,120}$/.test(key||'') || !body || typeof body.package_id!=='string' || typeof body.target_player_id!=='string' || Object.keys(body).some(k=>!['package_id','target_player_id','replace_previous'].includes(k))) throw errors.invalidParameter('Idempotency-Key, package_id and target_player_id are required');
++    if (body.replace_previous !== undefined && typeof body.replace_previous !== 'boolean') throw errors.invalidParameter('replace_previous must be boolean');
+     const canonical=JSON.stringify([req.params.match,body.package_id,body.target_player_id]);
+     const existing=db.prepare('SELECT * FROM analysis_runs WHERE owner_id=? AND idempotency_key=?').get(req.user.id,key);
+     if (existing) {
+@@ -114,7 +116,7 @@
+     await fs.promises.mkdir(dir);
+     try {
+         await fs.promises.copyFile(path.join(directory(p.storage_id),'package.zip'),path.join(dir,'package.zip'));
+-        await fs.promises.writeFile(path.join(dir,'task.json'),JSON.stringify({analysis_id:id,uploaded_at:p.uploaded_at,manifest:JSON.parse(p.manifest)}));
++        await fs.promises.writeFile(path.join(dir,'task.json'),JSON.stringify({analysis_id:id,uploaded_at:p.uploaded_at,replace_previous:body.replace_previous===true,manifest:JSON.parse(p.manifest)}));
+         db.exec('BEGIN IMMEDIATE');
+         try {
+             getPackage(req.user.id,body.package_id);
+@@ -123,7 +125,7 @@
+             db.exec('COMMIT');
+         } catch(e) {db.exec('ROLLBACK');throw e;}
+     } catch(e) {
+-        await fs.promises.rm(dir,{recursive:true,force:true});
++        await fs.promises.rm(dir,{recursive:true,force:true,maxRetries:5,retryDelay:80});
+         const concurrent=db.prepare('SELECT * FROM analysis_runs WHERE owner_id=? AND idempotency_key=?').get(req.user.id,key);
+         if (concurrent && concurrent.request_body===canonical) return success(res,run(getRun(req.user.id,concurrent.analysis_id)),'success',202);
+         if (concurrent) throw errors.conflict('Idempotency key conflict'); throw e;
+@@ -243,7 +245,7 @@
+ router.delete('/analyses/:id',wrap(async(req,res)=>{
+     const job=getRun(req.user.id,req.params.id);
+     if(job.status==='running') throw errors.conflict('Analysis is running');
+-    await discard(job.id);success(res);
++    await discard(job.id);pruneAnalysisPackage(req.user.id,job.package_id);success(res);
+ }));
+ router.delete('/analysis-packages/:id',wrap(async(req,res)=>{
+     const p=getPackage(req.user.id,req.params.id);
+@@ -256,7 +258,7 @@
+         db.prepare('DELETE FROM replay_jobs WHERE id=?').run(p.storage_id);
+         db.exec('COMMIT');
+     }catch(e){db.exec('ROLLBACK');throw e;}
+-    for(const id of [p.storage_id,...jobs.map(j=>j.id)]) await fs.promises.rm(directory(id),{recursive:true,force:true});
++    for(const id of [p.storage_id,...jobs.map(j=>j.id)]) await fs.promises.rm(directory(id),{recursive:true,force:true,maxRetries:5,retryDelay:80});
+     success(res);
+ }));
+ router.get('/matches/:match/analyses',wrap(async(req,res)=>{
+--- a/backend/src/routes/demoAnalyses.js
++++ b/backend/src/routes/demoAnalyses.js
+@@ -22,8 +22,10 @@
+ const { db, root, directory } = require('../services/replayStore');
+ const demoParser = require('../services/demoParser');
+ const aiAnalysis = require('../services/aiAnalysis');
++const {selectPerspective, roster} = require('../services/demoSelection');
+ const { enqueueDemoAi } = require('../services/replayQueue');
+ 
++const VISIBLE = `kind='demo' AND owner_id=? AND (coalesce(json_extract(meta,'$.selection_mode'),'')!='choose' OR NOT EXISTS (SELECT 1 FROM replay_jobs child WHERE child.owner_id=replay_jobs.owner_id AND child.kind='demo' AND coalesce(json_extract(child.meta,'$.selection_mode'),'')!='choose' AND json_extract(child.meta,'$.demo_sha256')=json_extract(replay_jobs.meta,'$.demo_sha256')))`;
+ const router = express.Router();
+ router.use(authenticate);
+ 
+@@ -71,7 +73,8 @@
+ 
+ function publicDemo(row) {
+     const meta = metaOf(row);
+-    const status = row.status === 'ready' ? 'completed'
++    const choosing = meta.selection_mode === 'choose';
++    const status = row.status === 'ready' ? (choosing ? 'awaiting_player' : 'completed')
+         : row.status === 'failed' ? 'failed'
+             : ['parsing', 'analyzing', 'reporting'].includes(row.stage) ? row.stage : 'queued';
+     return {
+@@ -79,8 +82,10 @@
+         status,
+         stage: row.stage,
+         progress: row.status === 'ready' ? 100 : null,
+-        message: row.error || (row.status === 'ready' ? '报告已保存' : row.stage),
+-        report_available: row.status === 'ready',
++        message: row.error || (row.status === 'ready' ? (choosing ? '请选择分析玩家' : '报告已保存') : row.stage),
++        report_available: row.status === 'ready' && !choosing,
++        roster_available: row.status === 'ready',
++        started_at: meta.played_at || meta.summary?.started_at || null,
+         target_player_id: meta.target_player_id ?? null,
+         target_selection: meta.target_selection ?? 'auto_top_fragger',
+         file_name: meta.file_name ?? null,
+@@ -154,6 +159,7 @@
+     const status = await demoParser.probe({ force: req.query.refresh === '1' });
+     success(res, {
+         available: status.available,
++        capabilities: ['player_selection','full_player_map','record_delete'],
+         python: status.python,
+         awpy: status.awpy,
+         polars: status.polars,
+@@ -193,6 +199,8 @@
+             throw errors.invalidParameter('target_player_id must be a SteamID64');
+         }
+         const target = requested ? String(requested) : '';
++        const choosing = req.body?.selection_mode === 'choose';
++        if (req.body?.selection_mode && !choosing) throw errors.invalidParameter('Invalid selection_mode');
+ 
+         const status = await demoParser.probe();
+         if (!status.available) {
+@@ -202,7 +210,7 @@
+ 
+         const hash = crypto.createHash('sha256');
+         for await (const chunk of fs.createReadStream(temp)) hash.update(chunk);
+-        const digest = `${hash.digest('hex')}:${target || 'auto'}`;
++        const digest = `${hash.digest('hex')}:${choosing ? 'source-1.2.1' : target || 'auto'}`;
+ 
+         const existing = db.prepare("SELECT * FROM replay_jobs WHERE owner_id=? AND digest=? AND version=?")
+             .get(req.user.id, digest, DEMO_VERSION);
+@@ -224,6 +232,7 @@
+         await fsp.rename(temp, path.join(dir, 'match.dem'));
+         await fsp.writeFile(path.join(dir, 'task.json'), JSON.stringify({
+             analysis_id: id,
++            selection_mode: choosing ? 'choose' : null,
+             uploaded_at: now,
+             target_player_id: target || null,
+             target_selection: target ? 'explicit' : 'auto_top_fragger',
+@@ -234,6 +243,8 @@
+             db.prepare(`INSERT INTO replay_jobs(id,owner_id,digest,version,kind,status,stage,created_at,updated_at,meta)
+                         VALUES(?,?,?,?,'demo','queued','queued',?,?,?)`).run(id, req.user.id, digest, DEMO_VERSION, now, now,
+                 JSON.stringify({
++                    selection_mode: choosing ? 'choose' : null,
++                    demo_sha256: digest.split(':')[0],
+                     file_name: file.originalname?.slice(0, 120) || 'match.dem',
+                     size_bytes: file.size,
+                     target_player_id: target || null,
+@@ -258,13 +269,28 @@
+     if (!Number.isSafeInteger(page) || page < 1 || page > 100000 || !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) {
+         throw errors.invalidParameter('Invalid pagination');
+     }
+-    const total = db.prepare("SELECT count(*) AS n FROM replay_jobs WHERE kind='demo' AND owner_id=?").get(req.user.id).n;
+-    const rows = db.prepare("SELECT * FROM replay_jobs WHERE kind='demo' AND owner_id=? ORDER BY created_at DESC LIMIT ? OFFSET ?")
++    const total = db.prepare(`SELECT count(*) AS n FROM replay_jobs WHERE ${VISIBLE}`).get(req.user.id).n;
++    const rows = db.prepare(`SELECT * FROM replay_jobs WHERE ${VISIBLE} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+         .all(req.user.id, pageSize, (page - 1) * pageSize);
+     success(res, { items: rows.map(publicDemo), page, pageSize, total });
+ }));
+ 
+ router.get('/:id', wrap(async (req, res) => success(res, publicDemo(demoRow(req.user.id, req.params.id)))));
++
++router.get('/:id/players', wrap(async (req, res) => {
++    const row = demoRow(req.user.id, req.params.id);
++    if (row.status !== 'ready') throw errors.conflict('Demo is still parsing');
++    const payload = JSON.parse(await fsp.readFile(path.join(directory(row.id), 'parse.json'), 'utf8'));
++    const meta = metaOf(row);
++    success(res, {players:roster(payload),map:payload.header.map_name,started_at:meta.played_at || payload.match_started_at || null});
++}));
++router.post('/:id/analyses', wrap(async (req, res) => {
++    const row = demoRow(req.user.id, req.params.id);
++    if (typeof req.body?.target_player_id !== 'string') throw errors.invalidParameter('Select a player');
++    if (req.body.force !== undefined && typeof req.body.force !== 'boolean') throw errors.invalidParameter('force must be boolean');
++    const run = await selectPerspective(row, req.body.target_player_id, req.body.played_at, req.body.force === true);
++    success(res, publicDemo(run), run.status === 'ready' ? 'success' : 'queued', run.status === 'ready' ? 200 : 202);
++}));
+ 
+ router.get('/:id/report', wrap(async (req, res) => {
+     const { dir } = readyDir(req);
+@@ -393,6 +419,17 @@
+     for (const id of [row.id, ...aiJobs.map((job) => job.id)]) {
+         await fsp.rm(directory(id), { recursive: true, force: true });
+     }
++    const sha = metaOf(row).demo_sha256;
++    if (sha) {
++        const remaining = db.prepare("SELECT count(*) AS n FROM replay_jobs WHERE kind='demo' AND owner_id=? AND json_extract(meta,'$.demo_sha256')=? AND coalesce(json_extract(meta,'$.selection_mode'),'')!='choose'").get(req.user.id,sha).n;
++        if (!remaining) {
++            const sources=db.prepare("SELECT id FROM replay_jobs WHERE kind='demo' AND owner_id=? AND json_extract(meta,'$.demo_sha256')=? AND json_extract(meta,'$.selection_mode')='choose' AND status!='running'").all(req.user.id,sha);
++            for (const source of sources) {
++                db.prepare('DELETE FROM replay_jobs WHERE id=?').run(source.id);
++                await fsp.rm(directory(source.id),{recursive:true,force:true,maxRetries:5,retryDelay:80});
++            }
++        }
++    }
+     success(res);
+ }));
+ 
+--- a/backend/src/services/demoAnalysis.js
++++ b/backend/src/services/demoAnalysis.js
+@@ -15,14 +15,14 @@
+ const formal = require('./replaySchema');
+ 
+ const {upgradeDemoAnalysis} = require('./demoCompatibility');
+-const VERSION = 'demo-rules-1.1.0';
++const VERSION = 'demo-rules-1.2.1';
+ const PARSE_SCHEMA = 'demo-parse-1.0.0';
+ const SIDES = ['terrorist', 'counter-terrorist'];
+ const UTILITY_WEAPONS = new Set([
+     'hegrenade', 'flashbang', 'smokegrenade', 'molotov', 'incgrenade', 'decoy'
+ ]);
+ const MAX_FINDINGS = 400;
+-const MAX_SAMPLES_PER_ROUND = 4000;
++const MAX_SAMPLES_PER_ROUND = 20000;
+ const MAX_TRAJECTORY_ROUNDS = 64;
+ 
+ function sideLabel(side) {
+@@ -557,7 +557,7 @@
+     }
+     const complete = rounds.length > 0 && rounds.every((round) => round.winner_side) &&
+         !/surrender/.test(String(rounds.at(-1)?.reason_name || ''));
+-    const startedAt = null;
++    const startedAt = options.playedAt || payload.match_started_at || null;
+     const teams = [
+         { team_id: 'terrorist', name: 'Terrorist', score: score.terrorist },
+         { team_id: 'counter_terrorist', name: 'Counter-Terrorist', score: score['counter-terrorist'] }
+@@ -586,6 +586,8 @@
+         target_player_id: targetId,
+         target_selection: options.targetSelection || 'auto_top_fragger',
+         match: {
++            started_at: startedAt,
++            started_at_source: startedAt ? (options.playedAtSource || (options.playedAt ? 'user_input' : 'demo')) : 'unknown',
+             map: String(payload.header?.map_name || 'unknown'),
+             server_name: String(payload.header?.server_name || '').slice(0, 200),
+             demo_version: String(payload.header?.demo_version_name || ''),
+@@ -655,6 +657,7 @@
+         identity,
+         evidence,
+         samples: payload.target_samples || [],
++        allSamples: payload.all_player_samples || [],
+         grenades: payload.grenades || [],
+         keyframes: buildKeyframes(payload, targetId)
+     };
+@@ -696,19 +699,19 @@
+     const byRound = new Map();
+     const push = (round, item) => {
+         const list = byRound.get(round) || [];
+-        if (list.length < MAX_SAMPLES_PER_ROUND) list.push(item);
++        if (list.length < MAX_SAMPLES_PER_ROUND || item.points?.length) list.push(item);
+         byRound.set(round, list);
+     };
+-    for (const sample of analysis.samples) {
++    for (const sample of analysis.allSamples.length ? analysis.allSamples : analysis.samples) {
+         if (!Number.isInteger(sample.round_num)) continue;
+         push(sample.round_num, {
+-            kind: 'player_samples',
++            kind: analysis.allSamples.length ? 'all_player_samples' : 'player_samples',
+             round_num: sample.round_num,
+             tick: sample.tick,
+             state: {
+-                steamid: analysis.details.target_player_id,
++                steamid: sample.steamid || analysis.details.target_player_id,
+                 side: sample.side ?? null,
+-                name: analysis.details.target_player.name,
++                name: sample.name || analysis.details.players?.find(p => p.steamid === sample.steamid)?.name || analysis.details.target_player.name,
+                 x: sample.x, y: sample.y, z: sample.z, yaw: sample.yaw,
+                 health: sample.health, armor: sample.armor,
+                 velocity_x: sample.velocity_x, velocity_y: sample.velocity_y,
+@@ -728,12 +731,14 @@
+         if (!Number.isInteger(grenade.round_num) || !grenade.points?.length) continue;
+         const owned = grenade.thrower_steamid === analysis.details.target_player_id;
+         push(grenade.round_num, {
+-            kind: owned ? 'trajectories' : 'unattributed_trajectories',
++            kind: analysis.allSamples.length ? 'all_trajectories' : owned ? 'trajectories' : 'unattributed_trajectories',
+             event_id: grenade.event_id,
+             round_num: grenade.round_num,
+             tick: grenade.tick,
+             type: grenade.type,
+-            ownership: owned ? 'known' : 'unknown',
++            ownership: grenade.thrower_steamid ? 'known' : 'unknown',
++            start_tick: grenade.point_ticks?.[0] ?? grenade.tick,
++            end_tick: grenade.point_ticks?.at(-1) ?? grenade.tick,
+             thrower_player_id: grenade.thrower_steamid ?? null,
+             points: grenade.points.map(([x, y, z]) => ({ x, y, z })),
+             point_ticks: grenade.point_ticks
+@@ -768,7 +773,7 @@
+         status,
+         match: {
+             started_at: details.match.started_at ?? null,
+-            started_at_source: 'demo',
++            started_at_source: details.match.started_at_source || 'unknown',
+             map: details.match.map,
+             tick_rate: details.match.tick_rate,
+             complete: details.match.complete,
+@@ -843,6 +848,7 @@
+             score: analysis.details.match.score,
+             target_player_id: analysis.details.target_player_id,
+             target_player_name: analysis.details.target_player.name,
++            started_at: analysis.details.match.started_at,
+             target_selection: analysis.details.target_selection,
+             demo_sha256: analysis.identity.demo_sha256,
+             rounds: analysis.details.match.rounds_played
+--- a/backend/src/services/demoCompatibility.js
++++ b/backend/src/services/demoCompatibility.js
+@@ -40,6 +40,7 @@
+   for (const e of records) if (e.type === 'kill' && relation(e.data.record) === 'team' && [e.data.record.attacker_steamid,e.data.record.victim_steamid].includes(target)) details.findings.push({finding_id:`team_kill:${e.event_id}`,rule_id:'team_kill',rule_version:'demo-rules-1.1.0',round_num:e.round_num,tick:e.tick,live_elapsed_seconds:e.live_elapsed_seconds,evidence_ids:[e.event_id],observation:`${e.data.record.attacker_name || '队友'} 误杀 ${e.data.record.victim_name || '队友'}`,review_prompt:'回看交火路线、队友位置与开火时机。',classification:'review_candidate'});
+   const known = new Set(payload.stats.map(s => s.steamid));
+   details.players = payload.players.filter(p => known.has(p.steamid));
+-  details.map = {counts:{player_samples:payload.target_samples.length}};
++  details.map = {counts:{player_samples:payload.target_samples.length, all_player_samples:payload.all_player_samples?.length || 0, trajectories:payload.grenades.length}};
++  details.replay_version = '1.2.1';
+ }
+ module.exports = {upgradeDemoAnalysis};
+--- /dev/null
++++ b/backend/src/services/demoSelection.js
+@@ -0,0 +1,74 @@
++'use strict';
++const fs = require('node:fs/promises');
++const path = require('node:path');
++const crypto = require('node:crypto');
++const { db, directory } = require('./replayStore');
++const { errors } = require('../utils/response');
++
++function playedAt(value) {
++    if (value == null || value === '') return null;
++    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value) || !Number.isFinite(Date.parse(value))) {
++        throw errors.invalidParameter('played_at must be an ISO timestamp with a timezone');
++    }
++    const date = new Date(value);
++    if (date.getUTCFullYear() < 2000 || date.getUTCFullYear() > 2100) throw errors.invalidParameter('Invalid match date');
++    return date.toISOString();
++}
++function roster(payload) {
++    const players = new Map((payload.players || []).map(p => [String(p.steamid), p]));
++    return (payload.stats || []).filter(p => p.steamid && /^\d{1,20}$/.test(String(p.steamid)))
++        .map(p => ({ player_id: String(p.steamid), name: p.name || players.get(String(p.steamid))?.name || String(p.steamid) }));
++}
++function focusPayload(payload, target) {
++    if (!roster(payload).some(p => p.player_id === target)) throw errors.invalidParameter('Player is not in this match');
++    return { ...payload, target_player_id: target,
++        target_samples: payload.all_player_samples ? payload.all_player_samples.filter(s => s.steamid === target) : payload.target_samples,
++        target_death_snapshots: payload.all_death_snapshots ? payload.all_death_snapshots.filter(s => s.steamid === target) : payload.target_death_snapshots };
++}
++async function clearAi(id) {
++    const jobs = db.prepare("SELECT id,status FROM replay_jobs WHERE kind='ai' AND digest=?").all(id);
++    if (jobs.some(j => j.status === 'running')) throw errors.conflict('AI analysis is running');
++    for (const job of jobs) {
++        db.prepare('DELETE FROM replay_jobs WHERE id=?').run(job.id);
++        await fs.rm(directory(job.id), { recursive: true, force: true });
++    }
++    for (const name of ['ai-report.json', 'ai-meta.json']) await fs.unlink(path.join(directory(id), name)).catch(e => { if (e.code !== 'ENOENT') throw e; });
++}
++async function selectPerspective(source, target, date, force = false) {
++    if (source.status !== 'ready') throw errors.conflict('Demo is still parsing');
++    const sourceMeta = JSON.parse(source.meta || '{}');
++    const payload = JSON.parse(await fs.readFile(path.join(directory(source.id), 'parse.json'), 'utf8'));
++    focusPayload(payload, target); // Validate before writing or replacing anything.
++    const explicitTime = playedAt(date);
++    const timestamp = explicitTime || sourceMeta.played_at || payload.match_started_at || null;
++    const timeSource = explicitTime ? 'user_input' : sourceMeta.played_at_source || (sourceMeta.played_at ? 'user_input' : payload.match_started_at ? 'demo' : 'unknown');
++    const sha = sourceMeta.demo_sha256 || payload.demo.sha256;
++    const digest = `${sha}:${target}`;
++    const existing = db.prepare("SELECT * FROM replay_jobs WHERE kind='demo' AND owner_id=? AND (digest=? OR (json_extract(meta,'$.demo_sha256')=? AND json_extract(meta,'$.target_player_id')=?)) AND coalesce(json_extract(meta,'$.selection_mode'),'')!='choose' ORDER BY updated_at DESC LIMIT 1")
++        .get(source.owner_id, digest, sha, target);
++    if (existing && ['queued', 'running'].includes(existing.status)) return existing;
++    const previous = existing ? JSON.parse(existing.meta || '{}') : {};
++    if (!force && existing?.status === 'ready' && previous.replay_version === '1.2.1' && (previous.played_at || null) === timestamp) return existing;
++    if (!existing && db.prepare("SELECT count(*) AS n FROM replay_jobs WHERE owner_id=? AND kind='demo' AND coalesce(json_extract(meta,'$.selection_mode'),'')!='choose'").get(source.owner_id).n >= 20) throw errors.conflict('Please delete an old analysis before creating another');
++    const id = existing?.id || crypto.randomUUID(), dir = directory(id), now = new Date().toISOString();
++    await fs.mkdir(dir, { recursive: true });
++    // Each perspective owns its input links: deleting another perspective cannot break it.
++    if (id !== source.id) {
++        await fs.copyFile(path.join(directory(source.id), 'parse.json'), path.join(dir, 'parse.json'));
++        try { await fs.link(path.join(directory(source.id), 'match.dem'), path.join(dir, 'match.dem')); }
++        catch (e) { if (e.code !== 'EEXIST') throw e; }
++    }
++    if (existing) await clearAi(id);
++    const meta = {file_name: sourceMeta.file_name, size_bytes: sourceMeta.size_bytes,
++        demo_sha256: sha, target_player_id: target, target_selection: 'explicit', played_at: timestamp, played_at_source:timeSource,
++        replay_version: '1.2.1'};
++    await fs.writeFile(path.join(dir, 'task.json'), JSON.stringify({analysis_id:id, uploaded_at:now,
++        target_player_id:target, target_selection:'explicit', played_at:timestamp, played_at_source:timeSource,
++        file_name:meta.file_name, cached_parse: !!payload.all_player_samples, max_rounds:60}));
++    if (existing) db.prepare("UPDATE replay_jobs SET status='queued',stage='queued',attempts=0,error=NULL,lease_until=NULL,updated_at=?,meta=? WHERE id=?")
++        .run(now, JSON.stringify(meta), id);
++    else db.prepare("INSERT INTO replay_jobs(id,owner_id,digest,version,kind,status,stage,created_at,updated_at,meta) VALUES(?,?,?,'demo-1.0.0','demo','queued','queued',?,?,?)")
++        .run(id, source.owner_id, digest, now, now, JSON.stringify(meta));
++    return db.prepare('SELECT * FROM replay_jobs WHERE id=?').get(id);
++}
++module.exports = {playedAt, roster, focusPayload, selectPerspective};
+--- /dev/null
++++ b/backend/src/services/replayCleanup.js
+@@ -0,0 +1,30 @@
++'use strict';
++const fs = require('node:fs');
++const {db, directory} = require('./replayStore');
++
++// Keep packages shared by other reports. IDs and storage paths come only from owned DB rows.
++function pruneAnalysisPackage(owner, packageId) {
++    if (db.prepare('SELECT 1 FROM analysis_runs WHERE owner_id=? AND package_id=?').get(owner,packageId)) return;
++    const saved=db.prepare('SELECT * FROM analysis_packages WHERE owner_id=? AND package_id=?').get(owner,packageId);
++    if (!saved) return;
++    if (db.prepare('SELECT status FROM replay_jobs WHERE id=?').get(saved.storage_id)?.status === 'running') return;
++    db.prepare('DELETE FROM analysis_packages WHERE owner_id=? AND package_id=?').run(owner,packageId);
++    db.prepare('DELETE FROM replay_jobs WHERE id=? AND owner_id=?').run(saved.storage_id,owner);
++    fs.rmSync(directory(saved.storage_id),{recursive:true,force:true,maxRetries:5,retryDelay:80});
++}
++function pruneDemoPerspectives(id) {
++    const current=db.prepare('SELECT * FROM replay_jobs WHERE id=?').get(id);
++    const meta=JSON.parse(current.meta || '{}');
++    if (meta.selection_mode === 'choose' || !meta.demo_sha256 || !meta.target_player_id) return;
++    const previous=db.prepare("SELECT id FROM replay_jobs WHERE kind='demo' AND owner_id=? AND id!=? AND status!='running' AND coalesce(json_extract(meta,'$.selection_mode'),'')!='choose' AND json_extract(meta,'$.demo_sha256')=? AND json_extract(meta,'$.target_player_id')=?")
++        .all(current.owner_id,id,meta.demo_sha256,meta.target_player_id);
++    for (const old of previous) {
++        const jobs=db.prepare("SELECT id,status FROM replay_jobs WHERE kind='ai' AND digest=?").all(old.id);
++        if (jobs.some(j=>j.status==='running')) continue;
++        for (const entry of [old,...jobs]) {
++            db.prepare('DELETE FROM replay_jobs WHERE id=?').run(entry.id);
++            fs.rmSync(directory(entry.id),{recursive:true,force:true,maxRetries:5,retryDelay:80});
++        }
++    }
++}
++module.exports={pruneAnalysisPackage,pruneDemoPerspectives};
+--- a/backend/src/services/replayJobRunner.js
++++ b/backend/src/services/replayJobRunner.js
+@@ -16,6 +16,7 @@
+ const demoParser = require('./demoParser');
+ const demoAnalysis = require('./demoAnalysis');
+ const aiAnalysis = require('./aiAnalysis');
++const {roster, focusPayload} = require('./demoSelection');
+ 
+ async function readJson(file) {
+     return JSON.parse(await fs.readFile(file, 'utf8'));
+@@ -38,22 +39,32 @@
+ async function runDemo(dir, onStage) {
+     const task = await readJson(path.join(dir, 'task.json'));
+     onStage({ stage: 'parsing' });
+-    const payload = await demoParser.parseDemo({
++    let payload = task.cached_parse ? await readJson(path.join(dir, 'parse.json')) : await demoParser.parseDemo({
+         input: path.join(dir, 'match.dem'),
+         output: path.join(dir, 'parse.json'),
+         targetPlayer: task.target_player_id || undefined,
+         maxRounds: task.max_rounds || undefined
+     });
++    if (task.selection_mode === 'choose') {
++        await fs.writeFile(path.join(dir, 'roster.json'), JSON.stringify({players:roster(payload),map:payload.header.map_name,started_at:payload.match_started_at || null}));
++        await fs.writeFile(path.join(dir, 'report-meta.json'), JSON.stringify({status:'awaiting_player',summary:{map:payload.header.map_name,started_at:payload.match_started_at || null,demo_sha256:payload.demo.sha256}}));
++        return;
++    }
++    if (task.target_player_id) payload = focusPayload(payload, task.target_player_id);
+     onStage({ stage: 'analyzing' });
+     const analysis = demoAnalysis.normalize(payload, {
+         analysisId: task.analysis_id,
+         uploadedAt: task.uploaded_at,
++        playedAt: task.played_at,
++        playedAtSource: task.played_at_source,
+         targetSelection: task.target_selection || 'auto_top_fragger'
+     });
+     onStage({ stage: 'reporting' });
+     await demoAnalysis.writeArtifacts(dir, analysis, {
+         analysisId: task.analysis_id,
+         uploadedAt: task.uploaded_at,
++        playedAt: task.played_at,
++        playedAtSource: task.played_at_source,
+         aiConfigured: aiAnalysis.isConfigured()
+     });
+ }
+--- a/backend/src/services/replayQueue.js
++++ b/backend/src/services/replayQueue.js
+@@ -6,6 +6,7 @@
+ const fs = require('node:fs');
+ const { db, directory } = require('./replayStore');
+ const aiAnalysis = require('./aiAnalysis');
++const {pruneAnalysisPackage,pruneDemoPerspectives} = require('./replayCleanup');
+ 
+ // Every job kind gets its own wall-clock budget: parsing a demo needs minutes,
+ // a ZIP rule pass needs seconds, an AI call is bounded by AI_TIMEOUT_MS.
+@@ -57,6 +58,17 @@
+                 const meta = JSON.parse(fs.readFileSync(path.join(directory(job.id), 'report-meta.json'), 'utf8'));
+                 db.prepare('UPDATE analysis_runs SET result_status=?,summary=? WHERE analysis_id=?')
+                     .run(meta.status, JSON.stringify(meta.summary), job.id);
++                const task = JSON.parse(fs.readFileSync(path.join(directory(job.id),'task.json'),'utf8'));
++                if (task.replace_previous) {
++                    const own = db.prepare('SELECT * FROM analysis_runs WHERE analysis_id=?').get(job.id);
++                    const previous = db.prepare("SELECT j.id,r.package_id FROM replay_jobs j JOIN analysis_runs r ON r.analysis_id=j.id WHERE r.owner_id=? AND r.match_id=? AND r.target_player_id=? AND j.id!=? AND j.status!='running'")
++                        .all(own.owner_id, own.match_id, own.target_player_id, job.id);
++                    for (const old of previous) {
++                        db.prepare('DELETE FROM replay_jobs WHERE id=?').run(old.id);
++                        fs.rmSync(directory(old.id),{recursive:true,force:true,maxRetries:5,retryDelay:80});
++                        pruneAnalysisPackage(own.owner_id,old.package_id);
++                    }
++                }
+             } catch (error) { outcome = error.message; status = 'failed'; }
+         }
+         if (status === 'ready' && job.kind === 'demo') {
+@@ -72,12 +84,13 @@
+                         summary: meta.summary,
+                         status: meta.status
+                     }), job.id);
++                pruneDemoPerspectives(job.id);
+             } catch (error) {
+                 console.error('Demo report metadata:', error.message);
+             }
+             // Auto-coaching is opt-in: it costs a provider call and must never
+             // delay the deterministic report from becoming available.
+-            if (process.env.AI_AUTO_ANALYZE === 'true' && aiAnalysis.isConfigured()) {
++            if (!JSON.parse(job.meta || '{}').skip_auto_ai && JSON.parse(job.meta || '{}').selection_mode !== 'choose' && process.env.AI_AUTO_ANALYZE === 'true' && aiAnalysis.isConfigured()) {
+                 try { enqueueDemoAi(job.id); } catch (error) { console.error('AI enqueue:', error.message); }
+             }
+         }
+--- /dev/null
++++ b/parser/match_time.py
+@@ -0,0 +1,30 @@
++"""Only label recorded match timestamps as match time; never use export/file mtime."""
++from datetime import datetime, timezone
++
++
++def normalize_match_time(value):
++    if value in (None, '', 0):
++        return None
++    try:
++        if isinstance(value, (int, float)) or str(value).isdigit():
++            number = float(value)
++            if number > 10**12:
++                number /= 1000
++            date = datetime.fromtimestamp(number, timezone.utc)
++        else:
++            date = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
++            if date.tzinfo is None:
++                return None
++        if not 2000 <= date.year <= 2100:
++            return None
++        return date.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
++    except (ValueError, TypeError, OverflowError, OSError):
++        return None
++
++
++def recorded_match_time(header):
++    for key in ('started_at', 'match_start_time', 'matchtime', 'match_time', 'utc_timestamp'):
++        value = normalize_match_time((header or {}).get(key))
++        if value:
++            return value
++    return None
+--- a/parser/parse_demo.py
++++ b/parser/parse_demo.py
+@@ -38,6 +38,7 @@
+ import time
+ import traceback
+ from typing import Any, Iterable
++from match_time import recorded_match_time
+ 
+ SCHEMA_VERSION = "demo-parse-1.0.0"
+ MAX_KILLS = 5000
+@@ -302,16 +303,28 @@
+         for row in economy_raw
+     ]
+ 
++    all_samples = collect_samples(demo, index, None, sample_every, truncated, warnings,
++                                  {row["steamid"] for row in stats})
+     target_samples: list[dict[str, Any]] = []
+     death_snapshots: list[dict[str, Any]] = []
+     if target:
+-        target_samples = collect_samples(demo, index, target, sample_every, truncated, warnings)
++        target_samples = [s for s in all_samples if s["steamid"] == target]
+         death_ticks = {kill["tick"] for kill in kills
+                        if kill["victim_steamid"] == target and kill["tick"] is not None}
+         death_snapshots = collect_death_snapshots(demo, index, target, death_ticks, truncated)
+ 
++    all_deaths = []
++    for player in stats:
++        sid = player["steamid"]
++        ticks = {k["tick"] for k in kills if k["victim_steamid"] == sid and k["tick"] is not None}
++        snapshots = death_snapshots if sid == target else collect_death_snapshots(demo, index, sid, ticks, truncated)
++        all_deaths.extend({**snapshot, "steamid": sid} for snapshot in snapshots)
++
+     return {
+         "header": header,
++        "match_started_at": recorded_match_time(header),
++        "all_player_samples": all_samples,
++        "all_death_snapshots": all_deaths,
+         "tick_rate": tick_rate(header, rounds),
+         "rounds": rounds,
+         "players": [
+@@ -341,8 +354,8 @@
+     }
+ 
+ 
+-def collect_samples(demo: Any, index: RoundIndex, target: str, every: int,
+-                    truncated: list[str], warnings: list[str]) -> list[dict[str, Any]]:
++def collect_samples(demo: Any, index: RoundIndex, target: str | None, every: int,
++                    truncated: list[str], warnings: list[str], known: set[str] | None = None) -> list[dict[str, Any]]:
+     try:
+         frame = demo.snapshots(every=max(8, int(every)))
+     except Exception as error:  # pragma: no cover - demo dependent
+@@ -350,10 +363,15 @@
+         return []
+     samples: list[dict[str, Any]] = []
+     for row in frame.to_dicts():
+-        if steamid(row.get("steamid")) != target:
++        sid = steamid(row.get("steamid"))
++        if not sid or (target and sid != target) or (known is not None and sid not in known):
+             continue
+         tick = row.get("tick")
++        if index.at(tick) is None:
++            continue
+         samples.append({
++            "steamid": sid,
++            "name": row.get("name"),
+             "tick": tick,
+             "round_num": index.at(tick),
+             "x": row.get("x"),
+@@ -379,8 +397,8 @@
+             "equipment_value": row.get("equipment_value"),
+             "money": row.get("money"),
+         })
+-        if len(samples) >= 40000:
+-            truncated.append("target_samples")
++        if len(samples) >= (40000 if target else 400000):
++            truncated.append("target_samples" if target else "all_player_samples")
+             break
+     return samples
+ 

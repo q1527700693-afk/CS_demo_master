@@ -8,7 +8,6 @@ const task = useUploadTask()
 const {
   chooseEveryTime,
   desktop,
-  cloudTarget,
   parser,
   checkingParser,
   parserError,
@@ -26,8 +25,10 @@ const { selectPlayer, selectFile, drop, process } = task
 const fileInput = ref<HTMLInputElement>()
 const route = useRoute()
 onMounted(() => {
-  if (typeof route.query.target === 'string') cloudTarget.value = route.query.target
-  task.resume(typeof route.query.task === 'string' ? route.query.task : undefined)
+  task.prepareNew()
+  if (typeof route.query.source === 'string' && typeof route.query.target === 'string')
+    task.startFromCloud(route.query.source, route.query.target, route.query.force === 'true')
+  else task.resume(typeof route.query.task === 'string' ? route.query.task : undefined)
   if (!desktop.value) void task.checkParser()
 })
 </script>
@@ -73,20 +74,8 @@ onMounted(() => {
         云端解析可用 · 原始 Demo 最大 512 MiB · AI
         {{ parser.ai?.configured ? '可用' : '暂未配置，规则报告仍可使用' }}
       </p>
-      <label
-        >分析玩家 SteamID64（选填）<input
-          v-model="cloudTarget"
-          :disabled="busy"
-          aria-label="云端分析玩家 SteamID64"
-          inputmode="numeric"
-          maxlength="17"
-          placeholder="留空自动选择击杀最多的玩家"
-      /></label>
       <p class="muted small-text">
-        报告生成后可从玩家名单选择其他玩家继续分析。每位玩家的记录都会保留。
-      </p>
-      <p v-if="route.query.file" class="muted small-text">
-        请重新选择 {{ route.query.file }}，生成所选玩家的新报告。
+        上传后先读取比赛名单，再选择要分析的玩家。不同玩家的报告分别保存。
       </p>
     </div>
     <label

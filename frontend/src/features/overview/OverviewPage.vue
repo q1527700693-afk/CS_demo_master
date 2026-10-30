@@ -1,29 +1,37 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import ReplayTable from '@/components/ReplayTable.vue'
 import AsyncState from '@/components/AsyncState.vue'
 import { useAuthStore } from '@/stores/auth'
 import { listReplays } from '@/features/replay/api'
+import { useUploadTask } from '@/features/replay/upload-task'
+import { isDesktopRuntime } from '@/app/runtime'
 import { initialReports } from '@/mocks/data'
 import { featureFlags, mockModules } from '@/app/config'
 import { errorMessage } from '@/api/http'
 import type { Replay } from '@/types'
 import { trackStartup } from '@/app/startup-tasks'
-const auth = useAuthStore()
+const auth = useAuthStore(),
+  uploadTask = useUploadTask()
+const desktop = isDesktopRuntime()
+const warnings = ref<string[]>([])
+let generation = 0
+let refreshTimer: ReturnType<typeof setTimeout> | undefined
 const items = ref<Replay[]>([])
 const loading = ref(false)
 const error = ref('')
 const completed = computed(() => items.value.filter((x) => x.status === 'completed'))
 const average = (key: 'rating' | 'adr') => {
-  const rows = completed.value.filter(row => row[key] !== null)
+  const rows = completed.value.filter((row) => row[key] !== null)
   return rows.length ? rows.reduce((sum, row) => sum + row[key]!, 0) / rows.length : null
 }
-const scoredMatches = computed(() => completed.value.filter(x => x.scoreKnown !== false))
+const scoredMatches = computed(() => completed.value.filter((x) => x.scoreKnown !== false))
 const winRate = computed(() =>
   scoredMatches.value.length
     ? Math.round(
-        (scoredMatches.value.filter((x) => x.score[0] > x.score[1]).length / scoredMatches.value.length) *
+        (scoredMatches.value.filter((x) => x.score[0] > x.score[1]).length /
+          scoredMatches.value.length) *
           100,
       )
     : null,
@@ -59,26 +67,58 @@ const metrics = computed(() => [
   },
 ])
 async function load() {
+  const current = ++generation
   error.value = ''
-  if (!featureFlags.replay) {
-    items.value = []
-    return
-  }
-  if (!auth.user) {
-    items.value = mockModules.replay ? initialReports : []
+  warnings.value = []
+  if (!featureFlags.replay || !auth.user) {
+    items.value = featureFlags.replay && mockModules.replay ? initialReports : []
+    loading.value = false
     return
   }
   loading.value = true
   try {
-    items.value = (await listReplays()).items
+    const result = await listReplays()
+    if (current !== generation) return
+    items.value = result.items
+    warnings.value = result.warnings
+    if (!result.items.length && result.warnings.length) error.value = result.warnings.join('；')
   } catch (e) {
-    error.value = errorMessage(e)
+    if (current === generation) error.value = errorMessage(e)
   } finally {
-    loading.value = false
+    if (current === generation) loading.value = false
   }
 }
-onMounted(() => trackStartup(load()))
-watch(() => auth.user?.id, load)
+function refreshVisible() {
+  if (document.visibilityState === 'hidden') return
+  clearTimeout(refreshTimer)
+  refreshTimer = setTimeout(() => void load(), 50)
+}
+onMounted(() => {
+  trackStartup(load())
+  window.addEventListener('focus', refreshVisible)
+  window.addEventListener('replays:changed', refreshVisible)
+  document.addEventListener('visibilitychange', refreshVisible)
+})
+onUnmounted(() => {
+  generation++
+  clearTimeout(refreshTimer)
+  window.removeEventListener('focus', refreshVisible)
+  window.removeEventListener('replays:changed', refreshVisible)
+  document.removeEventListener('visibilitychange', refreshVisible)
+})
+watch(
+  () => auth.user?.id,
+  () => {
+    items.value = []
+    void load()
+  },
+)
+watch(
+  () => uploadTask.busy,
+  (busy, previous) => {
+    if (previous && !busy) void load()
+  },
+)
 </script>
 <template>
   <section class="page-heading">
@@ -105,7 +145,8 @@ watch(() => auth.user?.id, load)
         >开始我的复盘 <AppIcon name="arrow" :size="18"
       /></RouterLink>
       <div class="hero-footnote">
-        <AppIcon name="shield" :size="14" /> 原始录像留在本地 · 报告默认私有
+        <AppIcon name="shield" :size="14" />
+        {{ desktop ? '原始录像留在本地 · 报告默认私有' : '云端解析 Demo · 报告默认私有' }}
       </div>
     </div>
     <div class="hero-radar" aria-hidden="true">
@@ -144,12 +185,23 @@ watch(() => auth.user?.id, load)
         <p>{{ metric.detail }}</p>
       </article>
     </section>
+    <p v-for="warning in warnings" :key="warning" class="muted small-text" role="status">
+      {{ warning }}
+    </p>
     <section class="panel recent-panel">
       <div class="panel-heading">
         <div>
           <h2>最近的复盘</h2>
           <p>每一场比赛，都值得再看一眼。</p>
         </div>
+        <button
+          class="button secondary compact"
+          :disabled="loading"
+          aria-label="刷新最近复盘"
+          @click="load"
+        >
+          刷新
+        </button>
         <RouterLink to="/replays" class="text-link"
           >全部对局 <AppIcon name="arrow" :size="16"
         /></RouterLink>

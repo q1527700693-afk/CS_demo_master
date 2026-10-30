@@ -7,6 +7,7 @@ import { mockModules } from '@/app/config'
 import { isDesktopRuntime } from '@/app/runtime'
 import { isCloudAnalysis } from './cloud-api'
 import { analysisName } from './analysis-name'
+import { loadAnalysisEntries } from './analysis-entries'
 import { useUploadTask } from './upload-task'
 import { useReplayReport } from './useReplayReport'
 import {
@@ -66,12 +67,29 @@ async function showInfo() {
 }
 const uploadTask = useUploadTask()
 const selectedTarget = ref('')
+const reportSequence = ref<number>()
+watch(
+  () => report.value?.analysis_id,
+  async (id, _previous, cleanup) => {
+    let active = true
+    cleanup(() => (active = false))
+    reportSequence.value = undefined
+    if (!id) return
+    try {
+      const { entries } = await loadAnalysisEntries()
+      if (active) reportSequence.value = entries.find((item) => item.id === id)?.sequence
+    } catch {
+      /* Reports remain readable if history is temporarily unavailable. */
+    }
+  },
+  { immediate: true },
+)
 const reportTitle = computed(() =>
   report.value
     ? analysisName(
         details.value?.target_player?.name || report.value.target_player_id,
-        report.value.match.started_at || report.value.uploaded_at,
         report.value.match.map,
+        reportSequence.value,
       )
     : '',
 )
@@ -85,11 +103,11 @@ const otherPlayers = computed(() => [
 async function analyzePlayer() {
   if (!report.value || !selectedTarget.value) return
   const cloud = isCloudAnalysis(report.value.analysis_id)
-  const target = selectedTarget.value,
-    sha = details.value?.source.demo?.sha256 || ''
+  const target = selectedTarget.value
   const file = details.value?.source.demo?.file_name || ''
-  await router.push({ path: '/replays/new', query: { target, file } })
-  if (cloud && !isDesktopRuntime()) uploadTask.reuseCloudFile(target, sha)
+  if (cloud && !isDesktopRuntime())
+    await router.push({ path: '/replays/new', query: { target, source: report.value.analysis_id } })
+  else await router.push({ path: '/replays/new', query: { target, file } })
 }
 const player = computed(() => details.value?.target_player?.name || '分析对象')
 const basic = computed(() => report.value?.report.modules.basic_stats?.metrics)
@@ -217,13 +235,7 @@ watch(rows, (value) => {
             <div>
               <p class="match-caption">比赛复盘 <span>／</span> {{ mapName(report.match.map) }}</p>
               <h1 class="analysis-title">{{ reportTitle }}</h1>
-              <p class="match-subline">
-                {{ rows.length || '—' }} 个已记录回合<span v-if="report.match.started_at">
-                  · {{ new Date(report.match.started_at).toLocaleDateString('zh-CN') }}</span
-                ><span v-else>
-                  · {{ new Date(report.uploaded_at).toLocaleDateString('zh-CN') }} 导入</span
-                >
-              </p>
+              <p class="match-subline">{{ rows.length || '—' }} 个已记录回合</p>
             </div>
           </div>
           <div v-if="ownTeam && otherTeam" class="match-score">

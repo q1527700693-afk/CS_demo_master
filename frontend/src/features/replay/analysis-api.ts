@@ -75,7 +75,11 @@ export const startAnalysis = async (
     {
       method: 'POST',
       headers: { 'Idempotency-Key': key },
-      body: JSON.stringify({ package_id: p.package_id, target_player_id: p.target_player_id }),
+      body: JSON.stringify({
+        package_id: p.package_id,
+        target_player_id: p.target_player_id,
+        replace_previous: true,
+      }),
     },
   )
   if (
@@ -188,6 +192,7 @@ export function rememberReport(report: AnalysisReport) {
   if (reports.size >= 10) reports.delete(reports.keys().next().value!)
   reports.set(cacheKey(report.analysis_id), report)
 }
+export const forgetReport = (id: string) => reports.delete(cacheKey(id))
 export const cachedReport = (id: string) => reports.get(cacheKey(id))
 
 /** Byte progress; missing Content-Length means indeterminate. */

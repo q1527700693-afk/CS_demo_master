@@ -64,7 +64,10 @@ async function load() {
       notice.value = '公开展示接口尚未上线；可以先选择内容并保存本机草稿，其他玩家暂不可见。'
     } else if (!unsupported(e)) error.value = errorMessage(e)
   } finally {
-    if (current === revision) loading.value = false
+    if (current === revision) {
+      loading.value = false
+      if (props.own) void loadChoices()
+    }
   }
 }
 async function loadChoices() {
@@ -164,6 +167,12 @@ async function save() {
   }
 }
 watch(() => [owner.value, props.own], load, { immediate: true })
+watch(
+  () => model.value.enabled,
+  (enabled) => {
+    if (enabled && props.own) void loadChoices()
+  },
+)
 </script>
 <template>
   <section class="panel demo-showcase" aria-labelledby="demo-showcase-heading">
@@ -190,21 +199,16 @@ watch(() => [owner.value, props.own], load, { immediate: true })
         默认关闭；只展示你选择的简要数据或 AI 点评，原始 Demo 与完整私人报告不会公开。
       </p>
       <div class="showcase-controls">
-        <button
-          class="button secondary compact"
-          :disabled="saving || selecting || choicesLoading"
-          @click="loadChoices"
-        >
-          {{ choicesLoading ? '读取比赛中…' : '选择已上传的比赛' }}
-        </button>
         <label
           >展示比赛<select
             v-model="model.analysis_id"
             :disabled="saving"
             aria-label="展示比赛"
+            @focus="loadChoices"
+            @pointerdown="loadChoices"
             @change="choose"
           >
-            <option :value="null">请选择比赛</option>
+            <option :value="null">{{ choicesLoading ? '读取比赛中…' : '请选择比赛' }}</option>
             <option
               v-if="model.analysis_id && !options.some((o) => o.id === model.analysis_id)"
               :value="model.analysis_id"

@@ -2,8 +2,6 @@
 import AppIcon from './AppIcon.vue'
 import type { Replay } from '@/types'
 defineProps<{ items: Replay[] }>()
-const date = (text: string) =>
-  new Date(text).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
 const status: Record<string, string> = {
   uploaded: '已上传',
   queued: '排队中',
@@ -26,25 +24,31 @@ const status: Record<string, string> = {
           <th>比分</th>
           <th>Rating</th>
           <th>ADR</th>
-          <th>日期</th>
           <th>报告</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="item in items" :key="item.id">
+        <tr
+          v-for="item in items"
+          :key="item.id"
+          data-testid="overview-replay-entry"
+          :data-analysis-id="item.id"
+        >
           <td>
             <div class="map-cell">
               <div class="map-tile" :class="item.map.toLowerCase().replace(/\s/g, '')">
                 {{ item.map.slice(0, 1) }}
               </div>
               <div>
-                <strong>{{ item.map }}</strong
-                ><small>{{ item.title }}</small>
+                <strong>{{ item.title }}</strong>
               </div>
             </div>
           </td>
           <td>
-            <span v-if="item.scoreKnown !== false" class="score" :class="{ win: item.score[0] > item.score[1] }"
+            <span
+              v-if="item.scoreKnown !== false"
+              class="score"
+              :class="{ win: item.score[0] > item.score[1] }"
               >{{ item.score[0] }} <em>:</em> {{ item.score[1] }}</span
             >
             <span v-else class="muted">未确认</span>
@@ -53,11 +57,10 @@ const status: Record<string, string> = {
             {{ item.rating?.toFixed(2) ?? '—' }}
           </td>
           <td class="numeric">{{ item.adr?.toFixed(1) ?? '—' }}</td>
-          <td class="muted">{{ item.matchTimeKnown === false ? '比赛时间未知 · 上传 ' : '' }}{{ date(item.createdAt) }}</td>
           <td>
             <RouterLink
               v-if="item.status === 'completed'"
-              :to="`/replays/${item.id}`"
+              :to="`/replays/${encodeURIComponent(item.id)}`"
               class="text-link"
               >查看报告 <AppIcon name="arrow" :size="15" /></RouterLink
             ><span v-else class="muted">{{ status[item.status] }}</span>

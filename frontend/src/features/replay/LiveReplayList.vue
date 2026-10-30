@@ -4,12 +4,29 @@ import { useAuthStore } from '@/stores/auth'
 import { useUploadTask } from './upload-task'
 import { loadAnalysisEntries, type AnalysisEntry } from './analysis-entries'
 import { errorMessage } from '@/api/http'
+import { deleteAnalysisEntry } from './analysis-delete'
 const auth = useAuthStore(),
   task = useUploadTask()
 const records = ref<AnalysisEntry[]>([]),
   loading = ref(false),
   error = ref(''),
   warnings = ref<string[]>([])
+const confirming = ref(''),
+  deleting = ref('')
+async function remove(item: AnalysisEntry) {
+  if (deleting.value) return
+  deleting.value = item.id
+  error.value = ''
+  try {
+    await deleteAnalysisEntry(item)
+    confirming.value = ''
+    await load()
+  } catch (e) {
+    error.value = errorMessage(e)
+  } finally {
+    deleting.value = ''
+  }
+}
 let generation = 0
 async function load() {
   const current = ++generation
@@ -47,7 +64,7 @@ onUnmounted(() => generation++)
     <div>
       <div class="eyebrow">MATCH LIBRARY</div>
       <h1>我的复盘<span class="orange">.</span></h1>
-      <p>每位玩家、每份分析单独保存；同一 Demo 切换玩家不会覆盖旧记录。</p>
+      <p>不同玩家分别保存；同一场比赛、同一玩家再次分析可更新已有记录。</p>
     </div>
     <RouterLink to="/replays/new" class="button primary">新建复盘</RouterLink>
   </section>
@@ -74,18 +91,38 @@ onUnmounted(() => generation++)
         · {{ item.message || item.status }}
       </p>
     </div>
-    <RouterLink
-      v-if="item.available"
-      :to="`/replays/${encodeURIComponent(item.id)}`"
-      class="button secondary"
-      >查看复盘</RouterLink
-    >
-    <RouterLink
-      v-else-if="item.source === 'cloud' && item.status !== 'failed'"
-      :to="{ path: '/replays/new', query: { task: item.id } }"
-      class="button secondary"
-      >查看进度</RouterLink
-    >
+    <div class="row-actions">
+      <RouterLink
+        v-if="item.available"
+        :to="`/replays/${encodeURIComponent(item.id)}`"
+        class="button secondary"
+        >查看复盘</RouterLink
+      >
+      <RouterLink
+        v-else-if="item.source === 'cloud' && item.status !== 'failed'"
+        :to="{ path: '/replays/new', query: { task: item.id } }"
+        class="button secondary"
+        >查看进度</RouterLink
+      >
+      <button
+        v-if="confirming !== item.id"
+        class="button danger compact"
+        :disabled="!!deleting"
+        :aria-label="`删除复盘 ${item.player}`"
+        @click="confirming = item.id"
+      >
+        删除
+      </button>
+      <div v-else class="delete-confirm" role="group" aria-label="确认删除复盘">
+        <span>删除这份复盘？其他玩家的记录会保留。</span>
+        <button class="button danger compact" :disabled="!!deleting" @click="remove(item)">
+          {{ deleting === item.id ? '删除中…' : '确认删除' }}
+        </button>
+        <button class="button secondary compact" :disabled="!!deleting" @click="confirming = ''">
+          取消
+        </button>
+      </div>
+    </div>
   </article>
 </template>
 <style scoped>
@@ -103,6 +140,26 @@ onUnmounted(() => generation++)
   align-items: center;
   justify-content: space-between;
   gap: 22px;
+}
+.row-actions,
+.delete-confirm {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.delete-confirm span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.danger {
+  background: #8c2c3b;
+  border-color: #d15468;
+  color: #fff0f2;
+}
+.button.danger:hover:not(:disabled) {
+  background: #aa3549;
+  border-color: #f17489;
 }
 .match-row h2 {
   font-size: 16px;

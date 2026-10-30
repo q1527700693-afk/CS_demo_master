@@ -5,6 +5,7 @@ import type { RosterPlayer } from './player-identity'
 
 export interface AutomaticLocalJob extends LocalJob {
   players?: RosterPlayer[]
+  started_at?: string | null
   active_target_player_id?: string
 }
 export function validateAnalysisFile(file: Pick<File, 'name' | 'size'>): string | null {
@@ -24,7 +25,11 @@ export const companion = {
     transfer<AutomaticLocalJob>(`/local/jobs/${encodeURIComponent(id)}`, '', () => {}, { signal }),
   export: (id: string, player: string, signal: AbortSignal) =>
     transfer<{ job_id: string }>(`/local/jobs/${encodeURIComponent(id)}/exports`, '', () => {}, {
-      json: { target_player_id: player, nickname_query: '', identity_confirmed: true },
+      json: {
+        target_player_id: player,
+        nickname_query: '',
+        identity_confirmed: true,
+      },
       signal,
     }),
   package: (id: string, player: string, signal: AbortSignal) =>

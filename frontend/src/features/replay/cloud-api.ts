@@ -22,6 +22,8 @@ export interface CloudDemo {
   progress: number | null
   message: string
   report_available: boolean
+  roster_available?: boolean
+  started_at?: string | null
   target_player_id: string | null
   file_name: string | null
   demo_sha256?: string | null
@@ -34,10 +36,12 @@ export interface CloudDemo {
     target_player_name?: string
     map?: string
     adr?: number | null
+    started_at?: string | null
   }
 }
 export interface ParserStatus {
   available: boolean
+  capabilities?: string[]
   max_size_bytes: number
   reason?: string
   ai?: { configured: boolean; auto: boolean; model: string }
@@ -55,7 +59,7 @@ export async function uploadCloudDemo(
     file,
     progress,
     signal,
-    target ? { target_player_id: target } : {},
+    target ? { target_player_id: target } : { selection_mode: 'choose' },
     600_000,
   )
   if (!result.demo_id) throw new ApiError('云端没有返回有效任务编号')
@@ -219,3 +223,21 @@ export async function getCloudEvents(id: string, details?: ReplayDetails, signal
     ),
   }
 }
+
+export const getCloudPlayers = (id: string, signal?: AbortSignal) =>
+  request<{
+    players: { player_id: string; name: string }[]
+    started_at: string | null
+    map: string
+  }>(`${cloudPath(id)}/players`, { signal })
+export const selectCloudPlayer = (
+  id: string,
+  target: string,
+  signal?: AbortSignal,
+  force = false,
+) =>
+  request<CloudDemo>(`${cloudPath(id)}/analyses`, {
+    method: 'POST',
+    body: JSON.stringify({ target_player_id: target, force }),
+    signal,
+  })

@@ -50,7 +50,12 @@ const rate = computed(() =>
   Number.isFinite(props.tickRate) && props.tickRate > 0 ? props.tickRate : 64,
 )
 const sorted = (list: ReplayMapItem[]) => list.sort((a, b) => (a.tick ?? 0) - (b.tick ?? 0))
-const playerGroups = computed(() => groupPlayerSamples(items.value, props.playerId, !!props.global))
+const fullReplay = computed(
+  () => !!props.global || items.value.some((i) => i.kind === 'all_player_samples'),
+)
+const playerGroups = computed(() =>
+  groupPlayerSamples(items.value, props.playerId, fullReplay.value),
+)
 const samples = computed(() => playerGroups.value.get(props.playerId) || [])
 const neighborSamples = computed(() =>
   sorted(items.value.filter((i) => i.kind === 'nearby_context')),
@@ -58,7 +63,7 @@ const neighborSamples = computed(() =>
 const utilities = computed(() =>
   items.value.filter(
     (i) =>
-      (props.global
+      (fullReplay.value
         ? i.kind === 'all_trajectories'
         : ['trajectories', 'unattributed_trajectories'].includes(i.kind)) && i.points?.length,
   ),
@@ -103,7 +108,7 @@ const dead = computed(() =>
 )
 const neighbors = computed(() => {
   if (!asset.value || !showNeighbors.value) return []
-  if (props.global)
+  if (fullReplay.value)
     return [...playerGroups.value]
       .filter(([id]) => id !== props.playerId)
       .flatMap(([id, list]) => {
@@ -186,7 +191,7 @@ const utilityLines = computed(() => {
       (i) =>
         (showContext.value ||
           i.thrower_player_id === props.playerId ||
-          i.kind === 'trajectories') &&
+          (i.kind === 'trajectories' && !i.thrower_player_id)) &&
         (utilityFilter.value === 'all' || utilityStyle(i.type).kind === utilityFilter.value) &&
         (entire.value ||
           ((i.start_tick ?? Infinity) <= tick.value &&
@@ -361,7 +366,16 @@ async function load() {
         })) ?? detail.events,
     }
     items.value = map.items
-    tick.value = props.global ? extent.value.min : extent.value.max
+    const firstState = map.items
+      .filter(
+        (i) =>
+          ['all_player_samples', 'player_samples'].includes(i.kind) &&
+          (i.tick ?? -1) >= extent.value.min,
+      )
+      .reduce((min, i) => Math.min(min, i.tick!), Infinity)
+    tick.value = fullReplay.value
+      ? Math.min(extent.value.max, Number.isFinite(firstState) ? firstState : extent.value.min)
+      : extent.value.max
     entire.value = true
     if (props.seek) seekTo(props.seek.tick)
   } catch (e) {
@@ -411,7 +425,7 @@ onUnmounted(() => {
         ><label><input v-model="showUtility" type="checkbox" />道具</label
         ><label
           ><input v-model="showNeighbors" type="checkbox" />{{
-            global ? '其他玩家' : '附近玩家'
+            fullReplay ? '其他玩家' : '附近玩家'
           }}</label
         >
       </div>
@@ -623,7 +637,7 @@ onUnmounted(() => {
                 : '该时刻无玩家位置记录'
         }}</span
         ><span>{{
-          global
+          fullReplay
             ? '全员位置 · 每 0.5 秒采样 · 存活玩家按游标时刻显示'
             : isCloudAnalysis(analysisId)
               ? '云端解析展示所选玩家位置与道具；不推测其他玩家的未知位置'
