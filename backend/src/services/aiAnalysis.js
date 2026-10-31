@@ -179,8 +179,33 @@ function parseModelJson(content) {
     }
 }
 
+function normalizeAiResult(result) {
+    if (!result || typeof result !== 'object' || Array.isArray(result)) return result;
+    const normalized = JSON.parse(JSON.stringify(result));
+    normalized.improvement_areas = Array.isArray(normalized.improvement_areas)
+        ? normalized.improvement_areas.slice(0, 12).map((area) => ({
+            ...area,
+            evidence_ids: Array.isArray(area.evidence_ids) ? [...new Set(area.evidence_ids)].slice(0, 20) : area.evidence_ids,
+            training: Array.isArray(area.training) ? area.training.slice(0, 10) : area.training
+        }))
+        : normalized.improvement_areas;
+    normalized.strengths = Array.isArray(normalized.strengths)
+        ? normalized.strengths.slice(0, 8).map((strength) => ({
+            ...strength,
+            evidence_ids: Array.isArray(strength.evidence_ids)
+                ? [...new Set(strength.evidence_ids)].slice(0, 20)
+                : strength.evidence_ids
+        }))
+        : normalized.strengths;
+    normalized.data_limitations = Array.isArray(normalized.data_limitations)
+        ? normalized.data_limitations.slice(0, 10)
+        : normalized.data_limitations;
+    return normalized;
+}
+
 function validateAiResult(result, details, allowedEvidenceIds = null) {
-    if (!validateResponse(result)) {
+    const normalized = normalizeAiResult(result);
+    if (!validateResponse(normalized)) {
         const reason = validateResponse.errors?.[0]?.message || 'Invalid AI response';
         throw upstreamError(`AI response failed validation: ${reason}`);
     }
@@ -188,7 +213,7 @@ function validateAiResult(result, details, allowedEvidenceIds = null) {
     const known = allowedEvidenceIds instanceof Set
         ? allowedEvidenceIds
         : knownEvidenceIds(details, allowedEvidenceIds || []);
-    const areas = [...result.improvement_areas, ...result.strengths];
+    const areas = [...normalized.improvement_areas, ...normalized.strengths];
     for (const area of areas) {
         for (const evidenceId of area.evidence_ids || []) {
             if (!known.has(evidenceId)) {
@@ -196,7 +221,7 @@ function validateAiResult(result, details, allowedEvidenceIds = null) {
             }
         }
     }
-    return result;
+    return normalized;
 }
 
 const SYSTEM_PROMPT = `你是 CS2 教练。

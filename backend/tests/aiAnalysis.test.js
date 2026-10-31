@@ -107,6 +107,50 @@ test('AI analysis builds compact facts and validates a provider response', async
     assert.doesNotMatch(requestedBody.messages[1].content, /player_samples/);
 });
 
+test('AI analysis caps oversized evidence lists instead of failing the whole report', async () => {
+    process.env.DEEPSEEK_API_KEY = 'test-key';
+    const evidenceIds = Array.from({ length: 25 }, (_, index) => `flash_${index}`);
+    const details = {
+        ...DETAILS,
+        statistics: {
+            modules: {
+                utility: {
+                    status: 'completed',
+                    sample_count: 25,
+                    metrics: { flashes_thrown: 25 },
+                    evidence_ids: evidenceIds
+                }
+            }
+        }
+    };
+    global.fetch = async () => ({
+        ok: true,
+        text: async () => JSON.stringify({
+            choices: [{
+                message: {
+                    content: JSON.stringify({
+                        summary: '道具使用需要改进。',
+                        improvement_areas: [{
+                            priority: 'high',
+                            category: 'utility',
+                            title: '证据较多的改进点',
+                            evidence_ids: evidenceIds,
+                            explanation: '测试超长证据列表。',
+                            training: ['保留最重要的证据。']
+                        }],
+                        strengths: [],
+                        data_limitations: []
+                    })
+                }
+            }]
+        })
+    });
+
+    const result = await aiAnalysis.analyze(details, { analysisId: 'analysis-many-evidence' });
+    assert.equal(result.improvement_areas[0].evidence_ids.length, 20);
+    assert.deepEqual(result.improvement_areas[0].evidence_ids, evidenceIds.slice(0, 20));
+});
+
 test('AI analysis rejects evidence IDs that do not exist in the report', async () => {
     process.env.DEEPSEEK_API_KEY = 'test-key';
     global.fetch = async () => ({
