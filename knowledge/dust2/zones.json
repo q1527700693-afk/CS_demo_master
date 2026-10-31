@@ -1,0 +1,491 @@
+{
+  "schema_version": "dust2-knowledge-0.1.0",
+  "map": "de_dust2",
+  "map_version": "2000933",
+  "description": "Approximate Dust2 callout zones and logical spawn slots. Coordinates are a draft for engine bootstrapping, not final tactical truth.",
+  "calibration_source": "local_radar_image",
+  "zones": [
+    {
+      "id": "t_spawn",
+      "name": "T 出生点",
+      "aliases": [
+        "T Spawn",
+        "T出生点"
+      ],
+      "kind": "spawn",
+      "center_radar": [
+        390,
+        925
+      ],
+      "radius_radar": 85,
+      "center_world": [
+        -760,
+        -831
+      ],
+      "radius_world": 374,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    },
+    {
+      "id": "ct_spawn",
+      "name": "CT 出生点",
+      "aliases": [
+        "CT Spawn",
+        "CT出生点"
+      ],
+      "kind": "spawn",
+      "center_radar": [
+        925,
+        250
+      ],
+      "radius_radar": 70,
+      "center_world": [
+        1594,
+        2139
+      ],
+      "radius_world": 308,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    },
+    {
+      "id": "a_site",
+      "name": "A 包点",
+      "aliases": [
+        "A Site",
+        "A点"
+      ],
+      "kind": "site",
+      "center_radar": [
+        235,
+        130
+      ],
+      "radius_radar": 85,
+      "center_world": [
+        -1442,
+        2667
+      ],
+      "radius_world": 374,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    },
+    {
+      "id": "a_long",
+      "name": "A 大",
+      "aliases": [
+        "Long A",
+        "A Long",
+        "A大"
+      ],
+      "kind": "lane",
+      "center_radar": [
+        155,
+        620
+      ],
+      "radius_radar": 95,
+      "center_world": [
+        -1794,
+        511
+      ],
+      "radius_world": 418,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    },
+    {
+      "id": "long_doors",
+      "name": "A 大门",
+      "aliases": [
+        "Long Doors",
+        "A大门"
+      ],
+      "kind": "choke",
+      "center_radar": [
+        175,
+        775
+      ],
+      "radius_radar": 55,
+      "center_world": [
+        -1706,
+        -171
+      ],
+      "radius_world": 242,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    },
+    {
+      "id": "a_long_pit",
+      "name": "A 大坑位",
+      "aliases": [
+        "Pit",
+        "坑位"
+      ],
+      "kind": "position",
+      "center_radar": [
+        135,
+        440
+      ],
+      "radius_radar": 55,
+      "center_world": [
+        -1882,
+        1303
+      ],
+      "radius_world": 242,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    },
+    {
+      "id": "a_short",
+      "name": "A 小",
+      "aliases": [
+        "Short A",
+        "A Short",
+        "A小"
+      ],
+      "kind": "lane",
+      "center_radar": [
+        360,
+        430
+      ],
+      "radius_radar": 80,
+      "center_world": [
+        -892,
+        1347
+      ],
+      "radius_world": 352,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    },
+    {
+      "id": "a_short_stairs",
+      "name": "A 小楼梯",
+      "aliases": [
+        "Short Stairs",
+        "A小楼梯"
+      ],
+      "kind": "choke",
+      "center_radar": [
+        370,
+        500
+      ],
+      "radius_radar": 50,
+      "center_world": [
+        -848,
+        1039
+      ],
+      "radius_world": 220,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    },
+    {
+      "id": "mid",
+      "name": "中路",
+      "aliases": [
+        "Mid",
+        "中路"
+      ],
+      "kind": "lane",
+      "center_radar": [
+        560,
+        520
+      ],
+      "radius_radar": 90,
+      "center_world": [
+        -12,
+        951
+      ],
+      "radius_world": 396,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    },
+    {
+      "id": "mid_doors",
+      "name": "中门",
+      "aliases": [
+        "Mid Doors",
+        "中门"
+      ],
+      "kind": "choke",
+      "center_radar": [
+        585,
+        245
+      ],
+      "radius_radar": 55,
+      "center_world": [
+        98,
+        2161
+      ],
+      "radius_world": 242,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    },
+    {
+      "id": "xbox",
+      "name": "Xbox",
+      "aliases": [
+        "X-Box",
+        "Xbox"
+      ],
+      "kind": "position",
+      "center_radar": [
+        625,
+        320
+      ],
+      "radius_radar": 45,
+      "center_world": [
+        274,
+        1831
+      ],
+      "radius_world": 198,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    },
+    {
+      "id": "catwalk",
+      "name": "Catwalk / 警家连接",
+      "aliases": [
+        "Catwalk",
+        "警家连接"
+      ],
+      "kind": "lane",
+      "center_radar": [
+        430,
+        390
+      ],
+      "radius_radar": 55,
+      "center_world": [
+        -584,
+        1523
+      ],
+      "radius_world": 242,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    },
+    {
+      "id": "b_tunnel",
+      "name": "B 洞",
+      "aliases": [
+        "B Tunnels",
+        "B洞"
+      ],
+      "kind": "lane",
+      "center_radar": [
+        825,
+        520
+      ],
+      "radius_radar": 75,
+      "center_world": [
+        1154,
+        951
+      ],
+      "radius_world": 330,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    },
+    {
+      "id": "upper_tunnels",
+      "name": "B 洞上层",
+      "aliases": [
+        "Upper Tunnels",
+        "B洞上层"
+      ],
+      "kind": "lane",
+      "center_radar": [
+        760,
+        340
+      ],
+      "radius_radar": 55,
+      "center_world": [
+        868,
+        1743
+      ],
+      "radius_world": 242,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    },
+    {
+      "id": "b_site",
+      "name": "B 包点",
+      "aliases": [
+        "B Site",
+        "B点"
+      ],
+      "kind": "site",
+      "center_radar": [
+        820,
+        165
+      ],
+      "radius_radar": 85,
+      "center_world": [
+        1132,
+        2513
+      ],
+      "radius_world": 374,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    },
+    {
+      "id": "lower_tunnels",
+      "name": "B 洞下层",
+      "aliases": [
+        "Lower Tunnels",
+        "B洞下层"
+      ],
+      "kind": "lane",
+      "center_radar": [
+        690,
+        770
+      ],
+      "radius_radar": 65,
+      "center_world": [
+        560,
+        -149
+      ],
+      "radius_world": 286,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    },
+    {
+      "id": "t_ramp",
+      "name": "T 坡",
+      "aliases": [
+        "T Ramp",
+        "T坡"
+      ],
+      "kind": "lane",
+      "center_radar": [
+        510,
+        790
+      ],
+      "radius_radar": 60,
+      "center_world": [
+        -232,
+        -237
+      ],
+      "radius_world": 264,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    },
+    {
+      "id": "ct_ramp",
+      "name": "CT 坡 / 警家回防",
+      "aliases": [
+        "CT Ramp",
+        "警家回防"
+      ],
+      "kind": "lane",
+      "center_radar": [
+        900,
+        350
+      ],
+      "radius_radar": 60,
+      "center_world": [
+        1484,
+        1699
+      ],
+      "radius_world": 264,
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+    }
+  ],
+  "spawn_slots": [
+    {
+      "id": "t_a_long_first",
+      "team": "T",
+      "name": "A 大第一身位",
+      "anchor_zone_id": "t_spawn",
+      "target_zone_id": "long_doors",
+      "assignment": "shortest_travel_path",
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Resolve from each round start position and route graph; do not assume a fixed player."
+    },
+    {
+      "id": "t_mid_fast_smoke",
+      "team": "T",
+      "name": "中门快烟位",
+      "anchor_zone_id": "t_spawn",
+      "target_zone_id": "mid_doors",
+      "assignment": "closest_smoke_route_to_mid_doors",
+      "confidence": "draft",
+      "needs_validation": true,
+      "notes": "Smoke must be thrown early enough to bloom before A-long entry."
+    },
+    {
+      "id": "t_short_first",
+      "team": "T",
+      "name": "A 小第一身位",
+      "anchor_zone_id": "t_spawn",
+      "target_zone_id": "a_short_stairs",
+      "assignment": "shortest_travel_path",
+      "confidence": "draft",
+      "needs_validation": true
+    },
+    {
+      "id": "t_b_tunnel_first",
+      "team": "T",
+      "name": "B 洞第一身位",
+      "anchor_zone_id": "t_spawn",
+      "target_zone_id": "lower_tunnels",
+      "assignment": "shortest_travel_path",
+      "confidence": "draft",
+      "needs_validation": true
+    },
+    {
+      "id": "t_awper_mid",
+      "team": "T",
+      "name": "T 中门狙位",
+      "anchor_zone_id": "t_spawn",
+      "target_zone_id": "mid_doors",
+      "assignment": "player_with_awp_and_short_mid_path",
+      "confidence": "draft",
+      "needs_validation": true
+    },
+    {
+      "id": "ct_a_long_anchor",
+      "team": "CT",
+      "name": "CT A 大防守位",
+      "anchor_zone_id": "ct_spawn",
+      "target_zone_id": "a_long",
+      "assignment": "shortest_travel_path",
+      "confidence": "draft",
+      "needs_validation": true
+    },
+    {
+      "id": "ct_b_anchor",
+      "team": "CT",
+      "name": "CT B 点防守位",
+      "anchor_zone_id": "ct_spawn",
+      "target_zone_id": "b_site",
+      "assignment": "shortest_travel_path",
+      "confidence": "draft",
+      "needs_validation": true
+    },
+    {
+      "id": "ct_mid_anchor",
+      "team": "CT",
+      "name": "CT 中路防守位",
+      "anchor_zone_id": "ct_spawn",
+      "target_zone_id": "mid",
+      "assignment": "closest_mid_route",
+      "confidence": "draft",
+      "needs_validation": true
+    }
+  ]
+}

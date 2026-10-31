@@ -1,0 +1,560 @@
+{
+  "schema_version": "dust2-knowledge-0.1.0",
+  "map": "de_dust2",
+  "description": "Core Dust2 utility intents. Exact lineups must be captured from validated demos before hard grading.",
+  "utilities": [
+    {
+      "id": "dust2_util_t_mid_fast_smoke",
+      "name": "中门快烟",
+      "type": "smoke",
+      "side": "T",
+      "origin": {
+        "zone_id": "t_spawn",
+        "spawn_slot": "t_mid_fast_smoke",
+        "lineup_status": "needs_capture",
+        "lineup_notes": "Record a real throw origin, view yaw/pitch and detonation tick from a validated demo."
+      },
+      "target": {
+        "zone_ids": [
+          "mid_doors"
+        ],
+        "coverage_lanes": [
+          "mid_doors_to_t_spawn",
+          "mid_doors_to_long_doors"
+        ],
+        "lineup_status": "needs_capture"
+      },
+      "timing": {
+        "phase": "early",
+        "deadline_seconds": 5.0,
+        "must_precede": [
+          "a_long_entry"
+        ],
+        "notes": "The smoke should be blooming before the A-long entry commits."
+      },
+      "purpose": "阻断中门 AWP 第一枪线，为 A 大第一身位创造过点窗口。",
+      "used_by": [
+        "dust2_t_a_long_rush",
+        "dust2_t_mid_default_fake"
+      ],
+      "evaluation_checks": [
+        {
+          "id": "thrown_before_deadline",
+          "type": "timing",
+          "description": "Thrown before the A-long entry reaches the commitment point."
+        },
+        {
+          "id": "bloomed_before_cross",
+          "type": "timing",
+          "description": "Smoke is active before the first teammate crosses the exposed A-long window."
+        },
+        {
+          "id": "landed_in_mid_doors",
+          "type": "landing_zone",
+          "description": "Detonation falls inside mid_doors."
+        }
+      ],
+      "confidence": "draft",
+      "needs_validation": true,
+      "source_refs": [
+        "expert_draft",
+        "community_callouts",
+        "local_radar_image"
+      ]
+    },
+    {
+      "id": "dust2_util_t_a_long_smoke",
+      "name": "A 大过点烟",
+      "type": "smoke",
+      "side": "T",
+      "origin": {
+        "zone_id": "t_spawn",
+        "spawn_slot": "t_a_long_first",
+        "lineup_status": "needs_capture",
+        "lineup_notes": "Record a real throw origin, view yaw/pitch and detonation tick from a validated demo."
+      },
+      "target": {
+        "zone_ids": [
+          "a_long",
+          "a_long_pit"
+        ],
+        "coverage_lanes": [
+          "a_long_pit_to_long_doors"
+        ],
+        "lineup_status": "needs_capture"
+      },
+      "timing": {
+        "phase": "execute",
+        "deadline_seconds": 7.0,
+        "must_precede": [
+          "enter_a_long"
+        ],
+        "notes": "Use only if the team has the lineup and the first contact is not already committed."
+      },
+      "purpose": "遮住 A 大坑位/长点方向，降低第一身位被远距离架死的风险。",
+      "used_by": [
+        "dust2_t_a_long_rush",
+        "dust2_t_a_short_split"
+      ],
+      "evaluation_checks": [
+        {
+          "id": "thrown_before_entry",
+          "type": "timing",
+          "description": "Thrown before the entry crosses into A long."
+        },
+        {
+          "id": "landed_in_a_long_pit",
+          "type": "landing_zone",
+          "description": "Detonation falls in the long/pit cover zone."
+        }
+      ],
+      "confidence": "draft",
+      "needs_validation": true,
+      "source_refs": [
+        "expert_draft",
+        "community_callouts",
+        "local_radar_image"
+      ]
+    },
+    {
+      "id": "dust2_util_t_a_long_flash",
+      "name": "A 大进攻闪",
+      "type": "flash",
+      "side": "T",
+      "origin": {
+        "zone_id": "t_spawn",
+        "spawn_slot": "t_a_long_first",
+        "lineup_status": "needs_capture",
+        "lineup_notes": "Record a real throw origin, view yaw/pitch and detonation tick from a validated demo."
+      },
+      "target": {
+        "zone_ids": [
+          "a_long",
+          "a_long_pit",
+          "a_site"
+        ],
+        "coverage_lanes": [
+          "a_long_pit_to_a_site"
+        ],
+        "lineup_status": "needs_capture"
+      },
+      "timing": {
+        "phase": "execute",
+        "deadline_seconds": 8.0,
+        "must_precede": [
+          "enter_a_long"
+        ],
+        "notes": "Judge by enemy blind event and teammate timing, not by animation alone."
+      },
+      "purpose": "在 A 大第一身位进点前压制坑位/包点方向的防守者。",
+      "used_by": [
+        "dust2_t_a_long_rush",
+        "dust2_t_mid_default_fake"
+      ],
+      "evaluation_checks": [
+        {
+          "id": "flash_before_entry",
+          "type": "timing",
+          "description": "Flash detonates before the entry commits."
+        },
+        {
+          "id": "enemy_blind",
+          "type": "blind_effect",
+          "description": "At least one defender in the target area is blinded long enough."
+        },
+        {
+          "id": "no_team_blind",
+          "type": "team_safety",
+          "description": "Does not blind the entering teammate."
+        }
+      ],
+      "confidence": "draft",
+      "needs_validation": true,
+      "source_refs": [
+        "expert_draft",
+        "community_callouts",
+        "local_radar_image"
+      ]
+    },
+    {
+      "id": "dust2_util_t_a_short_smoke",
+      "name": "A 小过点烟",
+      "type": "smoke",
+      "side": "T",
+      "origin": {
+        "zone_id": "t_spawn",
+        "spawn_slot": "t_short_first",
+        "lineup_status": "needs_capture",
+        "lineup_notes": "Record a real throw origin, view yaw/pitch and detonation tick from a validated demo."
+      },
+      "target": {
+        "zone_ids": [
+          "a_short",
+          "a_short_stairs"
+        ],
+        "coverage_lanes": [
+          "a_short_stairs_to_a_site"
+        ],
+        "lineup_status": "needs_capture"
+      },
+      "timing": {
+        "phase": "execute",
+        "deadline_seconds": 6.0,
+        "must_precede": [
+          "enter_a_short"
+        ],
+        "notes": "Smoke timing depends on whether the team is splitting A or faking short."
+      },
+      "purpose": "封住 A 小/警家连接方向，为 A 小夹 A 的短点队员创造进入包点的窗口。",
+      "used_by": [
+        "dust2_t_a_short_split"
+      ],
+      "evaluation_checks": [
+        {
+          "id": "thrown_before_short_entry",
+          "type": "timing",
+          "description": "Smoke is active before the short entry commits."
+        },
+        {
+          "id": "landed_in_a_short_stairs",
+          "type": "landing_zone",
+          "description": "Detonation is within the A-short chokepoint."
+        }
+      ],
+      "confidence": "draft",
+      "needs_validation": true,
+      "source_refs": [
+        "expert_draft",
+        "community_callouts",
+        "local_radar_image"
+      ]
+    },
+    {
+      "id": "dust2_util_t_a_short_flash",
+      "name": "A 小进点闪",
+      "type": "flash",
+      "side": "T",
+      "origin": {
+        "zone_id": "t_spawn",
+        "spawn_slot": "t_short_first",
+        "lineup_status": "needs_capture",
+        "lineup_notes": "Record a real throw origin, view yaw/pitch and detonation tick from a validated demo."
+      },
+      "target": {
+        "zone_ids": [
+          "a_short",
+          "a_site"
+        ],
+        "coverage_lanes": [
+          "a_short_stairs_to_a_site"
+        ],
+        "lineup_status": "needs_capture"
+      },
+      "timing": {
+        "phase": "execute",
+        "deadline_seconds": 7.0,
+        "must_precede": [
+          "enter_a_short"
+        ],
+        "notes": "Needs a real enemy-blind event to be graded as effective."
+      },
+      "purpose": "为 A 小第一身位进入包点提供致盲窗口。",
+      "used_by": [
+        "dust2_t_a_short_split",
+        "dust2_t_mid_default_fake"
+      ],
+      "evaluation_checks": [
+        {
+          "id": "flash_before_short_entry",
+          "type": "timing",
+          "description": "Flash detonates before short entry."
+        },
+        {
+          "id": "enemy_blind",
+          "type": "blind_effect",
+          "description": "At least one defender near A short/A site is blinded."
+        }
+      ],
+      "confidence": "draft",
+      "needs_validation": true,
+      "source_refs": [
+        "expert_draft",
+        "community_callouts",
+        "local_radar_image"
+      ]
+    },
+    {
+      "id": "dust2_util_t_b_tunnel_smoke",
+      "name": "B 洞过点烟",
+      "type": "smoke",
+      "side": "T",
+      "origin": {
+        "zone_id": "t_spawn",
+        "spawn_slot": "t_b_tunnel_first",
+        "lineup_status": "needs_capture",
+        "lineup_notes": "Record a real throw origin, view yaw/pitch and detonation tick from a validated demo."
+      },
+      "target": {
+        "zone_ids": [
+          "b_tunnel",
+          "upper_tunnels"
+        ],
+        "coverage_lanes": [
+          "b_tunnel_to_b_site"
+        ],
+        "lineup_status": "needs_capture"
+      },
+      "timing": {
+        "phase": "early",
+        "deadline_seconds": 5.0,
+        "must_precede": [
+          "enter_b_tunnel"
+        ],
+        "notes": "If the smoke is late, B rush should be downgraded to a slow B hit."
+      },
+      "purpose": "阻断 B 洞/警家方向的第一枪线，为 rush B 争取进入包点的窗口。",
+      "used_by": [
+        "dust2_t_b_tunnel_rush"
+      ],
+      "evaluation_checks": [
+        {
+          "id": "thrown_before_entry",
+          "type": "timing",
+          "description": "Smoke is thrown before the first B entry."
+        },
+        {
+          "id": "landed_in_b_tunnel",
+          "type": "landing_zone",
+          "description": "Detonation is within B tunnel."
+        }
+      ],
+      "confidence": "draft",
+      "needs_validation": true,
+      "source_refs": [
+        "expert_draft",
+        "community_callouts",
+        "local_radar_image"
+      ]
+    },
+    {
+      "id": "dust2_util_t_b_tunnel_fire",
+      "name": "B 洞封路火",
+      "type": "fire",
+      "side": "T",
+      "origin": {
+        "zone_id": "t_spawn",
+        "spawn_slot": "t_b_tunnel_first",
+        "lineup_status": "needs_capture",
+        "lineup_notes": "Record a real throw origin, view yaw/pitch and detonation tick from a validated demo."
+      },
+      "target": {
+        "zone_ids": [
+          "b_tunnel",
+          "upper_tunnels"
+        ],
+        "coverage_lanes": [
+          "b_tunnel_to_b_site"
+        ],
+        "lineup_status": "needs_capture"
+      },
+      "timing": {
+        "phase": "execute",
+        "deadline_seconds": 7.0,
+        "must_precede": [
+          "enter_b_tunnel"
+        ],
+        "notes": "Fire value is judged by area denial, not only by damage."
+      },
+      "purpose": "阻止 CT 从 B 洞/警家方向快速前压或反清，给 rush 队伍争取时间。",
+      "used_by": [
+        "dust2_t_b_tunnel_rush",
+        "dust2_t_mid_default_fake"
+      ],
+      "evaluation_checks": [
+        {
+          "id": "fire_before_entry",
+          "type": "timing",
+          "description": "Fire is active before the B entry commits."
+        },
+        {
+          "id": "landed_in_b_tunnel",
+          "type": "landing_zone",
+          "description": "Fire lands in the B tunnel approach."
+        }
+      ],
+      "confidence": "draft",
+      "needs_validation": true,
+      "source_refs": [
+        "expert_draft",
+        "community_callouts",
+        "local_radar_image"
+      ]
+    },
+    {
+      "id": "dust2_util_t_b_tunnel_flash",
+      "name": "B 洞进点闪",
+      "type": "flash",
+      "side": "T",
+      "origin": {
+        "zone_id": "t_spawn",
+        "spawn_slot": "t_b_tunnel_first",
+        "lineup_status": "needs_capture",
+        "lineup_notes": "Record a real throw origin, view yaw/pitch and detonation tick from a validated demo."
+      },
+      "target": {
+        "zone_ids": [
+          "b_site",
+          "b_tunnel"
+        ],
+        "coverage_lanes": [
+          "b_tunnel_to_b_site"
+        ],
+        "lineup_status": "needs_capture"
+      },
+      "timing": {
+        "phase": "execute",
+        "deadline_seconds": 7.0,
+        "must_precede": [
+          "enter_b_site"
+        ],
+        "notes": "Flash effectiveness requires an enemy blind event or a confirmed entry trade."
+      },
+      "purpose": "在 B 洞第一身位进入包点前压制 B 点/包点角落的防守者。",
+      "used_by": [
+        "dust2_t_b_tunnel_rush"
+      ],
+      "evaluation_checks": [
+        {
+          "id": "flash_before_entry",
+          "type": "timing",
+          "description": "Flash detonates before entering B site."
+        },
+        {
+          "id": "enemy_blind",
+          "type": "blind_effect",
+          "description": "At least one B-site defender is blinded."
+        },
+        {
+          "id": "no_team_blind",
+          "type": "team_safety",
+          "description": "Does not blind the first B entry."
+        }
+      ],
+      "confidence": "draft",
+      "needs_validation": true,
+      "source_refs": [
+        "expert_draft",
+        "community_callouts",
+        "local_radar_image"
+      ]
+    },
+    {
+      "id": "dust2_util_t_a_site_postplant_smoke",
+      "name": "A 包点下包后烟",
+      "type": "smoke",
+      "side": "T",
+      "origin": {
+        "zone_id": "a_site",
+        "spawn_slot": "t_a_long_first",
+        "lineup_status": "needs_capture",
+        "lineup_notes": "Record a real throw origin, view yaw/pitch and detonation tick from a validated demo."
+      },
+      "target": {
+        "zone_ids": [
+          "a_site",
+          "ct_ramp"
+        ],
+        "coverage_lanes": [
+          "ct_ramp_to_a_site"
+        ],
+        "lineup_status": "needs_capture"
+      },
+      "timing": {
+        "phase": "post_plant",
+        "deadline_seconds": null,
+        "must_precede": [
+          "ct_retake_contact"
+        ],
+        "notes": "This is a post-plant utility; do not evaluate it as an entry utility."
+      },
+      "purpose": "下包后阻断警家/CT 回防路线的第一枪线，帮助队伍建立交叉火力。",
+      "used_by": [
+        "dust2_t_a_long_rush",
+        "dust2_t_a_short_split"
+      ],
+      "evaluation_checks": [
+        {
+          "id": "landed_after_plant",
+          "type": "timing",
+          "description": "Utility is used after the bomb is planted."
+        },
+        {
+          "id": "landed_in_site_or_ct_route",
+          "type": "landing_zone",
+          "description": "Detonation covers the intended retake lane."
+        }
+      ],
+      "confidence": "draft",
+      "needs_validation": true,
+      "source_refs": [
+        "expert_draft",
+        "community_callouts",
+        "local_radar_image"
+      ]
+    },
+    {
+      "id": "dust2_util_ct_a_long_push_flash",
+      "name": "CT A 大前压闪",
+      "type": "flash",
+      "side": "CT",
+      "origin": {
+        "zone_id": "ct_spawn",
+        "spawn_slot": "ct_a_long_anchor",
+        "lineup_status": "needs_capture",
+        "lineup_notes": "Record a real throw origin, view yaw/pitch and detonation tick from a validated demo."
+      },
+      "target": {
+        "zone_ids": [
+          "a_long",
+          "long_doors",
+          "a_long_pit"
+        ],
+        "coverage_lanes": [
+          "a_long_to_long_doors"
+        ],
+        "lineup_status": "needs_capture"
+      },
+      "timing": {
+        "phase": "early",
+        "deadline_seconds": 6.0,
+        "must_precede": [
+          "ct_push_a_long"
+        ],
+        "notes": "If it blinds no enemy and the CT dies first, classify as an aggressive-push failure candidate, not automatically a utility failure."
+      },
+      "purpose": "配合 CT 主动前压 A 大，致盲控 A 大的 T 方并争取首杀。",
+      "used_by": [
+        "dust2_ct_a_long_pressure"
+      ],
+      "evaluation_checks": [
+        {
+          "id": "flash_before_push",
+          "type": "timing",
+          "description": "Flash detonates before the CT push commits."
+        },
+        {
+          "id": "enemy_blind",
+          "type": "blind_effect",
+          "description": "At least one T player holding A long is blinded."
+        }
+      ],
+      "confidence": "draft",
+      "needs_validation": true,
+      "source_refs": [
+        "expert_draft",
+        "community_callouts",
+        "local_radar_image"
+      ]
+    }
+  ]
+}

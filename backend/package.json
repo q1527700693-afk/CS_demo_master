@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "check:dust2": "node scripts/validate-dust2-knowledge.js"
   },
   "dependencies": {
     "ajv": "^8.20.0",

@@ -1,0 +1,95 @@
+{
+  "schema_version": "dust2-knowledge-0.1.0",
+  "map": "de_dust2",
+  "description": "Sources and verification status for the Dust2 v0.1 knowledge draft. URLs marked needs_validation must be opened/reviewed by a human before being treated as authoritative.",
+  "sources": [
+    {
+      "id": "local_map_calibration",
+      "kind": "local_file",
+      "title": "CS2 build 2000933 radar calibration",
+      "path": "frontend/public/maps/2000933/map_data.json",
+      "url": null,
+      "status": "verified",
+      "used_for": [
+        "coordinate_calibration"
+      ],
+      "notes": "de_dust2 entry: pos_x=-2476, pos_y=3239, scale=4.4, rotate=1."
+    },
+    {
+      "id": "local_radar_image",
+      "kind": "local_file",
+      "title": "CS2 build 2000933 Dust2 radar image",
+      "path": "frontend/public/maps/2000933/radars/de_dust2.png",
+      "url": null,
+      "status": "verified_asset",
+      "used_for": [
+        "approximate_zone_centers"
+      ],
+      "notes": "Zone centers and radii are an initial visual draft, not a polygon-accurate callout map."
+    },
+    {
+      "id": "expert_draft",
+      "kind": "expert_synthesis",
+      "title": "Dust2 tactical draft synthesized for this project",
+      "path": null,
+      "url": null,
+      "status": "draft",
+      "used_for": [
+        "zone_names",
+        "spawn_slot_roles",
+        "tactics",
+        "utility_intent"
+      ],
+      "notes": "Must be validated in-game and against real demos before hard blame or confident recommendations."
+    },
+    {
+      "id": "community_callouts",
+      "kind": "community_reference",
+      "title": "Dust2 callout and utility references",
+      "path": null,
+      "url": "https://totalcsgo.com/maps",
+      "url_candidates": [
+        "https://totalcsgo.com/maps",
+        "https://steamcommunity.com/app/730/guides/",
+        "https://liquipedia.net/counterstrike/Dust_II"
+      ],
+      "status": "needs_validation",
+      "used_for": [
+        "callout_names",
+        "common_utility_targets"
+      ],
+      "notes": "Use only as reference categories until a human confirms exact pages and current CS2 lineups. Do not copy paid or copyrighted guide text."
+    },
+    {
+      "id": "awpy_docs",
+      "kind": "documentation",
+      "title": "awpy CS2 demo parser documentation and project",
+      "path": null,
+      "url": "https://awpy.readthedocs.io/",
+      "url_candidates": [
+        "https://awpy.readthedocs.io/",
+        "https://github.com/pnxenopoulos/awpy"
+      ],
+      "status": "reference",
+      "used_for": [
+        "demo_parsing",
+        "event_semantics",
+        "map_coordinates"
+      ],
+      "notes": "Used for parser capabilities and coordinate/event semantics; not a tactical truth source."
+    },
+    {
+      "id": "hltv_demos",
+      "kind": "public_demo_reference",
+      "title": "HLTV Dust2 demo and match references",
+      "path": null,
+      "url": "https://www.hltv.org/results",
+      "status": "future_optional",
+      "used_for": [
+        "validation",
+        "pattern_mining_later"
+      ],
+      "notes": "Optional for a small 5-10 demo validation set later; not required for the initial rule engine."
+    }
+  ]
+}

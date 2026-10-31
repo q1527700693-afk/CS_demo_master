@@ -1,0 +1,752 @@
+{
+  "schema_version": "dust2-knowledge-0.1.0",
+  "map": "de_dust2",
+  "description": "Dust2 v0.1 tactic templates for a team-selected demo. All templates require demo validation before hard blame.",
+  "tactics": [
+    {
+      "id": "dust2_t_a_long_rush",
+      "name": "A 大快打",
+      "map": "de_dust2",
+      "side": "T",
+      "category": "rush",
+      "summary": "中门快烟配合 A 大闪和第一身位强抢 A 大，目标是在 CT 完成回防前进入 A 包点。",
+      "required_zone_presence": [
+        "a_long",
+        "long_doors",
+        "a_long_pit",
+        "a_site"
+      ],
+      "required_spawn_slots": [
+        "t_a_long_first",
+        "t_mid_fast_smoke"
+      ],
+      "economy_requirements": {
+        "min_rifles": 3,
+        "needs_smoke": true,
+        "needs_flash": true,
+        "preferred_buy": [
+          "full_buy",
+          "force_with_rifles"
+        ]
+      },
+      "required_utility": [
+        "dust2_util_t_mid_fast_smoke",
+        "dust2_util_t_a_long_flash"
+      ],
+      "optional_utility": [
+        "dust2_util_t_a_long_smoke",
+        "dust2_util_t_a_site_postplant_smoke"
+      ],
+      "steps": [
+        {
+          "order": 1,
+          "role": "mid_smoker",
+          "action": "throw_utility",
+          "utility_id": "dust2_util_t_mid_fast_smoke",
+          "deadline_seconds": 5.0,
+          "zone_id": "t_spawn"
+        },
+        {
+          "order": 2,
+          "role": "a_long_entry",
+          "action": "take_control",
+          "zone_id": "long_doors",
+          "deadline_seconds": 7.0
+        },
+        {
+          "order": 3,
+          "role": "flasher",
+          "action": "throw_utility",
+          "utility_id": "dust2_util_t_a_long_flash",
+          "deadline_seconds": 8.0,
+          "zone_id": "a_long"
+        },
+        {
+          "order": 4,
+          "role": "a_long_entry",
+          "action": "enter_site",
+          "zone_id": "a_site",
+          "deadline_seconds": 10.0
+        },
+        {
+          "order": 5,
+          "role": "trade_player",
+          "action": "trade",
+          "max_delay_seconds": 3.0,
+          "zone_id": "a_long_pit"
+        },
+        {
+          "order": 6,
+          "role": "postplant",
+          "action": "plant_then_hold",
+          "zone_id": "a_site"
+        }
+      ],
+      "success_conditions": [
+        "mid_smoke_bloomed_before_entry",
+        "a_long_flash_created_entry_window",
+        "entry_won_or_was_traded",
+        "team_entered_site_or_planted"
+      ],
+      "failure_modes": [
+        {
+          "code": "late_mid_smoke",
+          "description": "中门烟在 A 大进点后才生效。"
+        },
+        {
+          "code": "wasted_a_long_flash",
+          "description": "A 大闪没有致盲防守者，或闪到进点队友。"
+        },
+        {
+          "code": "untraded_entry_death",
+          "description": "第一身位死亡后无人及时补枪。"
+        },
+        {
+          "code": "mid_awp_untouched",
+          "description": "中门方向仍可直接架住 A 大过点。"
+        }
+      ],
+      "detection_rules": [
+        "至少 3 名 T 在前 10 秒进入 A 大/长门区域。",
+        "中门快烟在 A 大第一次交火前出现。",
+        "A 大方向出现第一交火，且队伍目标明显偏向 A 包点。"
+      ],
+      "adaptations": [
+        {
+          "when": "opponent_rotates_fast_to_a",
+          "recommendation": "保留 A 大压力，改由 2 人转 B 或第二时间再爆 A。",
+          "evidence_required": [
+            "ct_rotation_time",
+            "a_long_contact"
+          ]
+        },
+        {
+          "when": "opponent_has_mid_awp_and_no_smoke_available",
+          "recommendation": "不硬抢 A 大，改为中路默认或 B 洞施压。",
+          "evidence_required": [
+            "enemy_awp_position",
+            "our_smoke_inventory"
+          ]
+        },
+        {
+          "when": "a_long_first_spawn_lost",
+          "recommendation": "放弃第一时间 A 大，转 A 小夹 A 或 B 洞快打。",
+          "evidence_required": [
+            "round_start_spawn_distances"
+          ]
+        }
+      ],
+      "confidence": "draft",
+      "needs_validation": true,
+      "source_refs": [
+        "expert_draft",
+        "community_callouts",
+        "awpy_docs"
+      ]
+    },
+    {
+      "id": "dust2_t_b_tunnel_rush",
+      "name": "B 洞 rush",
+      "map": "de_dust2",
+      "side": "T",
+      "category": "rush",
+      "summary": "用 B 洞烟、火和闪快速压缩 B 点防守空间，争取在 CT 回防前完成下包。",
+      "required_zone_presence": [
+        "lower_tunnels",
+        "b_tunnel",
+        "upper_tunnels",
+        "b_site"
+      ],
+      "required_spawn_slots": [
+        "t_b_tunnel_first"
+      ],
+      "economy_requirements": {
+        "min_rifles": 3,
+        "needs_smoke": true,
+        "needs_flash": true,
+        "preferred_buy": [
+          "full_buy",
+          "force_with_rifles"
+        ]
+      },
+      "required_utility": [
+        "dust2_util_t_b_tunnel_smoke",
+        "dust2_util_t_b_tunnel_flash"
+      ],
+      "optional_utility": [
+        "dust2_util_t_b_tunnel_fire"
+      ],
+      "steps": [
+        {
+          "order": 1,
+          "role": "b_tunnel_entry",
+          "action": "take_control",
+          "zone_id": "lower_tunnels",
+          "deadline_seconds": 5.0
+        },
+        {
+          "order": 2,
+          "role": "b_tunnel_smoker",
+          "action": "throw_utility",
+          "utility_id": "dust2_util_t_b_tunnel_smoke",
+          "deadline_seconds": 6.0,
+          "zone_id": "b_tunnel"
+        },
+        {
+          "order": 3,
+          "role": "b_tunnel_flasher",
+          "action": "throw_utility",
+          "utility_id": "dust2_util_t_b_tunnel_flash",
+          "deadline_seconds": 7.0,
+          "zone_id": "b_tunnel"
+        },
+        {
+          "order": 4,
+          "role": "b_tunnel_entry",
+          "action": "enter_site",
+          "zone_id": "b_site",
+          "deadline_seconds": 9.0
+        },
+        {
+          "order": 5,
+          "role": "trade_player",
+          "action": "trade",
+          "max_delay_seconds": 3.0,
+          "zone_id": "b_tunnel"
+        },
+        {
+          "order": 6,
+          "role": "postplant",
+          "action": "plant_then_hold",
+          "zone_id": "b_site"
+        }
+      ],
+      "success_conditions": [
+        "b_tunnel_smoke_active_before_entry",
+        "b_flash_blinded_site_defender",
+        "entry_won_or_was_traded",
+        "bomb_planted"
+      ],
+      "failure_modes": [
+        {
+          "code": "late_b_smoke",
+          "description": "B 洞烟没有在进点前生效。"
+        },
+        {
+          "code": "no_b_site_flash_value",
+          "description": "闪光没有白到 B 点防守者。"
+        },
+        {
+          "code": "rush_into_awp",
+          "description": "在敌方 AWP 已架住 B 洞时仍然硬冲。"
+        }
+      ],
+      "detection_rules": [
+        "至少 3 名 T 在前 10 秒进入 B 洞/下层通道。",
+        "B 洞方向出现第一交火，且队伍目标明显偏向 B 包点。",
+        "B 洞烟/火/闪在进入 B 点前出现。"
+      ],
+      "adaptations": [
+        {
+          "when": "opponent_stacks_b_or_has_b_anchor_awp",
+          "recommendation": "先用中路默认逼转，再第二时间打 B。",
+          "evidence_required": [
+            "enemy_b_stack",
+            "enemy_awp_position"
+          ]
+        },
+        {
+          "when": "ct_rotates_fast_after_b_pressure",
+          "recommendation": "保留 B 洞道具压力，转 A 小或 A 大。",
+          "evidence_required": [
+            "ct_rotation_time",
+            "b_tunnel_pressure"
+          ]
+        }
+      ],
+      "confidence": "draft",
+      "needs_validation": true,
+      "source_refs": [
+        "expert_draft",
+        "community_callouts",
+        "awpy_docs"
+      ]
+    },
+    {
+      "id": "dust2_t_a_short_split",
+      "name": "A 小夹 A",
+      "map": "de_dust2",
+      "side": "T",
+      "category": "split",
+      "summary": "A 小短点队员和 A 大/中路压力同时进入 A 包点，迫使 CT 同时处理两条枪线。",
+      "required_zone_presence": [
+        "a_short_stairs",
+        "a_short",
+        "a_long",
+        "a_site"
+      ],
+      "required_spawn_slots": [
+        "t_short_first",
+        "t_a_long_first"
+      ],
+      "economy_requirements": {
+        "min_rifles": 3,
+        "needs_smoke": true,
+        "needs_flash": true,
+        "preferred_buy": [
+          "full_buy"
+        ]
+      },
+      "required_utility": [
+        "dust2_util_t_a_short_smoke",
+        "dust2_util_t_a_short_flash"
+      ],
+      "optional_utility": [
+        "dust2_util_t_a_long_smoke",
+        "dust2_util_t_a_site_postplant_smoke"
+      ],
+      "steps": [
+        {
+          "order": 1,
+          "role": "a_short_entry",
+          "action": "take_control",
+          "zone_id": "a_short_stairs",
+          "deadline_seconds": 7.0
+        },
+        {
+          "order": 2,
+          "role": "a_short_smoker",
+          "action": "throw_utility",
+          "utility_id": "dust2_util_t_a_short_smoke",
+          "deadline_seconds": 8.0,
+          "zone_id": "a_short"
+        },
+        {
+          "order": 3,
+          "role": "a_long_pressure",
+          "action": "apply_pressure",
+          "zone_id": "a_long",
+          "deadline_seconds": 9.0
+        },
+        {
+          "order": 4,
+          "role": "a_short_flasher",
+          "action": "throw_utility",
+          "utility_id": "dust2_util_t_a_short_flash",
+          "deadline_seconds": 9.5,
+          "zone_id": "a_short_stairs"
+        },
+        {
+          "order": 5,
+          "role": "a_short_entry",
+          "action": "enter_site",
+          "zone_id": "a_site",
+          "deadline_seconds": 11.0
+        },
+        {
+          "order": 6,
+          "role": "trade_player",
+          "action": "trade",
+          "max_delay_seconds": 3.0,
+          "zone_id": "a_site"
+        }
+      ],
+      "success_conditions": [
+        "a_short_smoke_active_before_entry",
+        "two_approach_vectors_create_crossfire",
+        "ct_defender_traded_or_forced_back",
+        "team_plants_or_controls_site"
+      ],
+      "failure_modes": [
+        {
+          "code": "fake_split_too_slow",
+          "description": "A 大压力没有和 A 小进点形成同一时间窗口。"
+        },
+        {
+          "code": "a_short_utility_whiffed",
+          "description": "A 小烟/闪未能帮助第一身位进入包点。"
+        },
+        {
+          "code": "split_turned_into_solo_entry",
+          "description": "A 小队员先死，A 大压力没有同步转化。"
+        }
+      ],
+      "detection_rules": [
+        "前 12 秒至少 2 名 T 在 A 小/A 小楼梯附近。",
+        "同一回合 A 大方向至少有一名 T 施压。",
+        "A 小烟/闪出现后才进入 A 包点。"
+      ],
+      "adaptations": [
+        {
+          "when": "ct_holds_short_with_two_players",
+          "recommendation": "先用 A 大假打拉走一人，再第二时间打 A 小。",
+          "evidence_required": [
+            "ct_short_stack",
+            "ct_rotation_time"
+          ]
+        },
+        {
+          "when": "short_entry_keeps_losing_first_duel",
+          "recommendation": "改为中路默认或 B 洞 rush，避免继续硬碰。",
+          "evidence_required": [
+            "short_entry_duel_results"
+          ]
+        }
+      ],
+      "confidence": "draft",
+      "needs_validation": true,
+      "source_refs": [
+        "expert_draft",
+        "community_callouts",
+        "awpy_docs"
+      ]
+    },
+    {
+      "id": "dust2_t_mid_default_fake",
+      "name": "中路默认 / 假打转点",
+      "map": "de_dust2",
+      "side": "T",
+      "category": "default",
+      "summary": "先用中路和道具拿信息，观察 CT 轮转速度；若对面回防快或被拉走，再假打一侧转另一侧。",
+      "required_zone_presence": [
+        "mid",
+        "mid_doors",
+        "xbox",
+        "a_site",
+        "b_site"
+      ],
+      "required_spawn_slots": [
+        "t_mid_fast_smoke",
+        "t_a_long_first"
+      ],
+      "economy_requirements": {
+        "min_rifles": 4,
+        "needs_smoke": true,
+        "needs_flash": true,
+        "preferred_buy": [
+          "full_buy"
+        ]
+      },
+      "required_utility": [
+        "dust2_util_t_mid_fast_smoke"
+      ],
+      "optional_utility": [
+        "dust2_util_t_a_long_flash",
+        "dust2_util_t_a_short_flash",
+        "dust2_util_t_b_tunnel_fire"
+      ],
+      "steps": [
+        {
+          "order": 1,
+          "role": "mid_controller",
+          "action": "take_mid_control",
+          "zone_id": "mid",
+          "deadline_seconds": 8.0
+        },
+        {
+          "order": 2,
+          "role": "mid_smoker",
+          "action": "throw_utility",
+          "utility_id": "dust2_util_t_mid_fast_smoke",
+          "deadline_seconds": 6.0,
+          "zone_id": "mid_doors"
+        },
+        {
+          "order": 3,
+          "role": "information_player",
+          "action": "probe_and_call_rotation",
+          "zone_id": "xbox",
+          "deadline_seconds": 15.0
+        },
+        {
+          "order": 4,
+          "role": "fake_group",
+          "action": "apply_pressure",
+          "zone_id": "a_site",
+          "deadline_seconds": 20.0
+        },
+        {
+          "order": 5,
+          "role": "hit_group",
+          "action": "execute_opposite_site",
+          "zone_id": "b_site",
+          "deadline_seconds": 26.0
+        }
+      ],
+      "success_conditions": [
+        "mid_control_obtained_without_losing_untraded_player",
+        "ct_rotation_observed",
+        "fake_pressure_forced_or_froze_rotation",
+        "hit_group_enters_opposite_site_with_man_advantage"
+      ],
+      "failure_modes": [
+        {
+          "code": "default_without_information",
+          "description": "一直控图但没有任何转点/进点决策。"
+        },
+        {
+          "code": "fake_too_early",
+          "description": "假打压力不足，CT 不动，转点撞上完整防守。"
+        },
+        {
+          "code": "rotation_read_too_late",
+          "description": "CT 已回防完成才开始打另一侧。"
+        },
+        {
+          "code": "mid_control_death",
+          "description": "中路信息位无补枪死亡，导致整套默认失效。"
+        }
+      ],
+      "detection_rules": [
+        "至少 3 名 T 在前 12 秒参与中路/两侧默认。",
+        "中门烟或中路控制事件出现在第一次爆点前。",
+        "同一回合出现明显 A/B 施压后转向另一侧的时间差。"
+      ],
+      "adaptations": [
+        {
+          "when": "opponent_rotates_fast_but_overcommits",
+          "recommendation": "继续假打原侧，等对面两人过点后转另一侧。",
+          "evidence_required": [
+            "ct_rotation_time",
+            "ct_player_positions"
+          ]
+        },
+        {
+          "when": "opponent_holds_default_without_rotation",
+          "recommendation": "停止长时间默认，直接打弱侧或利用道具爆点。",
+          "evidence_required": [
+            "ct_rotation_frequency",
+            "site_stack_count"
+          ]
+        },
+        {
+          "when": "our_a_long_first_spawn_is_strong",
+          "recommendation": "先用 A 大压力拿信息，再决定假打 B 或回头打 A。",
+          "evidence_required": [
+            "round_start_spawn_distances",
+            "a_long_contact"
+          ]
+        }
+      ],
+      "confidence": "draft",
+      "needs_validation": true,
+      "source_refs": [
+        "expert_draft",
+        "community_callouts",
+        "awpy_docs"
+      ]
+    },
+    {
+      "id": "dust2_ct_default",
+      "name": "CT 常规默认",
+      "map": "de_dust2",
+      "side": "CT",
+      "category": "defense",
+      "summary": "用 A 大、B 洞和中路的基础站位拖延进攻，优先保持交叉火力和可回防人数。",
+      "required_zone_presence": [
+        "a_long",
+        "a_site",
+        "b_tunnel",
+        "b_site",
+        "mid"
+      ],
+      "required_spawn_slots": [
+        "ct_a_long_anchor",
+        "ct_b_anchor",
+        "ct_mid_anchor"
+      ],
+      "economy_requirements": {
+        "min_rifles": 3,
+        "needs_smoke": false,
+        "needs_flash": false,
+        "preferred_buy": [
+          "full_buy",
+          "force_with_rifles"
+        ]
+      },
+      "required_utility": [],
+      "optional_utility": [],
+      "steps": [
+        {
+          "order": 1,
+          "role": "a_long_anchor",
+          "action": "hold_or_delay_a_long",
+          "zone_id": "a_long",
+          "deadline_seconds": 8.0
+        },
+        {
+          "order": 2,
+          "role": "b_anchor",
+          "action": "hold_or_delay_b_tunnel",
+          "zone_id": "b_tunnel",
+          "deadline_seconds": 8.0
+        },
+        {
+          "order": 3,
+          "role": "mid_anchor",
+          "action": "take_mid_information",
+          "zone_id": "mid",
+          "deadline_seconds": 8.0
+        },
+        {
+          "order": 4,
+          "role": "rotator",
+          "action": "rotate_on_confirmed_contact",
+          "zone_id": "ct_spawn",
+          "deadline_seconds": 20.0
+        }
+      ],
+      "success_conditions": [
+        "at_least_one_traded_contact",
+        "ct_does_not_lose_both_sites_to_early_rotations",
+        "retake_has_numbers_or_utility_advantage"
+      ],
+      "failure_modes": [
+        {
+          "code": "no_contact_then_full_site_loss",
+          "description": "CT 没有拿到任何信息就被快速爆点。"
+        },
+        {
+          "code": "overrotate_early",
+          "description": "未确认进攻方向就提前转点，导致另一侧空门。"
+        },
+        {
+          "code": "untraded_anchor_death",
+          "description": "前点防守者死亡后无人补枪。"
+        }
+      ],
+      "detection_rules": [
+        "CT 前 10 秒没有明显多人前压。",
+        "至少 3 名 CT 保持在包点/回防路径附近。",
+        "首次交火前没有全员挤向同一侧。"
+      ],
+      "adaptations": [
+        {
+          "when": "our_a_long_anchor_is_awp_and_enemy_has_no_smoke",
+          "recommendation": "保留 A 大前点枪线，但准备闪身换位。",
+          "evidence_required": [
+            "own_awp_position",
+            "enemy_smoke_inventory"
+          ]
+        },
+        {
+          "when": "enemy_has_fast_a_long_rush",
+          "recommendation": "A 大先给延迟道具，包点留可回防身位，避免第一身位被白后全崩。",
+          "evidence_required": [
+            "enemy_fast_a_long_rate",
+            "a_long_first_contact_time"
+          ]
+        }
+      ],
+      "confidence": "draft",
+      "needs_validation": true,
+      "source_refs": [
+        "expert_draft",
+        "community_callouts",
+        "awpy_docs"
+      ]
+    },
+    {
+      "id": "dust2_ct_a_long_pressure",
+      "name": "CT A 大前压",
+      "map": "de_dust2",
+      "side": "CT",
+      "category": "aggression",
+      "summary": "CT 主动用闪光和身位前压 A 大，争取首杀或打断 T 的 A 大默认控图。",
+      "required_zone_presence": [
+        "a_long",
+        "long_doors",
+        "a_long_pit"
+      ],
+      "required_spawn_slots": [
+        "ct_a_long_anchor"
+      ],
+      "economy_requirements": {
+        "min_rifles": 2,
+        "needs_smoke": false,
+        "needs_flash": true,
+        "preferred_buy": [
+          "full_buy",
+          "force_with_rifles"
+        ]
+      },
+      "required_utility": [
+        "dust2_util_ct_a_long_push_flash"
+      ],
+      "optional_utility": [],
+      "steps": [
+        {
+          "order": 1,
+          "role": "a_long_pusher",
+          "action": "throw_utility",
+          "utility_id": "dust2_util_ct_a_long_push_flash",
+          "deadline_seconds": 6.0,
+          "zone_id": "a_long"
+        },
+        {
+          "order": 2,
+          "role": "a_long_pusher",
+          "action": "push_to_contact",
+          "zone_id": "long_doors",
+          "deadline_seconds": 9.0
+        },
+        {
+          "order": 3,
+          "role": "support",
+          "action": "trade_or_fallback",
+          "zone_id": "a_long_pit",
+          "deadline_seconds": 12.0
+        }
+      ],
+      "success_conditions": [
+        "flash_created_contact_advantage",
+        "push_gets_first_kill_or_forces_rotation",
+        "pusher_survives_or_is_traded"
+      ],
+      "failure_modes": [
+        {
+          "code": "blind_push",
+          "description": "闪光没有白到人，仍然单独前压。"
+        },
+        {
+          "code": "overpush_without_trade",
+          "description": "前压第一人死后无人补枪。"
+        },
+        {
+          "code": "push_into_full_eco_advantage",
+          "description": "对面 eco/弱枪时前压收益应更高；强起局前压失败成本更高。"
+        }
+      ],
+      "detection_rules": [
+        "CT 在开局 10 秒内越过 A 大默认防守位。",
+        "A 大前压前有闪光事件。",
+        "前压后出现首杀或 T 方被迫转点。"
+      ],
+      "adaptations": [
+        {
+          "when": "enemy_is_eco_or_low_buy",
+          "recommendation": "可以加快 A 大前压或双人反清，但要保留一名包点回防。",
+          "evidence_required": [
+            "enemy_buy",
+            "enemy_weapon_count"
+          ]
+        },
+        {
+          "when": "enemy_has_full_buy_and_entry_fragile",
+          "recommendation": "停止单人前压，回到默认交叉火力。",
+          "evidence_required": [
+            "enemy_buy",
+            "our_entry_death_pattern"
+          ]
+        }
+      ],
+      "confidence": "draft",
+      "needs_validation": true,
+      "source_refs": [
+        "expert_draft",
+        "community_callouts",
+        "awpy_docs"
+      ]
+    }
+  ]
+}

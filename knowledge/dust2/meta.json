@@ -1,0 +1,42 @@
+{
+  "schema_version": "dust2-knowledge-0.1.0",
+  "status": "draft",
+  "map": "de_dust2",
+  "map_version": "2000933",
+  "scope": "Dust2 only, route A small curated knowledge base",
+  "calibration": {
+    "pos_x": -2476,
+    "pos_y": 3239,
+    "scale": 4.4,
+    "rotate": 1,
+    "source": "local_map_calibration",
+    "world_to_radar": {
+      "x": "(world_x - pos_x) / scale",
+      "y": "(pos_y - world_y) / scale"
+    },
+    "radar_to_world": {
+      "x": "pos_x + radar_x * scale",
+      "y": "pos_y - radar_y * scale"
+    }
+  },
+  "confidence_policy": {
+    "verified": "Checked against a real demo and/or in-game; may drive hard rules.",
+    "community": "From a public guide or widely used convention; needs a demo check before hard blame.",
+    "draft": "Engine bootstrap / expert draft; must not produce definitive blame.",
+    "unknown": "Data unavailable; do not make a claim."
+  },
+  "known_limits": [
+    "Zone centers are approximate and must be calibrated against demo positions.",
+    "Exact utility lineups are not captured yet; only origin/target zones are described.",
+    "A smoke landing in a target zone does not by itself prove that a sightline was blocked.",
+    "Demo data does not include voice communication or intent.",
+    "Dust2 only; other maps must not be inferred from this file."
+  ],
+  "non_goals_for_v0_1": [
+    "ML training",
+    "other maps",
+    "persistent user profiles",
+    "historical opponent database",
+    "pre-aim scoring"
+  ]
+}
