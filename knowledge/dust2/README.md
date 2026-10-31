@@ -89,6 +89,44 @@ For each of the first 5-10 Dust2 demos:
    - Is the stated responsibility supported by evidence?
 7. Update `confidence` and `needs_validation` fields.
 
+## Initial engine module
+
+The first deterministic engine slice lives in:
+
+```text
+backend/src/services/dust2Knowledge.js
+backend/src/services/dust2Tactics.js
+backend/tests/dust2Tactics.test.js
+```
+
+It already supports:
+
+- Dust2-only guard
+- approximate zone lookup from world coordinates
+- early-round zone counts
+- candidate tactic classification for:
+  - A long rush
+  - B tunnel rush
+  - A short split
+  - mid default/fake
+  - CT default
+  - CT A long pressure
+- observed utility matching by target zone
+- basic flash blind outcome counts
+- tactic-template checks for required zones, spawn slots and utility
+- per-round player zone involvement
+
+It deliberately does **not** yet judge economy, opponent tendencies or plan
+quality. Those require calibration and real demo labels.
+
+Offline probe after parsing a demo:
+
+```bash
+cd backend
+node scripts/analyze-dust2-parse.js /tmp/demo-out/parse.json T 12
+node scripts/analyze-dust2-parse.js /tmp/demo-out/parse.json CT
+```
+
 ## What the future rule engine should do with this file
 
 The engine should not ask an LLM to decide whether a tactic was good. It should:

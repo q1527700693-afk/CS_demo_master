@@ -8,7 +8,8 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node --test",
-    "check:dust2": "node scripts/validate-dust2-knowledge.js"
+    "check:dust2": "node scripts/validate-dust2-knowledge.js",
+    "analyze:dust2": "node scripts/analyze-dust2-parse.js"
   },
   "dependencies": {
     "ajv": "^8.20.0",
