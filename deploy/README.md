@@ -64,6 +64,13 @@ DEEPSEEK_MODEL=deepseek-chat
 AI_TIMEOUT_MS=60000
 AI_MAX_TOKENS=2000
 AI_PROMPT_VERSION=coach-1.0.0
+AI_AUTO_ANALYZE=false
+
+# Raw .dem parser dependencies
+DEMO_PARSER_PYTHON=/usr/bin/python3
+DEMO_PARSER_PYTHONPATH=/opt/cs-demo-master/parser/.pydeps
+DEMO_PARSER_SCRIPT=/opt/cs-demo-master/parser/parse_demo.py
+DEMO_PARSER_TIMEOUT_MS=300000
 ```
 
 The SQLite database and storage directories are created automatically.
@@ -116,6 +123,39 @@ deploy/nginx/cs-demo-master-subpath.conf.example
 The frontend is a Vue history-mode SPA, so Nginx must fall back to
 `index.html`. `/api/` and `/uploads/` must be proxied to the Node backend; do
 not serve them from the static directory.
+
+## Raw .dem parser
+
+The raw `.dem` path uses `parser/parse_demo.py` and `awpy`. Install Python 3.11+
+dependencies on the server:
+
+```bash
+cd /opt/cs-demo-master/parser
+python3 -m pip install --target .pydeps awpy
+PYTHONPATH="$PWD/.pydeps" python3 parse_demo.py --check
+```
+
+Expected JSON includes:
+
+```json
+{"ok": true, "awpy": "3.1.1", "polars": "2.1.0"}
+```
+
+The backend also needs a larger upload limit for the exact raw-demo endpoint:
+
+```nginx
+location = /api/v1/demo-analyses {
+    client_max_body_size 513m;
+    proxy_pass http://127.0.0.1:8000;
+    proxy_http_version 1.1;
+    proxy_request_buffering off;
+    proxy_read_timeout 600s;
+    proxy_send_timeout 600s;
+    proxy_set_header Host $host;
+}
+```
+
+The current backend limit is 512 MiB even though the UI text may mention 1 GB.
 
 ## 5. Persistence
 

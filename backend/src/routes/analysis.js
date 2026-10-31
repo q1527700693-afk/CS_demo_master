@@ -12,6 +12,7 @@ const { success, errors } = require('../utils/response');
 const { db, root, directory, VERSION } = require('../services/replayStore');
 const { readGlobalPage } = require('../services/replayGlobal');
 const aiAnalysis = require('../services/aiAnalysis');
+const {pruneAnalysisPackage} = require('../services/replayCleanup');
 const router = express.Router();
 router.use(['/analysis-packages','/analyses','/matches'], authenticate);
 const wrap = fn => (req,res,next) => Promise.resolve(fn(req,res)).catch(next);
@@ -23,7 +24,7 @@ function capacity(owner) {
 }
 async function discard(id) {
     db.prepare('DELETE FROM replay_jobs WHERE id=?').run(id);
-    await fs.promises.rm(directory(id),{recursive:true,force:true});
+    await fs.promises.rm(directory(id),{recursive:true,force:true,maxRetries:5,retryDelay:80});
 }
 function getPackage(owner,id) {
     const p = db.prepare('SELECT * FROM analysis_packages WHERE owner_id=? AND package_id=?').get(owner,id);
@@ -63,7 +64,7 @@ router.post('/analysis-packages', (req,res,next) => {
             await fs.promises.mkdir(dir); await fs.promises.rename(req.file.path,path.join(dir,'package.zip'));
             try { db.prepare("INSERT INTO replay_jobs(id,owner_id,digest,version,kind,created_at,updated_at) VALUES(?,?,?,'import-1.2.0','import',?,?)").run(id,req.user.id,digest,now,now); }
             catch(e) {
-                await fs.promises.rm(dir,{recursive:true,force:true});
+                await fs.promises.rm(dir,{recursive:true,force:true,maxRetries:5,retryDelay:80});
                 if (!db.prepare("SELECT id FROM replay_jobs WHERE owner_id=? AND digest=? AND version='import-1.2.0'").get(req.user.id,digest)) throw e;
             }
             job=db.prepare("SELECT * FROM replay_jobs WHERE owner_id=? AND digest=? AND version='import-1.2.0'").get(req.user.id,digest);
@@ -100,7 +101,8 @@ router.post('/analysis-packages', (req,res,next) => {
 }));
 router.post('/matches/:match/analyses',wrap(async(req,res)=>{
     const key=req.get('Idempotency-Key'), body=req.body;
-    if (!/^[a-zA-Z0-9_-]{1,120}$/.test(key||'') || !body || typeof body.package_id!=='string' || typeof body.target_player_id!=='string' || Object.keys(body).some(k=>!['package_id','target_player_id'].includes(k))) throw errors.invalidParameter('Idempotency-Key, package_id and target_player_id are required');
+    if (!/^[a-zA-Z0-9_-]{1,120}$/.test(key||'') || !body || typeof body.package_id!=='string' || typeof body.target_player_id!=='string' || Object.keys(body).some(k=>!['package_id','target_player_id','replace_previous'].includes(k))) throw errors.invalidParameter('Idempotency-Key, package_id and target_player_id are required');
+    if (body.replace_previous !== undefined && typeof body.replace_previous !== 'boolean') throw errors.invalidParameter('replace_previous must be boolean');
     const canonical=JSON.stringify([req.params.match,body.package_id,body.target_player_id]);
     const existing=db.prepare('SELECT * FROM analysis_runs WHERE owner_id=? AND idempotency_key=?').get(req.user.id,key);
     if (existing) {
@@ -114,7 +116,7 @@ router.post('/matches/:match/analyses',wrap(async(req,res)=>{
     await fs.promises.mkdir(dir);
     try {
         await fs.promises.copyFile(path.join(directory(p.storage_id),'package.zip'),path.join(dir,'package.zip'));
-        await fs.promises.writeFile(path.join(dir,'task.json'),JSON.stringify({analysis_id:id,uploaded_at:p.uploaded_at,manifest:JSON.parse(p.manifest)}));
+        await fs.promises.writeFile(path.join(dir,'task.json'),JSON.stringify({analysis_id:id,uploaded_at:p.uploaded_at,replace_previous:body.replace_previous===true,manifest:JSON.parse(p.manifest)}));
         db.exec('BEGIN IMMEDIATE');
         try {
             getPackage(req.user.id,body.package_id);
@@ -123,7 +125,7 @@ router.post('/matches/:match/analyses',wrap(async(req,res)=>{
             db.exec('COMMIT');
         } catch(e) {db.exec('ROLLBACK');throw e;}
     } catch(e) {
-        await fs.promises.rm(dir,{recursive:true,force:true});
+        await fs.promises.rm(dir,{recursive:true,force:true,maxRetries:5,retryDelay:80});
         const concurrent=db.prepare('SELECT * FROM analysis_runs WHERE owner_id=? AND idempotency_key=?').get(req.user.id,key);
         if (concurrent && concurrent.request_body===canonical) return success(res,run(getRun(req.user.id,concurrent.analysis_id)),'success',202);
         if (concurrent) throw errors.conflict('Idempotency key conflict'); throw e;
@@ -243,7 +245,7 @@ router.get('/analyses/:id/details',wrap(async(req,res)=>{
 router.delete('/analyses/:id',wrap(async(req,res)=>{
     const job=getRun(req.user.id,req.params.id);
     if(job.status==='running') throw errors.conflict('Analysis is running');
-    await discard(job.id);success(res);
+    await discard(job.id);pruneAnalysisPackage(req.user.id,job.package_id);success(res);
 }));
 router.delete('/analysis-packages/:id',wrap(async(req,res)=>{
     const p=getPackage(req.user.id,req.params.id);
@@ -256,7 +258,7 @@ router.delete('/analysis-packages/:id',wrap(async(req,res)=>{
         db.prepare('DELETE FROM replay_jobs WHERE id=?').run(p.storage_id);
         db.exec('COMMIT');
     }catch(e){db.exec('ROLLBACK');throw e;}
-    for(const id of [p.storage_id,...jobs.map(j=>j.id)]) await fs.promises.rm(directory(id),{recursive:true,force:true});
+    for(const id of [p.storage_id,...jobs.map(j=>j.id)]) await fs.promises.rm(directory(id),{recursive:true,force:true,maxRetries:5,retryDelay:80});
     success(res);
 }));
 router.get('/matches/:match/analyses',wrap(async(req,res)=>{

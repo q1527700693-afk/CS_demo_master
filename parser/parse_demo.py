@@ -38,6 +38,7 @@ import sys
 import time
 import traceback
 from typing import Any, Iterable
+from match_time import recorded_match_time
 
 SCHEMA_VERSION = "demo-parse-1.0.0"
 MAX_KILLS = 5000
@@ -153,7 +154,7 @@ def pick_target(stats: list[dict[str, Any]], explicit: str | None, warnings: lis
     if explicit:
         if any(steamid(row.get("steamid")) == explicit for row in known):
             return explicit
-        warnings.append(f"target player {explicit} is not in the demo roster; falling back to the top fragger")
+        raise UsageError(f"target player {explicit} is not in the demo roster")
     if not known:
         return None
     best = max(known, key=lambda row: (row.get("kills") or 0, row.get("adr") or 0))
@@ -302,16 +303,28 @@ def collect(demo: Any, explicit_target: str | None, max_rounds: int, sample_ever
         for row in economy_raw
     ]
 
+    all_samples = collect_samples(demo, index, None, sample_every, truncated, warnings,
+                                  {row["steamid"] for row in stats})
     target_samples: list[dict[str, Any]] = []
     death_snapshots: list[dict[str, Any]] = []
     if target:
-        target_samples = collect_samples(demo, index, target, sample_every, truncated, warnings)
+        target_samples = [s for s in all_samples if s["steamid"] == target]
         death_ticks = {kill["tick"] for kill in kills
                        if kill["victim_steamid"] == target and kill["tick"] is not None}
         death_snapshots = collect_death_snapshots(demo, index, target, death_ticks, truncated)
 
+    all_deaths = []
+    for player in stats:
+        sid = player["steamid"]
+        ticks = {k["tick"] for k in kills if k["victim_steamid"] == sid and k["tick"] is not None}
+        snapshots = death_snapshots if sid == target else collect_death_snapshots(demo, index, sid, ticks, truncated)
+        all_deaths.extend({**snapshot, "steamid": sid} for snapshot in snapshots)
+
     return {
         "header": header,
+        "match_started_at": recorded_match_time(header),
+        "all_player_samples": all_samples,
+        "all_death_snapshots": all_deaths,
         "tick_rate": tick_rate(header, rounds),
         "rounds": rounds,
         "players": [
@@ -341,8 +354,8 @@ def collect(demo: Any, explicit_target: str | None, max_rounds: int, sample_ever
     }
 
 
-def collect_samples(demo: Any, index: RoundIndex, target: str, every: int,
-                    truncated: list[str], warnings: list[str]) -> list[dict[str, Any]]:
+def collect_samples(demo: Any, index: RoundIndex, target: str | None, every: int,
+                    truncated: list[str], warnings: list[str], known: set[str] | None = None) -> list[dict[str, Any]]:
     try:
         frame = demo.snapshots(every=max(8, int(every)))
     except Exception as error:  # pragma: no cover - demo dependent
@@ -350,10 +363,15 @@ def collect_samples(demo: Any, index: RoundIndex, target: str, every: int,
         return []
     samples: list[dict[str, Any]] = []
     for row in frame.to_dicts():
-        if steamid(row.get("steamid")) != target:
+        sid = steamid(row.get("steamid"))
+        if not sid or (target and sid != target) or (known is not None and sid not in known):
             continue
         tick = row.get("tick")
+        if index.at(tick) is None:
+            continue
         samples.append({
+            "steamid": sid,
+            "name": row.get("name"),
             "tick": tick,
             "round_num": index.at(tick),
             "x": row.get("x"),
@@ -361,6 +379,7 @@ def collect_samples(demo: Any, index: RoundIndex, target: str, every: int,
             "z": row.get("z"),
             "yaw": row.get("yaw"),
             "pitch": row.get("pitch"),
+            "side": row.get("side"),
             "velocity": row.get("velocity"),
             "velocity_x": row.get("velocity_x"),
             "velocity_y": row.get("velocity_y"),
@@ -378,8 +397,8 @@ def collect_samples(demo: Any, index: RoundIndex, target: str, every: int,
             "equipment_value": row.get("equipment_value"),
             "money": row.get("money"),
         })
-        if len(samples) >= 40000:
-            truncated.append("target_samples")
+        if len(samples) >= (40000 if target else 400000):
+            truncated.append("target_samples" if target else "all_player_samples")
             break
     return samples
 

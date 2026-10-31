@@ -14,14 +14,15 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const formal = require('./replaySchema');
 
-const VERSION = 'demo-rules-1.0.0';
+const {upgradeDemoAnalysis} = require('./demoCompatibility');
+const VERSION = 'demo-rules-1.2.1';
 const PARSE_SCHEMA = 'demo-parse-1.0.0';
 const SIDES = ['terrorist', 'counter-terrorist'];
 const UTILITY_WEAPONS = new Set([
     'hegrenade', 'flashbang', 'smokegrenade', 'molotov', 'incgrenade', 'decoy'
 ]);
 const MAX_FINDINGS = 400;
-const MAX_SAMPLES_PER_ROUND = 4000;
+const MAX_SAMPLES_PER_ROUND = 20000;
 const MAX_TRAJECTORY_ROUNDS = 64;
 
 function sideLabel(side) {
@@ -103,7 +104,7 @@ function targetTeamSide(payload, targetId) {
 }
 
 /** Speed is derived from consecutive position samples when the demo omits velocity. */
-function movementSummary(samples) {
+function movementSummary(samples, tickRate = 64) {
     const byRound = new Map();
     let measured = 0, total = 0, peak = 0, jumping = 0, walking = 0, scoped = 0;
     for (const sample of samples) {
@@ -120,7 +121,7 @@ function movementSummary(samples) {
         for (let index = 1; index < list.length; index += 1) {
             const previous = list[index - 1], current = list[index];
             if (![previous.x, previous.y, current.x, current.y].every(Number.isFinite)) continue;
-            const dt = (current.tick - previous.tick) / 64;
+            const dt = (current.tick - previous.tick) / (Number(tickRate) || 64);
             if (!(dt > 0)) continue;
             let speed = Math.hypot(current.x - previous.x, current.y - previous.y) / dt;
             if (Number.isFinite(current.velocity_x) && Number.isFinite(current.velocity_y)) {
@@ -534,7 +535,7 @@ function normalize(payload, options = {}) {
     const rounds = payload.rounds || [];
     const score = scoreboard(rounds);
     const buys = buyTypesByRound(payload.round_economy || []);
-    const samples = movementSummary(payload.target_samples || []);
+    const samples = movementSummary(payload.target_samples || [], payload.tick_rate);
     const snapshotEvents = payload.target_death_snapshots || [];
     const findings = [
         ...deathFindings(payload, targetId),
@@ -556,7 +557,7 @@ function normalize(payload, options = {}) {
     }
     const complete = rounds.length > 0 && rounds.every((round) => round.winner_side) &&
         !/surrender/.test(String(rounds.at(-1)?.reason_name || ''));
-    const startedAt = null;
+    const startedAt = options.playedAt || payload.match_started_at || null;
     const teams = [
         { team_id: 'terrorist', name: 'Terrorist', score: score.terrorist },
         { team_id: 'counter_terrorist', name: 'Counter-Terrorist', score: score['counter-terrorist'] }
@@ -585,6 +586,8 @@ function normalize(payload, options = {}) {
         target_player_id: targetId,
         target_selection: options.targetSelection || 'auto_top_fragger',
         match: {
+            started_at: startedAt,
+            started_at_source: startedAt ? (options.playedAtSource || (options.playedAt ? 'user_input' : 'demo')) : 'unknown',
             map: String(payload.header?.map_name || 'unknown'),
             server_name: String(payload.header?.server_name || '').slice(0, 200),
             demo_version: String(payload.header?.demo_version_name || ''),
@@ -647,11 +650,14 @@ function normalize(payload, options = {}) {
                 .map((player) => ({ name: player.name, steamid: player.steamid }))
         }
     };
+    const evidence = evidenceOf(payload, targetId);
+    upgradeDemoAnalysis(details,payload,evidence);
     return {
         details,
         identity,
-        evidence: evidenceOf(payload, targetId),
+        evidence,
         samples: payload.target_samples || [],
+        allSamples: payload.all_player_samples || [],
         grenades: payload.grenades || [],
         keyframes: buildKeyframes(payload, targetId)
     };
@@ -693,17 +699,19 @@ function mapItems(analysis) {
     const byRound = new Map();
     const push = (round, item) => {
         const list = byRound.get(round) || [];
-        if (list.length < MAX_SAMPLES_PER_ROUND) list.push(item);
+        if (list.length < MAX_SAMPLES_PER_ROUND || item.points?.length) list.push(item);
         byRound.set(round, list);
     };
-    for (const sample of analysis.samples) {
+    for (const sample of analysis.allSamples.length ? analysis.allSamples : analysis.samples) {
         if (!Number.isInteger(sample.round_num)) continue;
         push(sample.round_num, {
-            kind: 'player_samples',
+            kind: analysis.allSamples.length ? 'all_player_samples' : 'player_samples',
             round_num: sample.round_num,
             tick: sample.tick,
             state: {
-                steamid: analysis.details.target_player_id,
+                steamid: sample.steamid || analysis.details.target_player_id,
+                side: sample.side ?? null,
+                name: sample.name || analysis.details.players?.find(p => p.steamid === sample.steamid)?.name || analysis.details.target_player.name,
                 x: sample.x, y: sample.y, z: sample.z, yaw: sample.yaw,
                 health: sample.health, armor: sample.armor,
                 velocity_x: sample.velocity_x, velocity_y: sample.velocity_y,
@@ -723,12 +731,14 @@ function mapItems(analysis) {
         if (!Number.isInteger(grenade.round_num) || !grenade.points?.length) continue;
         const owned = grenade.thrower_steamid === analysis.details.target_player_id;
         push(grenade.round_num, {
-            kind: owned ? 'trajectories' : 'unattributed_trajectories',
+            kind: analysis.allSamples.length ? 'all_trajectories' : owned ? 'trajectories' : 'unattributed_trajectories',
             event_id: grenade.event_id,
             round_num: grenade.round_num,
             tick: grenade.tick,
             type: grenade.type,
-            ownership: owned ? 'known' : 'unknown',
+            ownership: grenade.thrower_steamid ? 'known' : 'unknown',
+            start_tick: grenade.point_ticks?.[0] ?? grenade.tick,
+            end_tick: grenade.point_ticks?.at(-1) ?? grenade.tick,
             thrower_player_id: grenade.thrower_steamid ?? null,
             points: grenade.points.map(([x, y, z]) => ({ x, y, z })),
             point_ticks: grenade.point_ticks
@@ -763,7 +773,7 @@ function cloudReport(analysis, options = {}) {
         status,
         match: {
             started_at: details.match.started_at ?? null,
-            started_at_source: 'demo',
+            started_at_source: details.match.started_at_source || 'unknown',
             map: details.match.map,
             tick_rate: details.match.tick_rate,
             complete: details.match.complete,
@@ -837,6 +847,8 @@ async function writeArtifacts(directory, analysis, options = {}) {
             map: analysis.details.match.map,
             score: analysis.details.match.score,
             target_player_id: analysis.details.target_player_id,
+            target_player_name: analysis.details.target_player.name,
+            started_at: analysis.details.match.started_at,
             target_selection: analysis.details.target_selection,
             demo_sha256: analysis.identity.demo_sha256,
             rounds: analysis.details.match.rounds_played

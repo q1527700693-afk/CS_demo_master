@@ -317,7 +317,7 @@ test('re-uploading the same demo reuses the analysis', async () => {
 });
 
 test('a different target player is a separate analysis of the same demo', async () => {
-    const other = await upload(DEMO, { target: '76561198000000009' });
+    const other = await upload(DEMO, { target: '76561198000000002' });
     assert.equal(other.status, 202);
     assert.notEqual(other.body.data.demo_id, demoId);
     assert.equal(other.body.data.target_selection, 'explicit');

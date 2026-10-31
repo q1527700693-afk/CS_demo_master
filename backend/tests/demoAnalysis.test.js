@@ -20,7 +20,7 @@ test('normalizes a parsed demo into modules, findings and key rounds', () => {
     const { result } = analysis();
     const details = result.details;
     assert.equal(details.schema_version, 'report-1.0.0');
-    assert.equal(details.analysis_version, 'demo-rules-1.0.0');
+    assert.equal(details.analysis_version, 'demo-rules-1.2.1');
     assert.equal(details.source.kind, 'demo_file');
     assert.equal(details.source.match_id, `demo-${'a'.repeat(12)}`);
     assert.equal(details.target_player_id, sample.TARGET);

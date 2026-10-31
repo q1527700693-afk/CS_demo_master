@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const { db, directory } = require('./replayStore');
 const aiAnalysis = require('./aiAnalysis');
+const {pruneAnalysisPackage,pruneDemoPerspectives} = require('./replayCleanup');
 
 // Every job kind gets its own wall-clock budget: parsing a demo needs minutes,
 // a ZIP rule pass needs seconds, an AI call is bounded by AI_TIMEOUT_MS.
@@ -57,6 +58,17 @@ function startQueue(options = {}) {
                 const meta = JSON.parse(fs.readFileSync(path.join(directory(job.id), 'report-meta.json'), 'utf8'));
                 db.prepare('UPDATE analysis_runs SET result_status=?,summary=? WHERE analysis_id=?')
                     .run(meta.status, JSON.stringify(meta.summary), job.id);
+                const task = JSON.parse(fs.readFileSync(path.join(directory(job.id),'task.json'),'utf8'));
+                if (task.replace_previous) {
+                    const own = db.prepare('SELECT * FROM analysis_runs WHERE analysis_id=?').get(job.id);
+                    const previous = db.prepare("SELECT j.id,r.package_id FROM replay_jobs j JOIN analysis_runs r ON r.analysis_id=j.id WHERE r.owner_id=? AND r.match_id=? AND r.target_player_id=? AND j.id!=? AND j.status!='running'")
+                        .all(own.owner_id, own.match_id, own.target_player_id, job.id);
+                    for (const old of previous) {
+                        db.prepare('DELETE FROM replay_jobs WHERE id=?').run(old.id);
+                        fs.rmSync(directory(old.id),{recursive:true,force:true,maxRetries:5,retryDelay:80});
+                        pruneAnalysisPackage(own.owner_id,old.package_id);
+                    }
+                }
             } catch (error) { outcome = error.message; status = 'failed'; }
         }
         if (status === 'ready' && job.kind === 'demo') {
@@ -72,12 +84,13 @@ function startQueue(options = {}) {
                         summary: meta.summary,
                         status: meta.status
                     }), job.id);
+                pruneDemoPerspectives(job.id);
             } catch (error) {
                 console.error('Demo report metadata:', error.message);
             }
             // Auto-coaching is opt-in: it costs a provider call and must never
             // delay the deterministic report from becoming available.
-            if (process.env.AI_AUTO_ANALYZE === 'true' && aiAnalysis.isConfigured()) {
+            if (!JSON.parse(job.meta || '{}').skip_auto_ai && JSON.parse(job.meta || '{}').selection_mode !== 'choose' && process.env.AI_AUTO_ANALYZE === 'true' && aiAnalysis.isConfigured()) {
                 try { enqueueDemoAi(job.id); } catch (error) { console.error('AI enqueue:', error.message); }
             }
         }

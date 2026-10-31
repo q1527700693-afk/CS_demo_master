@@ -16,6 +16,7 @@ const { importPackage, saveCloudReport } = require('./cloudReplay');
 const demoParser = require('./demoParser');
 const demoAnalysis = require('./demoAnalysis');
 const aiAnalysis = require('./aiAnalysis');
+const {roster, focusPayload} = require('./demoSelection');
 
 async function readJson(file) {
     return JSON.parse(await fs.readFile(file, 'utf8'));
@@ -38,22 +39,32 @@ async function runAnalysis(dir, onStage, kind = 'analysis') {
 async function runDemo(dir, onStage) {
     const task = await readJson(path.join(dir, 'task.json'));
     onStage({ stage: 'parsing' });
-    const payload = await demoParser.parseDemo({
+    let payload = task.cached_parse ? await readJson(path.join(dir, 'parse.json')) : await demoParser.parseDemo({
         input: path.join(dir, 'match.dem'),
         output: path.join(dir, 'parse.json'),
         targetPlayer: task.target_player_id || undefined,
         maxRounds: task.max_rounds || undefined
     });
+    if (task.selection_mode === 'choose') {
+        await fs.writeFile(path.join(dir, 'roster.json'), JSON.stringify({players:roster(payload),map:payload.header.map_name,started_at:payload.match_started_at || null}));
+        await fs.writeFile(path.join(dir, 'report-meta.json'), JSON.stringify({status:'awaiting_player',summary:{map:payload.header.map_name,started_at:payload.match_started_at || null,demo_sha256:payload.demo.sha256}}));
+        return;
+    }
+    if (task.target_player_id) payload = focusPayload(payload, task.target_player_id);
     onStage({ stage: 'analyzing' });
     const analysis = demoAnalysis.normalize(payload, {
         analysisId: task.analysis_id,
         uploadedAt: task.uploaded_at,
+        playedAt: task.played_at,
+        playedAtSource: task.played_at_source,
         targetSelection: task.target_selection || 'auto_top_fragger'
     });
     onStage({ stage: 'reporting' });
     await demoAnalysis.writeArtifacts(dir, analysis, {
         analysisId: task.analysis_id,
         uploadedAt: task.uploaded_at,
+        playedAt: task.played_at,
+        playedAtSource: task.played_at_source,
         aiConfigured: aiAnalysis.isConfigured()
     });
 }

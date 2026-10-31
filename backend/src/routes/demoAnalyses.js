@@ -22,8 +22,10 @@ const { success, errors, ApiError, CODES } = require('../utils/response');
 const { db, root, directory } = require('../services/replayStore');
 const demoParser = require('../services/demoParser');
 const aiAnalysis = require('../services/aiAnalysis');
+const {selectPerspective, roster} = require('../services/demoSelection');
 const { enqueueDemoAi } = require('../services/replayQueue');
 
+const VISIBLE = `kind='demo' AND owner_id=? AND (coalesce(json_extract(meta,'$.selection_mode'),'')!='choose' OR NOT EXISTS (SELECT 1 FROM replay_jobs child WHERE child.owner_id=replay_jobs.owner_id AND child.kind='demo' AND coalesce(json_extract(child.meta,'$.selection_mode'),'')!='choose' AND json_extract(child.meta,'$.demo_sha256')=json_extract(replay_jobs.meta,'$.demo_sha256')))`;
 const router = express.Router();
 router.use(authenticate);
 
@@ -71,7 +73,8 @@ function aiStatus(row) {
 
 function publicDemo(row) {
     const meta = metaOf(row);
-    const status = row.status === 'ready' ? 'completed'
+    const choosing = meta.selection_mode === 'choose';
+    const status = row.status === 'ready' ? (choosing ? 'awaiting_player' : 'completed')
         : row.status === 'failed' ? 'failed'
             : ['parsing', 'analyzing', 'reporting'].includes(row.stage) ? row.stage : 'queued';
     return {
@@ -79,8 +82,10 @@ function publicDemo(row) {
         status,
         stage: row.stage,
         progress: row.status === 'ready' ? 100 : null,
-        message: row.error || (row.status === 'ready' ? '报告已保存' : row.stage),
-        report_available: row.status === 'ready',
+        message: row.error || (row.status === 'ready' ? (choosing ? '请选择分析玩家' : '报告已保存') : row.stage),
+        report_available: row.status === 'ready' && !choosing,
+        roster_available: row.status === 'ready',
+        started_at: meta.played_at || meta.summary?.started_at || null,
         target_player_id: meta.target_player_id ?? null,
         target_selection: meta.target_selection ?? 'auto_top_fragger',
         file_name: meta.file_name ?? null,
@@ -154,6 +159,7 @@ router.get('/parser', wrap(async (req, res) => {
     const status = await demoParser.probe({ force: req.query.refresh === '1' });
     success(res, {
         available: status.available,
+        capabilities: ['player_selection','full_player_map','record_delete'],
         python: status.python,
         awpy: status.awpy,
         polars: status.polars,
@@ -193,6 +199,8 @@ router.post('/', (req, res, next) => {
             throw errors.invalidParameter('target_player_id must be a SteamID64');
         }
         const target = requested ? String(requested) : '';
+        const choosing = req.body?.selection_mode === 'choose';
+        if (req.body?.selection_mode && !choosing) throw errors.invalidParameter('Invalid selection_mode');
 
         const status = await demoParser.probe();
         if (!status.available) {
@@ -202,7 +210,7 @@ router.post('/', (req, res, next) => {
 
         const hash = crypto.createHash('sha256');
         for await (const chunk of fs.createReadStream(temp)) hash.update(chunk);
-        const digest = `${hash.digest('hex')}:${target || 'auto'}`;
+        const digest = `${hash.digest('hex')}:${choosing ? 'source-1.2.1' : target || 'auto'}`;
 
         const existing = db.prepare("SELECT * FROM replay_jobs WHERE owner_id=? AND digest=? AND version=?")
             .get(req.user.id, digest, DEMO_VERSION);
@@ -224,6 +232,7 @@ router.post('/', (req, res, next) => {
         await fsp.rename(temp, path.join(dir, 'match.dem'));
         await fsp.writeFile(path.join(dir, 'task.json'), JSON.stringify({
             analysis_id: id,
+            selection_mode: choosing ? 'choose' : null,
             uploaded_at: now,
             target_player_id: target || null,
             target_selection: target ? 'explicit' : 'auto_top_fragger',
@@ -234,6 +243,8 @@ router.post('/', (req, res, next) => {
             db.prepare(`INSERT INTO replay_jobs(id,owner_id,digest,version,kind,status,stage,created_at,updated_at,meta)
                         VALUES(?,?,?,?,'demo','queued','queued',?,?,?)`).run(id, req.user.id, digest, DEMO_VERSION, now, now,
                 JSON.stringify({
+                    selection_mode: choosing ? 'choose' : null,
+                    demo_sha256: digest.split(':')[0],
                     file_name: file.originalname?.slice(0, 120) || 'match.dem',
                     size_bytes: file.size,
                     target_player_id: target || null,
@@ -258,13 +269,28 @@ router.get('/', wrap(async (req, res) => {
     if (!Number.isSafeInteger(page) || page < 1 || page > 100000 || !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) {
         throw errors.invalidParameter('Invalid pagination');
     }
-    const total = db.prepare("SELECT count(*) AS n FROM replay_jobs WHERE kind='demo' AND owner_id=?").get(req.user.id).n;
-    const rows = db.prepare("SELECT * FROM replay_jobs WHERE kind='demo' AND owner_id=? ORDER BY created_at DESC LIMIT ? OFFSET ?")
+    const total = db.prepare(`SELECT count(*) AS n FROM replay_jobs WHERE ${VISIBLE}`).get(req.user.id).n;
+    const rows = db.prepare(`SELECT * FROM replay_jobs WHERE ${VISIBLE} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
         .all(req.user.id, pageSize, (page - 1) * pageSize);
     success(res, { items: rows.map(publicDemo), page, pageSize, total });
 }));
 
 router.get('/:id', wrap(async (req, res) => success(res, publicDemo(demoRow(req.user.id, req.params.id)))));
+
+router.get('/:id/players', wrap(async (req, res) => {
+    const row = demoRow(req.user.id, req.params.id);
+    if (row.status !== 'ready') throw errors.conflict('Demo is still parsing');
+    const payload = JSON.parse(await fsp.readFile(path.join(directory(row.id), 'parse.json'), 'utf8'));
+    const meta = metaOf(row);
+    success(res, {players:roster(payload),map:payload.header.map_name,started_at:meta.played_at || payload.match_started_at || null});
+}));
+router.post('/:id/analyses', wrap(async (req, res) => {
+    const row = demoRow(req.user.id, req.params.id);
+    if (typeof req.body?.target_player_id !== 'string') throw errors.invalidParameter('Select a player');
+    if (req.body.force !== undefined && typeof req.body.force !== 'boolean') throw errors.invalidParameter('force must be boolean');
+    const run = await selectPerspective(row, req.body.target_player_id, req.body.played_at, req.body.force === true);
+    success(res, publicDemo(run), run.status === 'ready' ? 'success' : 'queued', run.status === 'ready' ? 200 : 202);
+}));
 
 router.get('/:id/report', wrap(async (req, res) => {
     const { dir } = readyDir(req);
@@ -392,6 +418,17 @@ router.delete('/:id', wrap(async (req, res) => {
     }
     for (const id of [row.id, ...aiJobs.map((job) => job.id)]) {
         await fsp.rm(directory(id), { recursive: true, force: true });
+    }
+    const sha = metaOf(row).demo_sha256;
+    if (sha) {
+        const remaining = db.prepare("SELECT count(*) AS n FROM replay_jobs WHERE kind='demo' AND owner_id=? AND json_extract(meta,'$.demo_sha256')=? AND coalesce(json_extract(meta,'$.selection_mode'),'')!='choose'").get(req.user.id,sha).n;
+        if (!remaining) {
+            const sources=db.prepare("SELECT id FROM replay_jobs WHERE kind='demo' AND owner_id=? AND json_extract(meta,'$.demo_sha256')=? AND json_extract(meta,'$.selection_mode')='choose' AND status!='running'").all(req.user.id,sha);
+            for (const source of sources) {
+                db.prepare('DELETE FROM replay_jobs WHERE id=?').run(source.id);
+                await fsp.rm(directory(source.id),{recursive:true,force:true,maxRetries:5,retryDelay:80});
+            }
+        }
     }
     success(res);
 }));
