@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { AnalysisReport, ReplayDetails } from './contracts'
+import type { AnalysisReport, ReplayDetails, ReplayEvent } from './contracts'
 import { valueText, weaponName, type ReviewFocus } from './review-presentation'
+import { utilityDamage } from './combat-facts'
 import ReviewFocusList from './ReviewFocusList.vue'
 const props = defineProps<{
   report: AnalysisReport
   details: ReplayDetails | null
   focuses: ReviewFocus[]
+  events?: ReplayEvent[]
+  eventsAvailable?: boolean
 }>()
 defineEmits<{ focus: [focus: ReviewFocus] }>()
 const filter = ref('all'),
   focusPage = ref(1)
 watch(filter, () => (focusPage.value = 1))
 const utility = computed(() => props.report.report.modules.utility?.metrics)
+const damage = computed(() => utilityDamage(props.events || [], props.report.target_player_id))
 const death = computed(() => props.report.report.modules.death_context?.metrics)
 const flashes = computed(() => [
   { label: '敌方致盲', value: utility.value?.enemies_blinded, color: '#9ccbb5' },
@@ -31,14 +35,26 @@ const deathRows = computed(() => [
 ])
 const throws = computed(() =>
   (props.details?.statistics.tables?.by_weapon || []).filter((w) =>
-    ['flashbang', 'smokegrenade', 'hegrenade', 'molotov', 'incgrenade', 'decoy'].includes(w.weapon),
+    [
+      'flashbang',
+      'smokegrenade',
+      'hegrenade',
+      'molotov',
+      'incgrenade',
+      'inferno',
+      'decoy',
+    ].includes(w.weapon),
   ),
 )
 const filtered = computed(() =>
   props.focuses.filter(
     (f) =>
       filter.value === 'all' ||
-      (filter.value === 'flash' ? f.rule.includes('flash') : f.rule.startsWith('death_')),
+      (filter.value === 'flash'
+        ? f.rule.includes('flash')
+        : filter.value === 'team'
+          ? f.rule === 'team_kill'
+          : f.rule.startsWith('death_')),
   ),
 )
 </script>
@@ -48,7 +64,7 @@ const filtered = computed(() =>
       <header class="review-section-heading">
         <div>
           <h2>闪光效果</h2>
-          <p>统计命中人次，同一人可多次计入</p>
+          <p>仅统计持续至少 0.5 秒的有效致盲；微白保留在详细事件中</p>
         </div>
       </header>
       <div class="utility-totals">
@@ -100,6 +116,29 @@ const filtered = computed(() =>
       </div>
     </section>
   </div>
+  <section class="review-panel throw-panel">
+    <header class="review-section-heading">
+      <div>
+        <h2>手雷与燃烧伤害</h2>
+        <p>仅计对敌伤害，优先使用有效生命伤害；缺少有效值时使用原始伤害。队伤单列。</p>
+      </div>
+    </header>
+    <div class="utility-totals">
+      <div>
+        <strong>{{ eventsAvailable ? valueText(damage.he, 0) : '—' }}</strong
+        ><span>高爆手雷伤害</span>
+      </div>
+      <div>
+        <strong>{{ eventsAvailable ? valueText(damage.fire, 0) : '—' }}</strong
+        ><span>燃烧伤害</span>
+      </div>
+      <div>
+        <strong>{{ eventsAvailable ? valueText(damage.team, 0) : '—' }}</strong
+        ><span>道具误伤队友</span>
+      </div>
+    </div>
+    <p v-if="!eventsAvailable" class="review-empty">伤害事件未载入，请重新读取报告。</p>
+  </section>
   <section v-if="throws.length" class="review-panel throw-panel">
     <header class="review-section-heading">
       <div>
@@ -139,6 +178,7 @@ const filtered = computed(() =>
         <option value="all">全部重点（{{ focuses.length }}）</option>
         <option value="flash">闪光配合</option>
         <option value="death">阵亡状态</option>
+        <option value="team">误杀队友（TK）</option>
       </select>
     </header>
     <ReviewFocusList

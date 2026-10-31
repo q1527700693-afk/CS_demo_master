@@ -1,18 +1,17 @@
-# 前端 v1.0.3 交接说明
+## Current v1.2.1 follow-up
 
-此文件夹包含完整的前端源码和训练小游戏运行文件；已包含 v1.0.1 的公网 HTTP 复盘页修复。
+Names and preview lists now use `#01 · nickname · map`. Calendar labels and date inputs were removed from both raw Demo channels; the frontend no longer submits `played_at`. Internal processing timestamps remain available for ordering and compatibility.
 
-## 本次修复
+Overview records now use the same complete cloud/ZIP/native perspective loader as My Replays. Background completion, deletion, returning to the window and the refresh button update recent reports and metrics. Available per-player statistics are used without copying another perspective's latest values. Both delete buttons are red.
 
-- 五种训练小游戏结束后均可进入最终得分页。普通 HTTP 地址下，浏览器可能不提供 `crypto.randomUUID()`；现在会用安全随机字节生成成绩编号。
-- 移除“自由指针”设置项及对应的准星、手枪跟随鼠标和射线判定代码。四种瞄准小游戏只使用第一人称鼠标锁定；反应测试仍使用点击或键盘输入。
-- 鼠标锁定失败或多次按 ESC 后不会切换操控方式，失败时提示重试。旧浏览器设置若保存过“自由指针”，新版会自动按第一人称读取；已有第一人称成绩保留，旧自由指针成绩不再显示。
-- 小球在手和枪模型之后绘制，避免被它们遮挡。
+The shared frontend changes apply to browser and Electron channels. Previous cloud and native parser fixes remain in place; the installed desktop binaries have not been rebuilt. Git changes remain uncommitted and unpushed.
 
-## 更新到仓库和服务器
+# v1.2.1
 
-把**本文件夹里面的内容**复制到仓库的 `frontend/` 目录并覆盖同名文件，提交到 `front_end` 分支。不要把 `front_end_v1.0.3` 整个文件夹再嵌套进 `frontend/`。
+Two-step roster selection, full-player maps, correct match-time labels, perspective replacement/deletion and upload state reset are implemented. See [v1.2.1 integration](docs/CLOUD-DEMO-v1.2.1.md). Frontend/local-parser sources and the required cloud-backend delta patch are included; preserve existing production ZIP combat fixes. GitHub changes are intentionally left uncommitted and unpushed for the owner to review.
 
-后端同学拉取新提交后，在 `frontend/` 运行 `pnpm install --frozen-lockfile` 和 `pnpm build`，用新 `dist/` 替换服务器前端静态文件。请确认服务器没有继续使用旧静态资源缓存，浏览器刷新后测试五个模式的结算、ESC 和小球显示。线上验证通过后，可给该提交打 `frontend-v1.0.3` 标签；旧标签保持不变。建议服务器后续启用 HTTPS。
+# Frontend v1.2.0 handoff
 
-此包不含 `node_modules`、`dist`、`.env.local`、测试输出和后端服务。无需复制原工作区的 `training` 目录；`public/vector-trainer/` 已包含完整的训练运行副本。其他启动和联调说明见 [README.md](README.md)。
+Copy this folder contents into frontend/ without nesting a version folder. Build with VITE_MOCK_AUTH=false, VITE_MOCK_PROFILE=false and VITE_MOCK_REPLAY=false. Do not copy node_modules, local environment files, SSH keys or test output.
+
+See docs/CLOUD-DEMO-v1.2.0.md for runtime channels, independent player history, required backend interfaces, compatibility patch and validation. The raw-demo-capable backend must be deployed before browser uploads become available. ZIP imports remain supported.

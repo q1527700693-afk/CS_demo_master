@@ -98,6 +98,7 @@ export interface ReplayEvent {
 }
 export interface RoundStatistics {
   round_num: number
+  team_kills?: number | null
   kills?: number | null
   deaths?: number | null
   assists?: number | null
@@ -109,6 +110,7 @@ export interface RoundStatistics {
 export interface WeaponStatistics {
   weapon: string
   shots?: number | null
+  team_kills?: number | null
   kills?: number | null
   deaths?: number | null
   raw_health_damage_dealt?: number | null
@@ -118,15 +120,25 @@ export interface DetailedRound {
   round_num: number
   winner_side?: string | null
   target_side?: string | null
+  target_start_state?: { side?: string | null; steamid?: string | null } | null
   team_economy?: { side: string; equipment_value: number | null; buy_type?: string }[]
   target_summary?: RoundStatistics
 }
 export interface ReplayDetails {
+  analysis_version?: string
+  players?: { player_id: string; name: string }[]
+  match?: { map?: string; tick_rate?: number; started_at?: string | null }
   export_scope?: { scope: string }
-  source: { match_id: string; package_id: string }
+  source: {
+    match_id: string
+    package_id: string
+    kind?: string
+    demo?: { sha256: string; file_name?: string }
+  }
   target_player_id: string
   target_player?: { player_id: string; name: string; team_id?: string | null }
   statistics: {
+    modules?: Record<string, AnalysisModule>
     tables?: { per_round?: RoundStatistics[]; by_weapon?: WeaponStatistics[] }
     source_player_stats?: Record<string, number | null>
     definitions?: Record<string, string>
@@ -192,16 +204,13 @@ export interface ReplayMapItem {
 }
 export interface RoundDetail extends DetailedRound {
   start_tick: number | null
-  end_tick: number
+  end_tick: number | null
   freeze_end_tick?: number | null
-  target_start_state?: { side?: string | null }
   events: ReplayEvent[]
   finding_ids: string[]
 }
 
-
-export type AiStatus = 'completed' | 'not_generated' | 'not_configured'
-
+export type AiStatus = 'completed' | 'not_generated' | 'not_configured' | 'queued'
 export interface AiImprovementArea {
   priority: 'high' | 'medium' | 'low'
   category: string
@@ -210,14 +219,15 @@ export interface AiImprovementArea {
   explanation: string
   training: string[]
 }
-
 export interface AiStrength {
   title: string
   evidence_ids: string[]
   explanation: string
 }
-
 export interface AiCoachReport {
+  queued?: boolean
+  stage?: string | null
+  last_error?: string | null
   ai_status: AiStatus
   analysis_id?: string
   model?: string

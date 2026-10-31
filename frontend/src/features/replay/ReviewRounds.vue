@@ -10,6 +10,7 @@ import {
   isTargetEvent,
   type ReviewFocus,
 } from './review-presentation'
+import { MIN_EFFECTIVE_BLIND_SECONDS } from './combat-facts'
 import RoundMap from './RoundMap.vue'
 import ReviewFocusList from './ReviewFocusList.vue'
 const props = defineProps<{
@@ -34,7 +35,9 @@ const roundEvents = computed(() =>
         e.round_num === props.round &&
         (eventScope.value === 'all' ||
           (['kill', 'blind', 'death_context'].includes(e.type) &&
-            isTargetEvent(e, props.report.target_player_id)) ||
+            isTargetEvent(e, props.report.target_player_id) &&
+            (e.type !== 'blind' ||
+              Number(e.data.record?.duration) >= MIN_EFFECTIVE_BLIND_SECONDS)) ||
           (e.type === 'bomb_action' &&
             [
               'finish_plant',

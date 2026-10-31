@@ -78,7 +78,8 @@ describe('review facts and localized presentation', () => {
       observation: '队友甲 被致盲 4.11 秒',
       evidenceIds: ['blind_1'],
     })
-    expect(focuses[1]!.priority).toBe(0)
+    expect(focuses).toHaveLength(1)
+    expect(events).toHaveLength(2) // short flash remains in raw evidence
     expect(focuses[0]!.action).not.toMatch(/可能|不代表|是否失误/)
   })
   it('lists actual unused inventory without inventing counts or fault judgments', () => {

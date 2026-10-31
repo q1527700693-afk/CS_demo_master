@@ -256,6 +256,9 @@
 .review-dashboard .loss-dot {
   background: #946b73;
 }
+.review-dashboard .unknown-dot {
+  background: #2e3c48;
+}
 .review-dashboard .round-strip {
   display: flex;
   gap: 5px;

@@ -4,6 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import AsyncState from '@/components/AsyncState.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import { mockModules } from '@/app/config'
+import { isDesktopRuntime } from '@/app/runtime'
+import { isCloudAnalysis } from './cloud-api'
+import { analysisName } from './analysis-name'
+import { loadAnalysisEntries } from './analysis-entries'
+import { useUploadTask } from './upload-task'
 import { useReplayReport } from './useReplayReport'
 import {
   mapName,
@@ -25,6 +30,10 @@ import './review.css'
 const route = useRoute(),
   router = useRouter()
 const {
+  ai,
+  aiError,
+  aiLoading,
+  generateAi,
   report,
   details,
   events,
@@ -36,10 +45,6 @@ const {
   detailsError,
   eventsError,
   historyError,
-  ai,
-  aiError,
-  aiLoading,
-  generateAi,
   actionError,
   retrying,
   load,
@@ -59,6 +64,50 @@ async function showInfo() {
     info.value.open = true
     info.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
+}
+const uploadTask = useUploadTask()
+const selectedTarget = ref('')
+const reportSequence = ref<number>()
+watch(
+  () => report.value?.analysis_id,
+  async (id, _previous, cleanup) => {
+    let active = true
+    cleanup(() => (active = false))
+    reportSequence.value = undefined
+    if (!id) return
+    try {
+      const { entries } = await loadAnalysisEntries()
+      if (active) reportSequence.value = entries.find((item) => item.id === id)?.sequence
+    } catch {
+      /* Reports remain readable if history is temporarily unavailable. */
+    }
+  },
+  { immediate: true },
+)
+const reportTitle = computed(() =>
+  report.value
+    ? analysisName(
+        details.value?.target_player?.name || report.value.target_player_id,
+        report.value.match.map,
+        reportSequence.value,
+      )
+    : '',
+)
+const otherPlayers = computed(() => [
+  ...new Map(
+    (details.value?.players || [])
+      .filter((p) => p.player_id !== report.value?.target_player_id)
+      .map((p) => [p.player_id, p]),
+  ).values(),
+])
+async function analyzePlayer() {
+  if (!report.value || !selectedTarget.value) return
+  const cloud = isCloudAnalysis(report.value.analysis_id)
+  const target = selectedTarget.value
+  const file = details.value?.source.demo?.file_name || ''
+  if (cloud && !isDesktopRuntime())
+    await router.push({ path: '/replays/new', query: { target, source: report.value.analysis_id } })
+  else await router.push({ path: '/replays/new', query: { target, file } })
 }
 const player = computed(() => details.value?.target_player?.name || '分析对象')
 const basic = computed(() => report.value?.report.modules.basic_stats?.metrics)
@@ -185,14 +234,8 @@ watch(rows, (value) => {
             <div class="map-emblem"><AppIcon name="map" :size="28" /></div>
             <div>
               <p class="match-caption">比赛复盘 <span>／</span> {{ mapName(report.match.map) }}</p>
-              <h1>{{ player }}<span>个人比赛报告</span></h1>
-              <p class="match-subline">
-                {{ rows.length || '—' }} 个已记录回合<span v-if="report.match.started_at">
-                  · {{ new Date(report.match.started_at).toLocaleDateString('zh-CN') }}</span
-                ><span v-else>
-                  · {{ new Date(report.uploaded_at).toLocaleDateString('zh-CN') }} 导入</span
-                >
-              </p>
+              <h1 class="analysis-title">{{ reportTitle }}</h1>
+              <p class="match-subline">{{ rows.length || '—' }} 个已记录回合</p>
             </div>
           </div>
           <div v-if="ownTeam && otherTeam" class="match-score">
@@ -205,13 +248,46 @@ watch(rows, (value) => {
               <span>{{ /^队伍/.test(otherTeam.name) ? '对方' : otherTeam.name }}</span
               ><strong class="opponent-score">{{ otherTeam.score ?? '—' }}</strong>
             </div>
-            <small>{{ report.match.complete ? '最终比分' : '记录比分' }}</small>
+            <small>{{
+              isCloudAnalysis(report.analysis_id)
+                ? '按阵营记录胜局'
+                : report.match.complete
+                  ? '最终比分'
+                  : '记录比分'
+            }}</small>
           </div>
         </header>
+        <section
+          v-if="report && isCloudAnalysis(report.analysis_id) && otherPlayers.length"
+          class="review-panel perspective-picker"
+        >
+          <div>
+            <strong>同一 Demo，换个视角复盘</strong>
+            <p class="muted small-text">为其他玩家新建独立分析，当前报告和历史记录均保留。</p>
+          </div>
+          <select v-model="selectedTarget" aria-label="分析其他玩家">
+            <option value="" disabled>选择另一位玩家</option>
+            <option v-for="p in otherPlayers" :key="p.player_id" :value="p.player_id">
+              {{ p.name }} · {{ p.player_id }}
+            </option>
+          </select>
+          <button
+            class="button primary compact"
+            :disabled="!selectedTarget || uploadTask.busy"
+            @click="analyzePlayer"
+          >
+            新建该玩家的分析
+          </button>
+        </section>
         <div v-if="rows.length" class="round-strip-panel">
           <div class="round-strip-heading">
             <span>回合走势 <small>点击回合进入地图</small></span>
-            <div><i class="win-dot" />获胜<i class="loss-dot" />失利</div>
+            <div>
+              <i class="win-dot" />获胜<i class="loss-dot" />失利
+              <template v-if="rows.some((round) => round.outcome === '未知')">
+                <i class="unknown-dot" />未记录
+              </template>
+            </div>
           </div>
           <div class="round-strip" aria-label="回合胜负时间线">
             <button
@@ -301,6 +377,8 @@ watch(rows, (value) => {
           :report="report"
           :details="details"
           :focuses="focuses"
+          :events="events"
+          :events-available="!eventsError"
           @focus="selectFocus"
         />
         <ReviewAi
@@ -308,6 +386,9 @@ watch(rows, (value) => {
           :ai="ai"
           :loading="aiLoading"
           :error="aiError"
+          :legacy="!!details?.analysis_version && /^rules-1\.[01]\./.test(details.analysis_version)"
+          :retrying="retrying"
+          @reanalyze="reanalyze"
           @generate="generateAi"
         />
         <template v-else
@@ -376,3 +457,23 @@ watch(rows, (value) => {
     >
   </div>
 </template>
+
+<style scoped>
+.analysis-title {
+  font-size: clamp(19px, 2vw, 28px);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.perspective-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.perspective-picker select {
+  max-width: 100%;
+  width: auto;
+  flex: 1 1 240px;
+}
+</style>

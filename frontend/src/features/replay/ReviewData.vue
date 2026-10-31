@@ -64,7 +64,8 @@ watch([eventRound, eventType, search], () => {
             <th>回合</th>
             <th>阵营</th>
             <th>结果</th>
-            <th>击杀</th>
+            <th>对敌击杀</th>
+            <th>TK</th>
             <th>死亡</th>
             <th>助攻</th>
             <th :title="metricDefinitions.raw_damage">原始伤害 ⓘ</th>
@@ -84,6 +85,7 @@ watch([eventRound, eventType, search], () => {
               {{ r.outcome === '未知' ? '—' : r.outcome }}
             </td>
             <td>{{ valueText(r.stats.kills, 0) }}</td>
+            <td>{{ valueText(r.stats.team_kills, 0) }}</td>
             <td>{{ valueText(r.stats.deaths, 0) }}</td>
             <td>{{ valueText(r.stats.assists, 0) }}</td>
             <td>{{ valueText(r.stats.raw_health_damage_dealt, 0) }}</td>

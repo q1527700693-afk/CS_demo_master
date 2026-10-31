@@ -6,8 +6,10 @@ const props = defineProps<{
   ai: AiCoachReport | null
   loading: boolean
   error: string
+  legacy?: boolean
+  retrying?: boolean
 }>()
-const emit = defineEmits<{ generate: [] }>()
+const emit = defineEmits<{ generate: []; reanalyze: [] }>()
 
 const categoryLabels: Record<string, string> = {
   utility: '道具',
@@ -23,9 +25,7 @@ const priorityLabels: Record<string, string> = {
   medium: '值得关注',
   low: '可继续观察',
 }
-const showGenerate = computed(
-  () => !props.ai || props.ai.ai_status === 'not_generated',
-)
+const showGenerate = computed(() => !props.ai || props.ai.ai_status === 'not_generated')
 </script>
 
 <template>
@@ -41,6 +41,18 @@ const showGenerate = computed(
       </span>
     </header>
 
+    <div v-if="legacy" class="ai-notice">
+      <strong>先更新这份报告的统计规则</strong>
+      <p>
+        这份报告生成于 TK 与短暂微白修复之前。请重新分析，再生成 AI 解读；已有 AI 内容仅供查看。
+      </p>
+      <button class="button secondary compact" :disabled="retrying" @click="emit('reanalyze')">
+        {{ retrying ? '正在创建任务…' : '按新规则重新分析' }}
+      </button>
+    </div>
+    <p v-if="loading" class="ai-notice" role="status">
+      AI 正在排队或生成，可先查看规则报告；生成结果会自动载入。
+    </p>
     <p v-if="error" role="alert" class="ai-alert">{{ error }}</p>
 
     <div v-if="ai?.ai_status === 'not_configured'" class="ai-notice">
@@ -48,11 +60,11 @@ const showGenerate = computed(
       <p>服务器没有配置模型 API Key。规则报告、回合复盘和详细数据仍可正常使用。</p>
     </div>
 
-    <div v-else-if="showGenerate && !error" class="ai-generate">
+    <div v-else-if="showGenerate && !legacy" class="ai-generate">
       <strong>生成一份针对性的提升建议</strong>
       <p>会分析本场的道具使用、闪光、死亡上下文和规则发现。生成可能需要约 30–60 秒。</p>
-      <button class="button primary" :disabled="loading" @click="emit('generate')">
-        {{ loading ? 'AI 分析中…' : '生成 AI 教练解读' }}
+      <button class="button primary" :disabled="loading || legacy" @click="emit('generate')">
+        {{ loading ? 'AI 分析中…' : error ? '重试生成 AI 解读' : '生成 AI 教练解读' }}
       </button>
     </div>
 
@@ -97,9 +109,16 @@ const showGenerate = computed(
       </section>
 
       <section v-if="ai.strengths?.length" class="ai-block">
-        <div class="ai-block-head"><h3>做得好的地方</h3><span>{{ ai.strengths.length }} 项</span></div>
+        <div class="ai-block-head">
+          <h3>做得好的地方</h3>
+          <span>{{ ai.strengths.length }} 项</span>
+        </div>
         <div class="ai-grid">
-          <article v-for="strength in ai.strengths" :key="strength.title" class="ai-area ai-strength">
+          <article
+            v-for="strength in ai.strengths"
+            :key="strength.title"
+            class="ai-area ai-strength"
+          >
             <h4>{{ strength.title }}</h4>
             <p>{{ strength.explanation }}</p>
             <div v-if="strength.evidence_ids.length" class="ai-evidence">
@@ -120,7 +139,7 @@ const showGenerate = computed(
       <footer class="ai-footer">
         <span>模型：{{ ai.model || '—' }}</span>
         <span>提示词版本：{{ ai.prompt_version || '—' }}</span>
-        <button class="review-text-button" :disabled="loading" @click="emit('generate')">
+        <button class="review-text-button" :disabled="loading || legacy" @click="emit('generate')">
           重新生成
         </button>
       </footer>

@@ -144,7 +144,7 @@ export async function saveLocalResult(
       }
     }
     ensureOwner()
-    await local(`${base}/commit`, { keys })
+    await local(`${base}/commit`, { replace_previous: true, keys })
     progress('完整复盘结果已保存到本机')
   })()
   saving.set(taskKey, task)
@@ -153,4 +153,10 @@ export async function saveLocalResult(
   } finally {
     saving.delete(taskKey)
   }
+}
+
+export async function deleteLocalResult(id: string) {
+  const owner = await libraryOwner()
+  if ((await listLocalResults()).some((r) => r.analysis_id === id))
+    await local(`/local/library/${owner}/${encodeURIComponent(id)}/delete`, {})
 }

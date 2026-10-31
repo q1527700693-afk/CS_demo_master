@@ -1,266 +1,35 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import { errorMessage } from '@/api/http'
-import { getMyProfile } from '@/features/profile/api'
-import { downloadReport, getAnalysis, startAnalysis, uploadPackage } from './analysis-api'
-import { companion, validateAnalysisFile, type AutomaticLocalJob } from './automatic-upload'
-import type { AcceptedPackage, StageProgress } from './contracts'
-import type { RosterPlayer } from './player-identity'
+import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { storeToRefs } from 'pinia'
+import { useUploadTask } from './upload-task'
 import ProgressStages from './ProgressStages.vue'
-import { newRequestKey } from './browser-capabilities'
-
-const router = useRouter(),
-  auth = useAuthStore()
-const fileInput = ref<HTMLInputElement>(),
-  file = ref<File | null>(null)
-const busy = ref(false),
-  dragging = ref(false),
-  error = ref(''),
-  analysisId = ref('')
-const players = ref<RosterPlayer[]>([]),
-  choosingPlayer = ref(false),
-  target = ref('')
-const stages = ref<StageProgress[]>([])
-const pendingKey = () => `csdm.pending-analysis.${auth.user?.id || 'guest'}`
-const playerKey = () => `csdm.analysis-player.${auth.user?.id || 'guest'}`
-const fileLabel = computed(() =>
-  file.value ? `${file.value.name} · ${(file.value.size / 1024 ** 2).toFixed(1)} MB` : '',
-)
-let disposed = false,
-  controller = new AbortController(),
-  generated: File | null = null
-let accepted: AcceptedPackage | null = null,
-  requestKey = newRequestKey(),
-  cloudFailed = false
-let resolvePlayer: ((value: string) => void) | undefined
-function resetStages(isDemo = true) {
-  stages.value = [
-    {
-      stage: 'local',
-      label: '解析 Demo',
-      status: isDemo ? 'pending' : 'skipped',
-      percent: null,
-      message: isDemo ? '选择文件后自动开始' : '使用已有分析包',
-    },
-    {
-      stage: 'upload',
-      label: '上传分析数据',
-      status: 'pending',
-      percent: null,
-      message: '解析完成后自动上传',
-    },
-    {
-      stage: 'cloud',
-      label: '生成报告',
-      status: 'pending',
-      percent: null,
-      message: '等待分析结果',
-    },
-    {
-      stage: 'download',
-      label: '打开报告',
-      status: 'pending',
-      percent: null,
-      message: '完成后自动展示',
-    },
-  ]
-}
-resetStages()
-function set(
-  index: number,
-  status: StageProgress['status'],
-  message: string,
-  percent: number | null = null,
-) {
-  if (!disposed && stages.value[index])
-    Object.assign(stages.value[index]!, { status, message, percent })
-}
-const wait = () => new Promise((resolve) => setTimeout(resolve, 700))
-function ensureActive() {
-  if (disposed) throw new DOMException('页面已离开', 'AbortError')
-}
-async function waitLocal(id: string, stage: 'parsed' | 'exported'): Promise<AutomaticLocalJob> {
-  while (true) {
-    ensureActive()
-    const state = await companion.state(id, controller.signal)
-    set(0, 'running', state.message, state.percent)
-    if (state.status === 'failed') throw new Error(state.message)
-    if (state.status === 'completed' && state.stage === stage) return state
-    await wait()
-  }
-}
-async function chooseTarget(roster: RosterPlayer[]): Promise<string> {
-  if (!roster.length) throw new Error('没有读取到玩家名单，请检查 Demo 文件')
-  players.value = roster
-  // A previously explicit selection or the account's bound SteamID can be reused.
-  let preferred = sessionStorage.getItem(playerKey()) || ''
-  if (!roster.some((p) => p.player_id === preferred)) {
-    try {
-      preferred = (await getMyProfile()).steam_id || ''
-    } catch {
-      preferred = ''
-    }
-  }
-  ensureActive()
-  if (preferred && roster.some((p) => p.player_id === preferred)) {
-    target.value = preferred
-    return preferred
-  }
-  choosingPlayer.value = true
-  set(0, 'running', '请选择要分析的玩家，选定后将自动继续')
-  return new Promise((resolve) => (resolvePlayer = resolve))
-}
-function selectPlayer(event: Event) {
-  const id = (event.target as HTMLSelectElement).value
-  if (!resolvePlayer || !players.value.some((p) => p.player_id === id)) return
-  target.value = id
-  sessionStorage.setItem(playerKey(), id)
-  choosingPlayer.value = false
-  const resolve = resolvePlayer
-  resolvePlayer = undefined
-  resolve(id)
-}
-async function parseDemo(source: File): Promise<File> {
-  set(0, 'running', '正在准备解析')
-  const health = await companion.health(controller.signal)
-  if (!health.awpy_available) throw new Error('解析服务尚未准备好，请重新启动本机服务')
-  const job = await companion.start(source, controller.signal, (n) =>
-    set(0, 'running', '正在读取比赛录像', n),
-  )
-  const roster = await waitLocal(job.job_id, 'parsed')
-  const player = await chooseTarget(roster.players || [])
-  ensureActive()
-  set(0, 'running', '正在分析选定玩家')
-  await companion.export(job.job_id, player, controller.signal)
-  const state = await waitLocal(job.job_id, 'exported')
-  if (state.active_target_player_id !== player)
-    throw new Error('分析对象与所选玩家不一致，已停止上传')
-  const blob = await companion.package(job.job_id, player, controller.signal)
-  ensureActive()
-  set(0, 'completed', 'Demo 解析完成', 100)
-  return new File([blob], 'analysis.zip', { type: 'application/zip' })
-}
-async function finishAnalysis() {
-  while (true) {
-    ensureActive()
-    const run = await getAnalysis(analysisId.value)
-    ensureActive()
-    set(2, 'running', run.message, run.progress)
-    if (run.status === 'failed') {
-      cloudFailed = true
-      throw new Error(run.message)
-    }
-    if (run.status === 'completed' || run.status === 'partial') {
-      set(2, 'completed', run.status === 'partial' ? '可用报告已生成' : '报告已生成', 100)
-      set(3, 'running', '正在接收报告')
-      await downloadReport(
-        run.analysis_id,
-        (n) => set(3, 'running', '正在接收报告', n),
-        run,
-        (message) => set(3, 'running', message),
-      )
-      ensureActive()
-      set(3, 'completed', '正在打开报告', 100)
-      sessionStorage.removeItem(pendingKey())
-      await router.replace(`/replays/${run.analysis_id}`)
-      return
-    }
-    await wait()
-  }
-}
-async function process() {
-  if (busy.value || (!file.value && !analysisId.value)) return
-  busy.value = true
-  error.value = ''
-  try {
-    if (analysisId.value && cloudFailed) {
-      const previous = await getAnalysis(analysisId.value)
-      const run = await startAnalysis(previous, newRequestKey())
-      analysisId.value = run.analysis_id
-      cloudFailed = false
-      sessionStorage.setItem(pendingKey(), run.analysis_id)
-    }
-    if (!analysisId.value) {
-      if (!generated) {
-        const source = file.value!
-        generated = source.name.toLowerCase().endsWith('.dem') ? await parseDemo(source) : source
-      }
-      ensureActive()
-      if (!accepted) {
-        set(1, 'running', '正在上传分析数据', 0)
-        accepted = await uploadPackage(generated, (n) =>
-          set(1, 'running', n === 100 ? '上传完成，正在校验' : '正在上传分析数据', n),
-        )
-        ensureActive()
-        if (target.value && accepted.target_player_id !== target.value) {
-          accepted = null
-          throw new Error('服务器返回的分析对象不一致')
-        }
-        set(1, 'completed', '分析数据已保存', 100)
-      }
-      set(2, 'running', '正在生成复盘报告')
-      const run = await startAnalysis(accepted, requestKey)
-      ensureActive()
-      analysisId.value = run.analysis_id
-      sessionStorage.setItem(pendingKey(), run.analysis_id)
-    }
-    await finishAnalysis()
-  } catch (e) {
-    if (disposed) return
-    error.value = errorMessage(e)
-    const stage = stages.value.find((s) => s.status === 'running')
-    if (stage) Object.assign(stage, { status: 'failed', percent: null, message: error.value })
-  } finally {
-    if (!disposed) busy.value = false
-  }
-}
-function selectFile(candidate: File | null) {
-  if (!candidate || busy.value) return
-  const invalid = validateAnalysisFile(candidate)
-  if (invalid) {
-    error.value = invalid
-    return
-  }
-  controller.abort()
-  controller = new AbortController()
-  file.value = candidate
-  generated = null
-  accepted = null
-  target.value = ''
-  players.value = []
-  analysisId.value = ''
-  cloudFailed = false
-  error.value = ''
-  requestKey = newRequestKey()
-  sessionStorage.removeItem(pendingKey())
-  resetStages(candidate.name.toLowerCase().endsWith('.dem'))
-  void process()
-}
-function drop(event: DragEvent) {
-  dragging.value = false
-  if (busy.value) return
-  const files = event.dataTransfer?.files
-  if (files && files.length > 1) {
-    error.value = '每次请选择一场比赛'
-    return
-  }
-  selectFile(files?.[0] || null)
-}
+const task = useUploadTask()
+const {
+  chooseEveryTime,
+  desktop,
+  parser,
+  checkingParser,
+  parserError,
+  file,
+  busy,
+  dragging,
+  error,
+  analysisId,
+  players,
+  choosingPlayer,
+  stages,
+  fileLabel,
+} = storeToRefs(task)
+const { selectPlayer, selectFile, drop, process } = task
+const fileInput = ref<HTMLInputElement>()
+const route = useRoute()
 onMounted(() => {
-  analysisId.value = sessionStorage.getItem(pendingKey()) || ''
-  if (analysisId.value) {
-    resetStages(false)
-    set(1, 'completed', '已恢复此前上传的分析任务', 100)
-    void process()
-  }
-})
-onUnmounted(() => {
-  disposed = true
-  controller.abort()
-  resolvePlayer?.('')
-  resolvePlayer = undefined
+  task.prepareNew()
+  if (typeof route.query.source === 'string' && typeof route.query.target === 'string')
+    task.startFromCloud(route.query.source, route.query.target, route.query.force === 'true')
+  else task.resume(typeof route.query.task === 'string' ? route.query.task : undefined)
+  if (!desktop.value) void task.checkParser()
 })
 </script>
 <template>
@@ -268,10 +37,47 @@ onUnmounted(() => {
     <div>
       <div class="eyebrow">MATCH ANALYSIS</div>
       <h1>分析一场比赛<span class="orange">.</span></h1>
-      <p>拖入 Demo，自动解析、上传并打开复盘报告。</p>
+      <p>
+        {{
+          desktop
+            ? 'Demo 在本机解析，仅上传分析数据。'
+            : '上传原始 Demo，由服务器解析并保存个人报告。'
+        }}
+      </p>
     </div>
   </section>
   <section class="panel automatic-upload">
+    <div class="analysis-channels" aria-label="Demo 解析通道">
+      <button class="channel" :class="{ selected: !desktop }" :disabled="desktop">
+        <strong>云端解析 Demo</strong
+        ><span>{{ desktop ? '应用版已关闭' : '当前可用 · 服务器解析' }}</span>
+      </button>
+      <button class="channel" :class="{ selected: desktop }" :disabled="!desktop">
+        <strong>本地解析 Demo</strong
+        ><span>{{ desktop ? '当前可用 · 原始文件留在本机' : '请在应用版中使用' }}</span>
+      </button>
+    </div>
+    <label v-if="desktop" class="local-choice"
+      ><input
+        v-model="chooseEveryTime"
+        type="checkbox"
+        :disabled="busy"
+      />每次选择要分析的玩家</label
+    >
+    <div v-if="!desktop" class="cloud-options">
+      <p v-if="checkingParser" role="status">正在检测云端解析服务…</p>
+      <p v-else-if="parserError" class="error-text" role="alert">
+        {{ parserError }}
+        <button class="button secondary compact" @click="task.checkParser">重新检测</button>
+      </p>
+      <p v-else-if="parser?.available" class="muted small-text">
+        云端解析可用 · 原始 Demo 最大 512 MiB · AI
+        {{ parser.ai?.configured ? '可用' : '暂未配置，规则报告仍可使用' }}
+      </p>
+      <p class="muted small-text">
+        上传后先读取比赛名单，再选择要分析的玩家。不同玩家的报告分别保存。
+      </p>
+    </div>
     <label
       class="drop-zone"
       :class="{ dragging, busy }"
@@ -285,7 +91,10 @@ onUnmounted(() => {
     >
       <span class="drop-symbol" aria-hidden="true">↑</span>
       <strong>{{ busy ? '正在处理比赛…' : '将 Demo 拖到这里，或点击选择文件' }}</strong>
-      <span class="muted">支持 .dem（最多 1 GB）及已有 .zip 分析包（最多 50 MB）</span>
+      <span class="muted"
+        >支持 .dem（{{ desktop ? '最多 1 GB，本机解析' : '最多 512 MiB，上传服务器' }}）及已有 .zip
+        分析包（最多 50 MB）</span
+      >
       <span v-if="fileLabel" class="selected-file">{{ fileLabel }}</span>
       <input
         ref="fileInput"
@@ -322,11 +131,59 @@ onUnmounted(() => {
       重试
     </button>
     <p v-if="busy && !choosingPlayer" class="muted small-text" role="status">
-      正在自动处理，完成后将直接打开报告。
+      可切换到练枪或其他页面，任务会在后台继续。请保持此浏览器标签页打开。
     </p>
   </section>
 </template>
 <style scoped>
+.local-choice {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+.local-choice input {
+  width: 16px;
+}
+.analysis-channels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.channel {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #1b2329;
+  color: #b9c4cc;
+}
+.channel span {
+  font-size: 11px;
+}
+.channel.selected {
+  border-color: #c18d59;
+  color: #f0bc87;
+  background: #29251f;
+}
+.channel:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.cloud-options {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.cloud-options label {
+  display: grid;
+  gap: 8px;
+  max-width: 430px;
+  font-size: 12px;
+}
 .automatic-upload {
   padding: 24px;
 }
