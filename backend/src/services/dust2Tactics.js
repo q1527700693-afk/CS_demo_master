@@ -12,6 +12,7 @@
  * judgments need economy, opponent tendencies and a validated demo corpus.
  */
 const knowledge = require('./dust2Knowledge');
+const { attributeUtility } = require('./utilityAttribution');
 
 const SUPPORTED_MAP = 'de_dust2';
 const EARLY_SECONDS = 12;
@@ -20,7 +21,7 @@ const MID_SECONDS = 22;
 const A_LONG_APPROACH = new Set(['a_long', 'long_doors', 'a_long_pit']);
 const A_SHORT_APPROACH = new Set(['a_short', 'a_short_stairs']);
 const B_TUNNEL_APPROACH = new Set(['lower_tunnels', 'b_tunnel', 'upper_tunnels']);
-const MID_APPROACH = new Set(['mid', 'mid_doors', 'xbox', 'catwalk']);
+const MID_APPROACH = new Set(['mid', 'mid_doors', 'xbox', 'catwalk', 't_ramp']);
 const A_SITE_ZONES = new Set(['a_site']);
 const B_SITE_ZONES = new Set(['b_site']);
 
@@ -73,6 +74,71 @@ function playerNameMap(payload) {
     return result;
 }
 
+/**
+ * Group demo players by the team identifier present in the demo. The demo's
+ * `team_clan_name` is the user-facing team ID for v0.1; a persistent software
+ * account binding is explicitly deferred.
+ */
+function teamRosters(payload) {
+    const groups = new Map();
+    for (const player of payload?.players || []) {
+        const key = String(player.team_clan_name || player.team || player.side || 'unknown');
+        const current = groups.get(key) || { team_clan_name: key, steamids: [], names: [], sides: [] };
+        if (player.steamid) current.steamids.push(String(player.steamid));
+        if (player.name) current.names.push(player.name);
+        const side = normalizeSide(player.side);
+        if (side && !current.sides.includes(side)) current.sides.push(side);
+        groups.set(key, current);
+    }
+    return [...groups.values()].map((team) => ({
+        ...team,
+        steamids: [...new Set(team.steamids)],
+        names: [...new Set(team.names)]
+    }));
+}
+
+/**
+ * Accept a side ("T"/"CT"), a demo team name, an array of SteamID64s, or an
+ * object such as { teamClanName: "TEAM A" } / { steamIds: [...] }.
+ */
+function resolveTeam(payload, selection) {
+    if (selection && typeof selection === 'object') {
+        if (selection.teamClanName || selection.clanName || selection.name) {
+            return resolveTeam(payload, selection.teamClanName || selection.clanName || selection.name);
+        }
+        if (selection.steamIds || selection.steamids) {
+            return resolveTeam(payload, selection.steamIds || selection.steamids);
+        }
+    }
+    if (Array.isArray(selection)) {
+        const steamIds = new Set(selection.map(String).filter(Boolean));
+        return { mode: 'roster', steamIds, label: `${steamIds.size} players`, teamClanName: null };
+    }
+    if (selection && typeof selection === 'object' && selection instanceof Set) {
+        return { mode: 'roster', steamIds: new Set([...selection].map(String)), label: `${selection.size} players`, teamClanName: null };
+    }
+    if (typeof selection === 'string') {
+        const side = normalizeSide(selection);
+        if (side) return { mode: 'side', side, label: side, steamIds: null, teamClanName: null };
+        const csv = selection.split(',').map((value) => value.trim()).filter(Boolean);
+        if (csv.length > 1 || /^\d{8,20}$/.test(selection.trim())) {
+            return resolveTeam(payload, csv);
+        }
+        const roster = teamRosters(payload).find((team) =>
+            team.team_clan_name === selection || team.team_clan_name.toLowerCase() === selection.toLowerCase()
+        );
+        if (roster) {
+            return {
+                mode: 'roster',
+                steamIds: new Set(roster.steamids),
+                label: roster.team_clan_name,
+                teamClanName: roster.team_clan_name
+            };
+        }
+    }
+    return { mode: 'unknown', side: null, label: String(selection || ''), steamIds: null, teamClanName: null };
+}
+
 function findRound(payload, roundNum) {
     return (payload?.rounds || []).find((round) => Number(round.round_num) === Number(roundNum)) || null;
 }
@@ -87,6 +153,12 @@ function firstTick(samples, round) {
     return number(round?.start_tick) ?? fallback;
 }
 
+function actionStartTick(samples, round) {
+    // Dust2 rounds have a buy/freeze phase. Classifying early movement from
+    // round.start_tick would treat every frozen spawn position as a tactic.
+    return number(round?.freeze_end_tick) ?? firstTick(samples, round);
+}
+
 function sampleZone(sample) {
     const x = number(sample?.x);
     const y = number(sample?.y);
@@ -94,23 +166,25 @@ function sampleZone(sample) {
     return knowledge.zoneAt(x, y, { toleranceWorld: 70 });
 }
 
-function teamSamples(payload, roundNum, side) {
-    const sides = playerSideMap(payload);
+function teamSamples(payload, roundNum, team) {
+    const selection = team?.mode ? team : resolveTeam(payload, team);
     return allSamples(payload).filter((sample) => {
         if (Number(sample.round_num) !== Number(roundNum)) return false;
-        return normalizeSide(sample.side) === side || sides.get(String(sample.steamid)) === side;
+        if (selection.mode === 'roster') return selection.steamIds.has(String(sample.steamid));
+        if (selection.mode === 'side') return normalizeSide(sample.side) === selection.side;
+        return false;
     });
 }
 
-function sampleWindow(samples, round, maxSeconds) {
-    if (!samples.length) return [];
-    const rate = tickRate(round?.payload || { tick_rate: round?.tick_rate });
-    const start = firstTick(samples, round);
-    const end = start + maxSeconds * rate;
-    return samples.filter((sample) => {
-        const tick = number(sample.tick);
-        return tick !== null && tick >= start && tick <= end;
-    });
+function roundTeamSide(payload, roundNum, team, samples = null) {
+    const selection = team?.mode ? team : resolveTeam(payload, team);
+    if (selection.mode === 'side') return selection.side;
+    const source = samples || teamSamples(payload, roundNum, selection);
+    for (const sample of source) {
+        const side = normalizeSide(sample.side);
+        if (side) return side;
+    }
+    return null;
 }
 
 function uniquePlayersInZones(samples, zones) {
@@ -139,19 +213,23 @@ function eventZone(x, y) {
     return zone ? zone.id : null;
 }
 
-function firstContact(payload, roundNum, side) {
+function isSelectedPlayer(payload, team, steamid) {
+    if (team.mode === 'roster') return team.steamIds.has(String(steamid));
+    const side = playerSideMap(payload).get(String(steamid));
+    return Boolean(side && side === team.side);
+}
+
+function firstContact(payload, roundNum, team) {
+    const selection = team?.mode ? team : resolveTeam(payload, team);
     const sides = playerSideMap(payload);
     const round = findRound(payload, roundNum) || {};
-    const start = number(round.start_tick) ?? 0;
+    const start = number(round.freeze_end_tick) ?? number(round.start_tick) ?? 0;
     const rate = tickRate(payload);
     const kills = (payload?.kills || [])
         .filter((kill) => Number(kill.round_num) === Number(roundNum))
         .sort((a, b) => Number(a.tick) - Number(b.tick));
-    const kill = kills.find((item) => {
-        const attackerSide = normalizeSide(item.attacker_side) || sides.get(String(item.attacker_steamid));
-        const victimSide = normalizeSide(item.victim_side) || sides.get(String(item.victim_steamid));
-        return attackerSide === side || victimSide === side;
-    });
+    const kill = kills.find((item) => isSelectedPlayer(payload, selection, item.attacker_steamid) ||
+        isSelectedPlayer(payload, selection, item.victim_steamid));
     if (!kill) return null;
     const victimZone = eventZone(kill.victim_x, kill.victim_y);
     const attackerZone = eventZone(kill.attacker_x, kill.attacker_y);
@@ -164,6 +242,16 @@ function firstContact(payload, roundNum, side) {
         victim_side: normalizeSide(kill.victim_side) || sides.get(String(kill.victim_steamid)) || null,
         attacker_side: normalizeSide(kill.attacker_side) || sides.get(String(kill.attacker_steamid)) || null
     };
+}
+
+function teamBombSite(payload, roundNum, team) {
+    const selection = team?.mode ? team : resolveTeam(payload, team);
+    const plants = (payload?.bomb || [])
+        .filter((event) => Number(event.round_num) === Number(roundNum) &&
+            String(event.event || '').toLowerCase().includes('finish_plant') &&
+            event.bombsite)
+        .filter((event) => isSelectedPlayer(payload, selection, event.steamid));
+    return plants.length ? String(plants.at(-1).bombsite).toUpperCase() : null;
 }
 
 function utilityTypeMatches(actual, expected) {
@@ -183,15 +271,21 @@ function matchingUtility(side, actualType, zoneId) {
     return null;
 }
 
-function observedUtilities(payload, roundNum, side) {
-    const sides = playerSideMap(payload);
+function observedUtilities(payload, roundNum, team) {
+    const selection = team?.mode ? team : resolveTeam(payload, team);
+    const side = roundTeamSide(payload, roundNum, selection);
+    if (!side) return { observed: [], unmatched: [], side: null };
     const names = playerNameMap(payload);
+    const attributed = attributeUtility(payload);
     const observed = [];
     const unmatched = [];
     const add = (actualType, event, x, y) => {
-        const thrower = String(event.thrower_steamid || '');
-        const throwerSide = normalizeSide(event.thrower_side) || sides.get(thrower);
-        if (throwerSide !== side) return;
+        const inferred = attributed.get(event.event_id) || null;
+        const thrower = String(event.thrower_steamid || inferred?.thrower_steamid || '');
+        if (!thrower || !isSelectedPlayer(payload, selection, thrower)) return;
+        const throwerSide = normalizeSide(event.thrower_side) || inferred?.thrower_side || playerSideMap(payload).get(thrower) || side;
+        if (selection.mode === 'side' && throwerSide !== selection.side) return;
+        if (selection.mode === 'roster' && throwerSide !== side) return;
         const zoneId = eventZone(x, y);
         if (!zoneId) {
             unmatched.push({ type: actualType, event_id: event.event_id, reason: 'no_zone', x, y });
@@ -207,7 +301,8 @@ function observedUtilities(payload, roundNum, side) {
             type: def.type,
             event_id: event.event_id || null,
             thrower_steamid: thrower || null,
-            thrower_name: names.get(thrower) || null,
+            thrower_name: names.get(thrower) || inferred?.thrower_name || null,
+            thrower_attribution: inferred || null,
             tick: number(event.start_tick ?? event.tick),
             target_zone_id: zoneId
         });
@@ -234,7 +329,6 @@ function observedUtilities(payload, roundNum, side) {
         add('flash', { ...grenade, start_tick: grenade.tick }, last[0], last[1]);
     }
 
-    // Attach blind outcomes to observed flash utilities when the demo has them.
     for (const entry of observed) {
         if (entry.type !== 'flash') continue;
         const blinds = (payload?.blinds || []).filter((blind) =>
@@ -252,11 +346,7 @@ function observedUtilities(payload, roundNum, side) {
     const grouped = new Map();
     for (const entry of observed) {
         const current = grouped.get(entry.utility_id) || {
-            utility_id: entry.utility_id,
-            type: entry.type,
-            events: [],
-            throwers: [],
-            target_zone_ids: []
+            utility_id: entry.utility_id, type: entry.type, events: [], throwers: [], target_zone_ids: []
         };
         current.events.push(entry.event_id);
         if (entry.thrower_steamid) current.throwers.push(entry.thrower_steamid);
@@ -265,6 +355,7 @@ function observedUtilities(payload, roundNum, side) {
         grouped.set(entry.utility_id, current);
     }
     return {
+        side,
         observed: [...grouped.values()].map((entry) => ({
             ...entry,
             throwers: [...new Set(entry.throwers)],
@@ -274,9 +365,12 @@ function observedUtilities(payload, roundNum, side) {
     };
 }
 
-function spawnAssignments(payload, roundNum, side) {
+function spawnAssignments(payload, roundNum, team, effectiveSide = null) {
+    const selection = team?.mode ? team : resolveTeam(payload, team);
+    const side = effectiveSide || roundTeamSide(payload, roundNum, selection);
+    if (!side) return [];
     const slots = knowledge.load().zones.spawn_slots.filter((slot) => slot.team === side);
-    const samples = teamSamples(payload, roundNum, side);
+    const samples = teamSamples(payload, roundNum, selection);
     if (!samples.length) return [];
     const firstByPlayer = new Map();
     for (const sample of samples) {
@@ -312,40 +406,32 @@ function spawnAssignments(payload, roundNum, side) {
 
 function candidate(tacticId, reasons, metrics) {
     const def = knowledge.tactic(tacticId);
-    return {
-        tactic_id: tacticId,
-        name: def?.name || tacticId,
-        confidence: 'draft',
-        reasons,
-        metrics
-    };
+    return { tactic_id: tacticId, name: def?.name || tacticId, confidence: 'draft', reasons, metrics };
 }
 
-function classifyTactic(payload, roundNum, side) {
+function classifyTactic(payload, roundNum, team) {
     if (!isSupported(payload)) {
-        return {
-            status: 'unsupported',
-            map: mapName(payload) || null,
-            reason: 'Only de_dust2 is supported by the Dust2 knowledge pack.'
-        };
+        return { status: 'unsupported', map: mapName(payload) || null, reason: 'Only de_dust2 is supported by the Dust2 knowledge pack.' };
     }
-    const normalizedSide = normalizeSide(side);
-    if (!normalizedSide) return { status: 'invalid_side', side };
+    const selection = team?.mode ? team : resolveTeam(payload, team);
+    if (selection.mode === 'unknown') {
+        return { status: 'invalid_team', team: selection.label, reason: 'Pass T/CT, a demo team name, or a SteamID roster.' };
+    }
     const round = findRound(payload, roundNum);
     if (!round) return { status: 'round_not_found', round_num: roundNum };
-    const samples = teamSamples(payload, roundNum, normalizedSide);
+    const samples = teamSamples(payload, roundNum, selection);
     if (!samples.length) {
-        return { status: 'insufficient_data', round_num: Number(roundNum), team_side: normalizedSide, reason: 'No all-player samples for this team/round.' };
+        return { status: 'insufficient_data', round_num: Number(roundNum), team: selection.label, reason: 'No all-player samples for this team/round.' };
+    }
+    const side = roundTeamSide(payload, roundNum, selection, samples);
+    if (!side) {
+        return { status: 'insufficient_data', round_num: Number(roundNum), team: selection.label, reason: 'Could not determine this team side for the round.' };
     }
     const rate = tickRate(payload);
-    const start = firstTick(samples, round);
+    const start = actionStartTick(samples, round);
     const early = samples.filter((sample) => {
         const tick = number(sample.tick);
         return tick !== null && tick >= start && tick <= start + EARLY_SECONDS * rate;
-    });
-    const late = samples.filter((sample) => {
-        const tick = number(sample.tick);
-        return tick !== null && tick >= start && tick <= start + MID_SECONDS * rate;
     });
     const earlyCounts = {
         a_long_approach: uniquePlayersInZones(early, A_LONG_APPROACH),
@@ -356,35 +442,70 @@ function classifyTactic(payload, roundNum, side) {
         b_site: uniquePlayersInZones(early, B_SITE_ZONES)
     };
     const allCounts = allZoneCounts(samples);
-    const contact = firstContact(payload, roundNum, normalizedSide);
-    const utility = observedUtilities(payload, roundNum, normalizedSide);
+    const contact = firstContact(payload, roundNum, selection);
+    const plantSite = side === 'T' ? teamBombSite(payload, roundNum, selection) : null;
+    const utility = observedUtilities(payload, roundNum, selection);
     const utilityIds = new Set(utility.observed.map((item) => item.utility_id));
     const candidates = [];
+    const common = { early_counts: earlyCounts, first_contact: contact, utilities: [...utilityIds], planted_site: plantSite };
 
-    if (normalizedSide === 'T') {
-        if (earlyCounts.b_tunnel_approach >= 3 || (earlyCounts.b_tunnel_approach >= 2 && contact?.victim_zone_id === 'b_tunnel')) {
-            candidates.push(candidate('dust2_t_b_tunnel_rush', [
-                `${earlyCounts.b_tunnel_approach} 名 T 在前 ${EARLY_SECONDS} 秒进入 B 洞路线`,
-                utilityIds.has('dust2_util_t_b_tunnel_smoke') ? '观察到 B 洞烟' : '未观察到 B 洞烟'
-            ], { early_counts: earlyCounts, first_contact: contact, utilities: [...utilityIds] }));
-        }
-        if (earlyCounts.a_long_approach >= 3 || (earlyCounts.a_long_approach >= 2 && contact?.victim_zone_id && ['a_long', 'a_long_pit', 'a_site'].includes(contact.victim_zone_id))) {
-            candidates.push(candidate('dust2_t_a_long_rush', [
-                `${earlyCounts.a_long_approach} 名 T 在前 ${EARLY_SECONDS} 秒进入 A 大路线`,
-                utilityIds.has('dust2_util_t_mid_fast_smoke') ? '观察到中门快烟' : '未观察到中门快烟'
-            ], { early_counts: earlyCounts, first_contact: contact, utilities: [...utilityIds] }));
-        }
-        if (earlyCounts.a_short_approach >= 2 && (earlyCounts.a_long_approach >= 1 || earlyCounts.mid_approach >= 1)) {
-            candidates.push(candidate('dust2_t_a_short_split', [
-                `${earlyCounts.a_short_approach} 名 T 进入 A 小路线`,
-                `${earlyCounts.a_long_approach + earlyCounts.mid_approach} 名 T 在 A 大/中路形成第二压力点`
-            ], { early_counts: earlyCounts, first_contact: contact, utilities: [...utilityIds] }));
-        }
-        if (earlyCounts.mid_approach >= 2 || utilityIds.has('dust2_util_t_mid_fast_smoke')) {
-            candidates.push(candidate('dust2_t_mid_default_fake', [
-                `${earlyCounts.mid_approach} 名 T 进入中路控制区`,
-                utilityIds.has('dust2_util_t_mid_fast_smoke') ? '观察到中门快烟' : '中路控制未观察到中门烟'
-            ], { early_counts: earlyCounts, first_contact: contact, utilities: [...utilityIds] }));
+    if (side === 'T') {
+        // The bomb site is a strong objective signal. Early B pressure followed
+        // by an A plant is a fake/rotate, not a B rush.
+        if (plantSite === 'A') {
+            if (earlyCounts.a_long_approach >= 2) {
+                candidates.push(candidate('dust2_t_a_long_rush', [
+                    `${earlyCounts.a_long_approach} 名 T 进入 A 大路线，且最终在 A 下包`,
+                    utilityIds.has('dust2_util_t_mid_fast_smoke') ? '观察到中门快烟' : '未观察到中门快烟'
+                ], common));
+            } else if (earlyCounts.a_short_approach >= 2) {
+                candidates.push(candidate('dust2_t_a_short_split', [
+                    `${earlyCounts.a_short_approach} 名 T 进入 A 小路线，且最终在 A 下包`
+                ], common));
+            } else if (earlyCounts.b_tunnel_approach >= 2 || earlyCounts.mid_approach >= 3) {
+                candidates.push(candidate('dust2_t_mid_default_fake', [
+                    `早期有 ${earlyCounts.b_tunnel_approach} 人走 B 洞路线，但最终在 A 下包`,
+                    `中路控制 ${earlyCounts.mid_approach} 人，符合假打/转点特征`
+                ], common));
+            } else {
+                candidates.push(candidate('dust2_t_mid_default_fake', ['最终在 A 下包，但早期没有明确的单一路线 Rush'], common));
+            }
+        } else if (plantSite === 'B') {
+            if (earlyCounts.b_tunnel_approach >= 2 || allCounts.b_site > 0) {
+                candidates.push(candidate('dust2_t_b_tunnel_rush', [
+                    `${earlyCounts.b_tunnel_approach} 名 T 进入 B 洞路线，且最终在 B 下包`,
+                    utilityIds.has('dust2_util_t_b_tunnel_smoke') ? '观察到 B 洞烟' : '未观察到 B 洞烟'
+                ], common));
+            } else if (earlyCounts.a_long_approach >= 2 || earlyCounts.a_short_approach >= 2) {
+                candidates.push(candidate('dust2_t_mid_default_fake', ['早期在 A 侧施压，但最终转 B 下包'], common));
+            } else {
+                candidates.push(candidate('dust2_t_mid_default_fake', ['最终在 B 下包，但早期没有明确的单一路线 Rush'], common));
+            }
+        } else {
+            if (earlyCounts.b_tunnel_approach >= 3 || (earlyCounts.b_tunnel_approach >= 2 && contact?.victim_zone_id === 'b_tunnel')) {
+                candidates.push(candidate('dust2_t_b_tunnel_rush', [
+                    `${earlyCounts.b_tunnel_approach} 名 T 在前 ${EARLY_SECONDS} 秒进入 B 洞路线`,
+                    utilityIds.has('dust2_util_t_b_tunnel_smoke') ? '观察到 B 洞烟' : '未观察到 B 洞烟'
+                ], common));
+            }
+            if (earlyCounts.a_long_approach >= 3 || (earlyCounts.a_long_approach >= 2 && contact?.victim_zone_id && ['a_long', 'a_long_pit', 'a_site'].includes(contact.victim_zone_id))) {
+                candidates.push(candidate('dust2_t_a_long_rush', [
+                    `${earlyCounts.a_long_approach} 名 T 在前 ${EARLY_SECONDS} 秒进入 A 大路线`,
+                    utilityIds.has('dust2_util_t_mid_fast_smoke') ? '观察到中门快烟' : '未观察到中门快烟'
+                ], common));
+            }
+            if (earlyCounts.a_short_approach >= 2 && (earlyCounts.a_long_approach >= 1 || earlyCounts.mid_approach >= 1)) {
+                candidates.push(candidate('dust2_t_a_short_split', [
+                    `${earlyCounts.a_short_approach} 名 T 进入 A 小路线`,
+                    `${earlyCounts.a_long_approach + earlyCounts.mid_approach} 名 T 在 A 大/中路形成第二压力点`
+                ], common));
+            }
+            if (earlyCounts.mid_approach >= 2 || utilityIds.has('dust2_util_t_mid_fast_smoke')) {
+                candidates.push(candidate('dust2_t_mid_default_fake', [
+                    `${earlyCounts.mid_approach} 名 T 进入中路控制区`,
+                    utilityIds.has('dust2_util_t_mid_fast_smoke') ? '观察到中门快烟' : '中路控制未观察到中门烟'
+                ], common));
+            }
         }
     } else {
         if (earlyCounts.a_long_approach >= 1 && utilityIds.has('dust2_util_ct_a_long_push_flash') &&
@@ -406,25 +527,30 @@ function classifyTactic(payload, roundNum, side) {
         status: candidates.length ? 'classified' : 'unclassified',
         map: mapName(payload),
         round_num: Number(roundNum),
-        team_side: normalizedSide,
+        team: { mode: selection.mode, label: selection.label, team_clan_name: selection.teamClanName || null },
+        team_side: side,
         candidates,
         facts: {
             early_seconds: EARLY_SECONDS,
             early_zone_counts: earlyCounts,
             all_zone_counts: allCounts,
             first_contact: contact,
+            planted_site: plantSite,
             observed_utilities: utility.observed,
             unmatched_utilities: utility.unmatched,
-            spawn_assignments: spawnAssignments(payload, roundNum, normalizedSide)
+            spawn_assignments: spawnAssignments(payload, roundNum, selection, side)
         }
     };
 }
 
-function evaluateTactic(payload, roundNum, side, tacticId) {
+function evaluateTactic(payload, roundNum, team, tacticId) {
     const def = knowledge.tactic(tacticId);
     if (!def) throw new Error(`Unknown Dust2 tactic: ${tacticId}`);
-    const classification = classifyTactic(payload, roundNum, side);
+    const classification = classifyTactic(payload, roundNum, team);
     if (classification.status !== 'classified') return { ...classification, tactic_id: tacticId, checks: [] };
+    if (def.side !== classification.team_side) {
+        return { ...classification, tactic_id: tacticId, status: 'side_mismatch', checks: [], reason: `Tactic requires ${def.side}, round side is ${classification.team_side}.` };
+    }
     const facts = classification.facts;
     const observed = new Set((facts.observed_utilities || []).map((item) => item.utility_id));
     const zones = facts.all_zone_counts || {};
@@ -467,23 +593,18 @@ function evaluateTactic(payload, roundNum, side, tacticId) {
     };
 }
 
-function analyzeTeamRound(payload, roundNum, side) {
-    const classification = classifyTactic(payload, roundNum, side);
+function analyzeTeamRound(payload, roundNum, team) {
+    const classification = classifyTactic(payload, roundNum, team);
     if (classification.status !== 'classified') return classification;
     const primary = classification.candidates[0];
     const involvement = new Map();
     const names = playerNameMap(payload);
-    const sides = playerSideMap(payload);
-    for (const sample of teamSamples(payload, roundNum, normalizeSide(side))) {
+    const selection = team?.mode ? team : resolveTeam(payload, team);
+    for (const sample of teamSamples(payload, roundNum, selection)) {
         const sid = String(sample.steamid);
         const zone = sampleZone(sample);
         if (!involvement.has(sid)) {
-            involvement.set(sid, {
-                steamid: sid,
-                name: names.get(sid) || sid,
-                zones: new Set(),
-                sample_count: 0
-            });
+            involvement.set(sid, { steamid: sid, name: names.get(sid) || sid, zones: new Set(), sample_count: 0 });
         }
         const entry = involvement.get(sid);
         entry.sample_count += 1;
@@ -494,49 +615,50 @@ function analyzeTeamRound(payload, roundNum, side) {
         ...classification,
         primary_tactic_id: primary?.tactic_id || null,
         primary_tactic_name: primary?.name || null,
-        evaluation: primary ? evaluateTactic(payload, roundNum, side, primary.tactic_id) : null,
-        player_involvement: [...involvement.values()],
-        player_sides: Object.fromEntries(sides)
+        evaluation: primary ? evaluateTactic(payload, roundNum, selection, primary.tactic_id) : null,
+        player_involvement: [...involvement.values()]
     };
 }
 
-function analyzeTeamMatch(payload, side, options = {}) {
-    if (!isSupported(payload)) {
-        return { status: 'unsupported', map: mapName(payload) || null, rounds: [] };
-    }
+function analyzeTeamMatch(payload, team, options = {}) {
+    if (!isSupported(payload)) return { status: 'unsupported', map: mapName(payload) || null, rounds: [] };
+    const selection = team?.mode ? team : resolveTeam(payload, team);
+    if (selection.mode === 'unknown') return { status: 'invalid_team', team: team || null, rounds: [] };
     const maxRounds = Math.max(1, Math.min(Number(options.maxRounds) || 10, 30));
     const rounds = [...(payload.rounds || [])]
         .sort((a, b) => Number(a.round_num) - Number(b.round_num))
         .slice(0, maxRounds);
-    const analyses = rounds.map((round) => analyzeTeamRound(payload, round.round_num, side));
+    const analyses = rounds.map((round) => analyzeTeamRound(payload, round.round_num, selection));
     return {
         status: 'ok',
         map: mapName(payload),
-        team_side: normalizeSide(side),
+        team: { mode: selection.mode, label: selection.label, team_clan_name: selection.teamClanName || null, steamids: selection.steamIds ? [...selection.steamIds] : null },
         rounds: analyses,
         summary: {
             rounds_analyzed: analyses.length,
             classified_rounds: analyses.filter((item) => item.status === 'classified').length,
             insufficient_data_rounds: analyses.filter((item) => item.status === 'insufficient_data').length,
-            primary_tactics: analyses
-                .filter((item) => item.primary_tactic_id)
-                .reduce((counts, item) => {
-                    counts[item.primary_tactic_id] = (counts[item.primary_tactic_id] || 0) + 1;
-                    return counts;
-                }, {})
+            primary_tactics: analyses.filter((item) => item.primary_tactic_id).reduce((counts, item) => {
+                counts[item.primary_tactic_id] = (counts[item.primary_tactic_id] || 0) + 1;
+                return counts;
+            }, {})
         }
     };
 }
 
 module.exports = {
     SUPPORTED_MAP,
+    EARLY_SECONDS,
     normalizeSide,
     isSupported,
+    teamRosters,
+    resolveTeam,
     classifyTactic,
     evaluateTactic,
     analyzeTeamRound,
     analyzeTeamMatch,
     observedUtilities,
     spawnAssignments,
-    firstContact
+    firstContact,
+    teamBombSite
 };

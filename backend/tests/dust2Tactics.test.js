@@ -157,3 +157,36 @@ test('summarizes primary tactics across rounds', () => {
     assert.equal(result.summary.rounds_analyzed, 1);
     assert.equal(result.summary.primary_tactics.dust2_t_a_long_rush, 1);
 });
+
+test('a demo team roster stays selected across halftime', () => {
+    const payload = basePayload({
+        tZones: { t1: 'a_long', t2: 'a_long', t3: 'a_long', t4: 't_spawn', t5: 't_spawn' },
+        ctZones: { ct1: 'a_long', ct2: 'a_site', ct3: 'b_site', ct4: 'mid', ct5: 'ct_spawn' }
+    });
+    const roster = ['76561198000000001', '76561198000000002', '76561198000000003', '76561198000000004', '76561198000000005'];
+    payload.rounds.push({ round_num: 2, start_tick: 10000, end_tick: 20000 });
+    // The same roster has switched to CT in the second round.
+    for (const steamid of roster) {
+        const [x, y] = pos('ct_spawn');
+        payload.all_player_samples.push({ steamid, name: steamid, side: 'counter-terrorist', round_num: 2, tick: 10100, x, y, z: 0 });
+    }
+    const result = dust2.analyzeTeamMatch(payload, roster, { maxRounds: 2 });
+    assert.equal(result.status, 'ok');
+    assert.equal(result.rounds.length, 2);
+    assert.equal(result.rounds[0].team_side, 'T');
+    assert.equal(result.rounds[1].team_side, 'CT');
+    assert.equal(result.team.mode, 'roster');
+    assert.deepEqual(result.team.steamids.sort(), [...roster].sort());
+});
+
+
+test('uses the planted bombsite to distinguish B pressure from a B rush', () => {
+    const payload = basePayload({
+        tZones: { t1: 'b_tunnel', t2: 'b_tunnel', t3: 'lower_tunnels', t4: 'mid', t5: 't_spawn' },
+        ctZones: { ct1: 'a_long', ct2: 'a_site', ct3: 'b_site', ct4: 'mid', ct5: 'ct_spawn' }
+    });
+    payload.bomb = [{ round_num: 1, tick: 5000, event: 'finish_plant', bombsite: 'A', steamid: '76561198000000001' }];
+    const result = dust2.classifyTactic(payload, 1, 'T');
+    assert.equal(result.facts.planted_site, 'A');
+    assert.equal(result.candidates[0].tactic_id, 'dust2_t_mid_default_fake');
+});

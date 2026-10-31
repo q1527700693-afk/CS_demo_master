@@ -53,15 +53,33 @@ function radarToWorld(x, y) {
     };
 }
 
+function pointInPolygon(x, y, polygon) {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const [xi, yi] = polygon[i];
+        const [xj, yj] = polygon[j];
+        const intersects = ((yi > y) !== (yj > y)) &&
+            (x < ((xj - xi) * (y - yi)) / ((yj - yi) || Number.EPSILON) + xi);
+        if (intersects) inside = !inside;
+    }
+    return inside;
+}
+
 /**
- * Return the closest zone whose approximate radius contains the world position.
- * If no zone contains it, return the closest zone only when it is within the
- * optional `toleranceWorld` (useful while callout polygons are still draft).
+ * Return the best zone for a world position. Hand-curated radar polygons take
+ * precedence over the approximate center/radius fallback; higher polygon
+ * priority wins where rectangles overlap.
  */
 function zoneAt(x, y, { toleranceWorld = 0 } = {}) {
     if (!Number.isFinite(Number(x)) || !Number.isFinite(Number(y))) return null;
     const px = Number(x);
     const py = Number(y);
+    const radar = worldToRadar(px, py);
+    const polygonMatches = load().zones.zones
+        .filter((zone) => Array.isArray(zone.polygon_radar) && pointInPolygon(radar.x, radar.y, zone.polygon_radar))
+        .map((zone) => ({ zone, distance: Math.hypot(radar.x - zone.center_radar[0], radar.y - zone.center_radar[1]) }))
+        .sort((a, b) => a.distance - b.distance || (b.zone.polygon_priority || 0) - (a.zone.polygon_priority || 0));
+    if (polygonMatches.length) return polygonMatches[0].zone;
     let best = null;
     let bestDistance = Infinity;
     for (const zone of load().zones.zones) {
@@ -73,8 +91,7 @@ function zoneAt(x, y, { toleranceWorld = 0 } = {}) {
         }
     }
     if (!best) return null;
-    if (bestDistance <= best.radius_world + toleranceWorld) return best;
-    return toleranceWorld > 0 ? best : null;
+    return bestDistance <= best.radius_world + toleranceWorld ? best : null;
 }
 
 function tactic(id) {

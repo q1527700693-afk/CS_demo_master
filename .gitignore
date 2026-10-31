@@ -15,6 +15,7 @@ dist/
 .npm-cache/
 
 # Native demo parser runtime: wheels, scratch demos and extracted dependencies
+.dust2-demos/
 parser/.pydeps/
 parser/wheels/
 parser/.tmp/

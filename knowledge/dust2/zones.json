@@ -17,15 +17,34 @@
         390,
         925
       ],
-      "radius_radar": 85,
+      "radius_radar": 120,
       "center_world": [
         -760,
         -831
       ],
-      "radius_world": 374,
+      "radius_world": 528,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          285,
+          850
+        ],
+        [
+          500,
+          850
+        ],
+        [
+          500,
+          990
+        ],
+        [
+          285,
+          990
+        ]
+      ],
+      "polygon_priority": 95
     },
     {
       "id": "ct_spawn",
@@ -36,18 +55,37 @@
       ],
       "kind": "spawn",
       "center_radar": [
-        925,
-        250
+        620,
+        179
       ],
-      "radius_radar": 70,
+      "radius_radar": 100,
       "center_world": [
-        1594,
-        2139
+        252,
+        2451
       ],
-      "radius_world": 308,
+      "radius_world": 440,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          540,
+          70
+        ],
+        [
+          720,
+          70
+        ],
+        [
+          720,
+          290
+        ],
+        [
+          540,
+          290
+        ]
+      ],
+      "polygon_priority": 95
     },
     {
       "id": "a_site",
@@ -61,15 +99,34 @@
         235,
         130
       ],
-      "radius_radar": 85,
+      "radius_radar": 100,
       "center_world": [
         -1442,
         2667
       ],
-      "radius_world": 374,
+      "radius_world": 440,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          130,
+          40
+        ],
+        [
+          350,
+          40
+        ],
+        [
+          350,
+          280
+        ],
+        [
+          130,
+          280
+        ]
+      ],
+      "polygon_priority": 90
     },
     {
       "id": "a_long",
@@ -81,18 +138,37 @@
       ],
       "kind": "lane",
       "center_radar": [
-        155,
+        195,
         620
       ],
-      "radius_radar": 95,
+      "radius_radar": 120,
       "center_world": [
-        -1794,
+        -1618,
         511
       ],
-      "radius_world": 418,
+      "radius_world": 528,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          70,
+          420
+        ],
+        [
+          235,
+          420
+        ],
+        [
+          235,
+          760
+        ],
+        [
+          70,
+          760
+        ]
+      ],
+      "polygon_priority": 50
     },
     {
       "id": "long_doors",
@@ -103,18 +179,37 @@
       ],
       "kind": "choke",
       "center_radar": [
-        175,
-        775
+        195,
+        755
       ],
-      "radius_radar": 55,
+      "radius_radar": 75,
       "center_world": [
-        -1706,
-        -171
+        -1618,
+        -83
       ],
-      "radius_world": 242,
+      "radius_world": 330,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          160,
+          720
+        ],
+        [
+          300,
+          720
+        ],
+        [
+          300,
+          860
+        ],
+        [
+          160,
+          860
+        ]
+      ],
+      "polygon_priority": 60
     },
     {
       "id": "a_long_pit",
@@ -128,15 +223,34 @@
         135,
         440
       ],
-      "radius_radar": 55,
+      "radius_radar": 75,
       "center_world": [
         -1882,
         1303
       ],
-      "radius_world": 242,
+      "radius_world": 330,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          90,
+          300
+        ],
+        [
+          260,
+          300
+        ],
+        [
+          260,
+          440
+        ],
+        [
+          90,
+          440
+        ]
+      ],
+      "polygon_priority": 55
     },
     {
       "id": "a_short",
@@ -151,15 +265,34 @@
         360,
         430
       ],
-      "radius_radar": 80,
+      "radius_radar": 110,
       "center_world": [
         -892,
         1347
       ],
-      "radius_world": 352,
+      "radius_world": 484,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          250,
+          300
+        ],
+        [
+          500,
+          300
+        ],
+        [
+          500,
+          470
+        ],
+        [
+          250,
+          470
+        ]
+      ],
+      "polygon_priority": 50
     },
     {
       "id": "a_short_stairs",
@@ -173,15 +306,34 @@
         370,
         500
       ],
-      "radius_radar": 50,
+      "radius_radar": 80,
       "center_world": [
         -848,
         1039
       ],
-      "radius_world": 220,
+      "radius_world": 352,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          250,
+          450
+        ],
+        [
+          460,
+          450
+        ],
+        [
+          460,
+          580
+        ],
+        [
+          250,
+          580
+        ]
+      ],
+      "polygon_priority": 55
     },
     {
       "id": "mid",
@@ -195,15 +347,34 @@
         560,
         520
       ],
-      "radius_radar": 90,
+      "radius_radar": 105,
       "center_world": [
         -12,
         951
       ],
-      "radius_world": 396,
+      "radius_world": 462,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          470,
+          280
+        ],
+        [
+          680,
+          280
+        ],
+        [
+          680,
+          720
+        ],
+        [
+          470,
+          720
+        ]
+      ],
+      "polygon_priority": 40
     },
     {
       "id": "mid_doors",
@@ -217,15 +388,34 @@
         585,
         245
       ],
-      "radius_radar": 55,
+      "radius_radar": 80,
       "center_world": [
         98,
         2161
       ],
-      "radius_world": 242,
+      "radius_world": 352,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          520,
+          130
+        ],
+        [
+          710,
+          130
+        ],
+        [
+          710,
+          300
+        ],
+        [
+          520,
+          300
+        ]
+      ],
+      "polygon_priority": 60
     },
     {
       "id": "xbox",
@@ -239,15 +429,34 @@
         625,
         320
       ],
-      "radius_radar": 45,
+      "radius_radar": 70,
       "center_world": [
         274,
         1831
       ],
-      "radius_world": 198,
+      "radius_world": 308,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          580,
+          280
+        ],
+        [
+          720,
+          280
+        ],
+        [
+          720,
+          430
+        ],
+        [
+          580,
+          430
+        ]
+      ],
+      "polygon_priority": 45
     },
     {
       "id": "catwalk",
@@ -261,15 +470,34 @@
         430,
         390
       ],
-      "radius_radar": 55,
+      "radius_radar": 85,
       "center_world": [
         -584,
         1523
       ],
-      "radius_world": 242,
+      "radius_world": 374,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          350,
+          320
+        ],
+        [
+          520,
+          320
+        ],
+        [
+          520,
+          470
+        ],
+        [
+          350,
+          470
+        ]
+      ],
+      "polygon_priority": 45
     },
     {
       "id": "b_tunnel",
@@ -280,18 +508,37 @@
       ],
       "kind": "lane",
       "center_radar": [
-        825,
-        520
+        790,
+        570
       ],
-      "radius_radar": 75,
+      "radius_radar": 140,
       "center_world": [
-        1154,
-        951
+        1000,
+        731
       ],
-      "radius_world": 330,
+      "radius_world": 616,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          680,
+          440
+        ],
+        [
+          900,
+          440
+        ],
+        [
+          900,
+          720
+        ],
+        [
+          680,
+          720
+        ]
+      ],
+      "polygon_priority": 50
     },
     {
       "id": "upper_tunnels",
@@ -305,15 +552,34 @@
         760,
         340
       ],
-      "radius_radar": 55,
+      "radius_radar": 90,
       "center_world": [
         868,
         1743
       ],
-      "radius_world": 242,
+      "radius_world": 396,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          680,
+          250
+        ],
+        [
+          900,
+          250
+        ],
+        [
+          900,
+          440
+        ],
+        [
+          680,
+          440
+        ]
+      ],
+      "polygon_priority": 45
     },
     {
       "id": "b_site",
@@ -327,15 +593,34 @@
         820,
         165
       ],
-      "radius_radar": 85,
+      "radius_radar": 120,
       "center_world": [
         1132,
         2513
       ],
-      "radius_world": 374,
+      "radius_world": 528,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          720,
+          40
+        ],
+        [
+          940,
+          40
+        ],
+        [
+          940,
+          300
+        ],
+        [
+          720,
+          300
+        ]
+      ],
+      "polygon_priority": 90
     },
     {
       "id": "lower_tunnels",
@@ -349,15 +634,34 @@
         690,
         770
       ],
-      "radius_radar": 65,
+      "radius_radar": 100,
       "center_world": [
         560,
         -149
       ],
-      "radius_world": 286,
+      "radius_world": 440,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          620,
+          690
+        ],
+        [
+          800,
+          690
+        ],
+        [
+          800,
+          900
+        ],
+        [
+          620,
+          900
+        ]
+      ],
+      "polygon_priority": 45
     },
     {
       "id": "t_ramp",
@@ -371,15 +675,34 @@
         510,
         790
       ],
-      "radius_radar": 60,
+      "radius_radar": 80,
       "center_world": [
         -232,
         -237
       ],
-      "radius_world": 264,
+      "radius_world": 352,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          400,
+          690
+        ],
+        [
+          620,
+          690
+        ],
+        [
+          620,
+          900
+        ],
+        [
+          400,
+          900
+        ]
+      ],
+      "polygon_priority": 35
     },
     {
       "id": "ct_ramp",
@@ -393,15 +716,34 @@
         900,
         350
       ],
-      "radius_radar": 60,
+      "radius_radar": 85,
       "center_world": [
         1484,
         1699
       ],
-      "radius_world": 264,
+      "radius_world": 374,
       "confidence": "draft",
       "needs_validation": true,
-      "notes": "Radar center and radius are approximate; calibrate against demo coordinates before hard classification."
+      "notes": "Draft radar polygon; center/radius is a fallback until demo calibration.",
+      "polygon_radar": [
+        [
+          730,
+          260
+        ],
+        [
+          960,
+          260
+        ],
+        [
+          960,
+          450
+        ],
+        [
+          730,
+          450
+        ]
+      ],
+      "polygon_priority": 40
     }
   ],
   "spawn_slots": [

@@ -35,6 +35,7 @@ tactic templates: 6
 | `tactics.json` | tactic steps, success conditions, failure modes, adaptations |
 | `sources.json` | source IDs and validation status |
 | `sources.md` | human-readable source notes and validation checklist |
+| `validation-notes.md` | first five-demo calibration findings and review rounds |
 
 Run the structural validator:
 
