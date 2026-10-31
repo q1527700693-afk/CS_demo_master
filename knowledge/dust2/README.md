@@ -37,6 +37,7 @@ tactic templates: 6
 | `sources.md` | human-readable source notes and validation checklist |
 | `validation-notes.md` | first five-demo calibration findings and review rounds |
 | `callouts.md` | team-facing callout dictionary and B-window/dog-hole distinction |
+| `recommendation-design.md` | CT defense profile and site recommendation rules |
 
 Run the structural validator:
 
@@ -174,3 +175,6 @@ a kill, a lineup or a tactical result.
 
 
 See `callouts.md` for the team-facing Dust2 callout names.
+
+
+See `recommendation-design.md` for the CT profile/site recommendation layer.
