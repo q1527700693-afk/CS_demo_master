@@ -17,7 +17,7 @@ future Dust2 rule engine a stable vocabulary for:
 
 ```text
 map: de_dust2 only
-zones: 18
+zones: 19
 spawn slots: 8
 core utility intents: 10
 tactic templates: 6
@@ -36,6 +36,7 @@ tactic templates: 6
 | `sources.json` | source IDs and validation status |
 | `sources.md` | human-readable source notes and validation checklist |
 | `validation-notes.md` | first five-demo calibration findings and review rounds |
+| `callouts.md` | team-facing callout dictionary and B-window/dog-hole distinction |
 
 Run the structural validator:
 
@@ -170,3 +171,6 @@ a kill, a lineup or a tactical result.
 - confirmation of exact callout names used by the players
 - at least 10 in-game utility lineups with origin/target
 - 2-3 humans to review tactic labels and “criminal” candidates
+
+
+See `callouts.md` for the team-facing Dust2 callout names.

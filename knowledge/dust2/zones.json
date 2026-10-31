@@ -10,7 +10,9 @@
       "name": "T 出生点",
       "aliases": [
         "T Spawn",
-        "T出生点"
+        "T出生点",
+        "T家",
+        "匪家"
       ],
       "kind": "spawn",
       "center_radar": [
@@ -51,7 +53,9 @@
       "name": "CT 出生点",
       "aliases": [
         "CT Spawn",
-        "CT出生点"
+        "CT出生点",
+        "CT家",
+        "警家"
       ],
       "kind": "spawn",
       "center_radar": [
@@ -92,6 +96,7 @@
       "name": "A 包点",
       "aliases": [
         "A Site",
+        "A包点",
         "A点"
       ],
       "kind": "site",
@@ -132,9 +137,11 @@
       "id": "a_long",
       "name": "A 大",
       "aliases": [
-        "Long A",
         "A Long",
-        "A大"
+        "A大",
+        "Long A",
+        "匪家右手",
+        "长道"
       ],
       "kind": "lane",
       "center_radar": [
@@ -168,7 +175,8 @@
           760
         ]
       ],
-      "polygon_priority": 50
+      "polygon_priority": 50,
+      "team_view": "from_t_spawn:right"
     },
     {
       "id": "long_doors",
@@ -256,9 +264,9 @@
       "id": "a_short",
       "name": "A 小",
       "aliases": [
-        "Short A",
         "A Short",
-        "A小"
+        "A小",
+        "Short A"
       ],
       "kind": "lane",
       "center_radar": [
@@ -298,8 +306,8 @@
       "id": "a_short_stairs",
       "name": "A 小楼梯",
       "aliases": [
-        "Short Stairs",
-        "A小楼梯"
+        "A小楼梯",
+        "Short Stairs"
       ],
       "kind": "choke",
       "center_radar": [
@@ -504,7 +512,12 @@
       "name": "B 洞",
       "aliases": [
         "B Tunnels",
-        "B洞"
+        "B tunnels",
+        "B洞",
+        "B洞主通道",
+        "B通",
+        "B通道",
+        "匪家左手"
       ],
       "kind": "lane",
       "center_radar": [
@@ -538,14 +551,17 @@
           720
         ]
       ],
-      "polygon_priority": 50
+      "polygon_priority": 50,
+      "team_view": "from_t_spawn:left"
     },
     {
       "id": "upper_tunnels",
       "name": "B 洞上层",
       "aliases": [
-        "Upper Tunnels",
-        "B洞上层"
+        "B上",
+        "B洞上层",
+        "B窗口方向",
+        "Upper Tunnels"
       ],
       "kind": "lane",
       "center_radar": [
@@ -579,13 +595,15 @@
           440
         ]
       ],
-      "polygon_priority": 45
+      "polygon_priority": 45,
+      "team_view": "from_t_spawn:left"
     },
     {
       "id": "b_site",
       "name": "B 包点",
       "aliases": [
         "B Site",
+        "B包点",
         "B点"
       ],
       "kind": "site",
@@ -620,14 +638,17 @@
           300
         ]
       ],
-      "polygon_priority": 90
+      "polygon_priority": 90,
+      "team_view": "from_t_spawn:left"
     },
     {
       "id": "lower_tunnels",
       "name": "B 洞下层",
       "aliases": [
-        "Lower Tunnels",
-        "B洞下层"
+        "B下",
+        "B洞下层",
+        "B洞入口",
+        "Lower Tunnels"
       ],
       "kind": "lane",
       "center_radar": [
@@ -661,7 +682,8 @@
           900
         ]
       ],
-      "polygon_priority": 45
+      "polygon_priority": 45,
+      "team_view": "from_t_spawn:left"
     },
     {
       "id": "t_ramp",
@@ -744,6 +766,51 @@
         ]
       ],
       "polygon_priority": 40
+    },
+    {
+      "id": "b_window",
+      "name": "B窗口 / 狗洞",
+      "aliases": [
+        "狗洞",
+        "B窗口",
+        "B洞窗口",
+        "B窗",
+        "B window"
+      ],
+      "kind": "window",
+      "center_radar": [
+        860,
+        265
+      ],
+      "radius_radar": 45,
+      "center_world": [
+        1308,
+        2073
+      ],
+      "radius_world": 198,
+      "polygon_radar": [
+        [
+          820,
+          225
+        ],
+        [
+          915,
+          225
+        ],
+        [
+          915,
+          325
+        ],
+        [
+          820,
+          325
+        ]
+      ],
+      "polygon_priority": 92,
+      "confidence": "draft",
+      "needs_validation": true,
+      "team_view": "from_t_spawn:left",
+      "notes": "Draft B-window/dog-hole zone near B site; verify exact coordinate in-game before hard blame."
     }
   ],
   "spawn_slots": [
