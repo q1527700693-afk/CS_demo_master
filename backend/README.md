@@ -11,6 +11,9 @@ See the [replay architecture and API specification](../docs/replay-analysis-desi
 for implementation details, the current AI extension contract, and all-player
 v1.2 exports/paginated global evidence in [REPLAY_V12.md](REPLAY_V12.md).
 
+For weapon/economy highlights and the AI prompt contract, see
+[../docs/weapon-economy-highlights.md](../docs/weapon-economy-highlights.md).
+
 ## Tech Stack
 
 - Node.js 22+

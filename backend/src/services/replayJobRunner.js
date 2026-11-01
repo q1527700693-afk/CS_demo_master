@@ -16,6 +16,7 @@ const { importPackage, saveCloudReport } = require('./cloudReplay');
 const demoParser = require('./demoParser');
 const demoAnalysis = require('./demoAnalysis');
 const aiAnalysis = require('./aiAnalysis');
+const { extractWeaponImpact } = require('./weaponImpact');
 const {roster, focusPayload} = require('./demoSelection');
 
 async function readJson(file) {
@@ -45,6 +46,8 @@ async function runDemo(dir, onStage) {
         targetPlayer: task.target_player_id || undefined,
         maxRounds: task.max_rounds || undefined
     });
+    const weaponFacts = extractWeaponImpact(payload);
+    await fs.writeFile(path.join(dir, 'weapon-facts.json'), JSON.stringify(weaponFacts));
     if (task.selection_mode === 'choose') {
         await fs.writeFile(path.join(dir, 'roster.json'), JSON.stringify({players:roster(payload),map:payload.header.map_name,started_at:payload.match_started_at || null}));
         await fs.writeFile(path.join(dir, 'report-meta.json'), JSON.stringify({status:'awaiting_player',summary:{map:payload.header.map_name,started_at:payload.match_started_at || null,demo_sha256:payload.demo.sha256}}));
@@ -74,7 +77,15 @@ async function runAi(dir) {
     const directory = task.demo_dir;
     const details = await readJson(path.join(directory, 'report.json'));
     const evidence = await readJson(path.join(directory, 'evidence-index.json')).catch(() => ({}));
-    const result = await aiAnalysis.analyzeDemo(details, {
+    let weaponFacts = await readJson(path.join(directory, 'weapon-facts.json')).catch(() => null);
+    if (!weaponFacts) {
+        const parsed = await readJson(path.join(directory, 'parse.json')).catch(() => null);
+        if (parsed) weaponFacts = extractWeaponImpact(parsed);
+    }
+    const detailsForAi = weaponFacts
+        ? { ...details, weapon_highlights: weaponFacts.highlights, weapon_profiles: weaponFacts.player_profiles }
+        : details;
+    const result = await aiAnalysis.analyzeDemo(detailsForAi, {
         analysisId: task.demo_job_id,
         evidenceIds: Object.keys(evidence)
     });
