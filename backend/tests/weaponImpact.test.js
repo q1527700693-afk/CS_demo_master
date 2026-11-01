@@ -53,20 +53,23 @@ function payload() {
 
 test('highlights low-cost eco first blood and multi-kill weapons', () => {
     const result = extractWeaponImpact(payload());
-    const r8 = result.highlights.find((item) => item.weapon === 'revolver' && item.player_name === 'T1');
-    const deagle = result.highlights.find((item) => item.weapon === 'deagle' && item.player_name === 'T3');
+    const t1 = result.highlights.find((item) => item.player_name === 'T1');
+    const t3 = result.highlights.find((item) => item.player_name === 'T3');
+    assert.ok(t1);
+    const r8 = t1.weapons.find((item) => item.weapon === 'revolver');
+    const deagle = t3.weapons.find((item) => item.weapon === 'deagle');
     assert.ok(r8);
     assert.equal(r8.kills, 2);
     assert.equal(r8.first_bloods, 1);
     assert.equal(r8.economy_kills, 2);
     assert.ok(deagle);
     assert.equal(deagle.kills, 2);
-    assert.match(deagle.reason, /Desert Eagle|冷门|经济|force/);
+    assert.match(t3.reason, /Desert Eagle|冷门|经济|force/);
 });
 
 test('does not turn every ordinary rifle kill into a headline', () => {
     const result = extractWeaponImpact(payload());
-    assert.equal(result.highlights.some((item) => item.weapon === 'ak47'), false);
+    assert.equal(result.highlights.some((item) => item.weapons.some((weapon) => weapon.weapon === 'ak47')), false);
     const t2 = result.player_profiles.find((item) => item.name === 'T2');
     assert.ok(t2);
     assert.equal(t2.top_weapons[0].weapon, 'ak47');
@@ -74,7 +77,7 @@ test('does not turn every ordinary rifle kill into a headline', () => {
 
 test('keeps weapon evidence IDs available for AI citation', () => {
     const result = extractWeaponImpact(payload());
-    const highlighted = result.highlights.find((item) => item.weapon === 'revolver');
+    const highlighted = result.highlights.find((item) => item.player_name === 'T1');
     assert.ok(highlighted.evidence_ids.includes('kill_0001'));
     assert.ok(highlighted.evidence_ids.includes('kill_0002'));
 });

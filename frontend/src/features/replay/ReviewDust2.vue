@@ -273,19 +273,24 @@ onMounted(loadTeams)
           <div v-else class="dust2-weapon-list">
             <article
               v-for="highlight in summary.weapon_highlights"
-              :key="`${highlight.player_name}-${highlight.weapon}-${highlight.rounds.join('-')}`"
+              :key="`${highlight.player_name}-${highlight.evidence_ids.join('-')}`"
               class="dust2-weapon-card"
             >
               <div class="dust2-weapon-head">
                 <strong>{{ highlight.player_name.trim() }}</strong>
-                <span>{{ highlight.weapon_label }}</span>
+                <span>低成本 / 高影响</span>
+              </div>
+              <div class="dust2-weapon-tags">
+                <span v-for="weapon in highlight.weapons" :key="weapon.weapon">
+                  {{ weapon.weapon_label }} {{ weapon.kills }} 杀
+                  <template v-if="weapon.first_bloods"> · {{ weapon.first_bloods }} 首杀</template>
+                </span>
               </div>
               <p>{{ highlight.reason }}</p>
               <div class="dust2-weapon-stats">
-                <span>{{ highlight.kills }} 杀</span>
+                <span>共 {{ highlight.kills }} 杀</span>
                 <span v-if="highlight.first_bloods">{{ highlight.first_bloods }} 首杀</span>
                 <span v-if="highlight.multi_kill_rounds">{{ highlight.multi_kill_rounds }} 个多杀回合</span>
-                <span v-if="highlight.cost != null">约 ${{ highlight.cost }}</span>
               </div>
               <div class="dust2-evidence">
                 <span>证据</span>
@@ -540,6 +545,19 @@ onMounted(loadTeams)
   color: var(--muted, #aab4c3);
   font-size: 13px;
   line-height: 1.65;
+}
+.dust2-weapon-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.dust2-weapon-tags span {
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: rgba(255, 154, 85, 0.1);
+  color: #ffc092;
+  font-size: 11px;
 }
 .dust2-weapon-stats {
   display: flex;

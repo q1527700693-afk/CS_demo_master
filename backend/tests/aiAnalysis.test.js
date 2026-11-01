@@ -226,15 +226,15 @@ test('demo facts include weapon highlights and player weapon profiles', () => {
     const details = {
         ...DEMO_DETAILS,
         weapon_highlights: [{
-            player_name: 'Tester', weapon: 'revolver', weapon_label: 'R8 Revolver',
-            category: 'pistol', cost: 600, kills: 2, headshots: 1, first_bloods: 1,
+            player_name: 'Tester', kills: 2, headshots: 1, first_bloods: 1,
             economy_kills: 2, low_cost_kills: 2, multi_kill_rounds: 1,
+            weapons: [{ weapon: 'revolver', weapon_label: 'R8 Revolver', cost: 600, kills: 2, first_bloods: 1, economy_kills: 2 }],
             rounds: [3], reason: 'eco first blood', evidence_ids: ['kill_0001']
         }],
         weapon_profiles: [{ name: 'Tester', side: 'T', top_weapons: [{ weapon: 'revolver', kills: 2 }] }]
     };
     const facts = aiAnalysis.buildDemoFacts(details, 'analysis-weapons');
-    assert.equal(facts.weapon_highlights[0].weapon, 'revolver');
+    assert.equal(facts.weapon_highlights[0].weapons[0].weapon, 'revolver');
     assert.equal(facts.weapon_highlights[0].first_bloods, 1);
     assert.equal(facts.weapon_profiles[0].top_weapons[0].weapon, 'revolver');
     assert.match(aiAnalysis.DEMO_SYSTEM_PROMPT, /weapon_highlights/);

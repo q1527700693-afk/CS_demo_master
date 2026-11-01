@@ -379,16 +379,20 @@ function buildDemoFacts(details, analysisId = null) {
         weapon_highlights: (source.weapon_highlights || []).slice(0, 20).map((item) => ({
             player_name: item.player_name,
             team_clan_name: item.team_clan_name,
-            weapon: item.weapon,
-            weapon_label: item.weapon_label,
-            category: item.category,
-            cost: item.cost,
             kills: item.kills,
             headshots: item.headshots,
             first_bloods: item.first_bloods,
             economy_kills: item.economy_kills,
             low_cost_kills: item.low_cost_kills,
             multi_kill_rounds: item.multi_kill_rounds,
+            weapons: (item.weapons || []).slice(0, 6).map((weapon) => ({
+                weapon: weapon.weapon,
+                weapon_label: weapon.weapon_label,
+                cost: weapon.cost,
+                kills: weapon.kills,
+                first_bloods: weapon.first_bloods,
+                economy_kills: weapon.economy_kills
+            })),
             rounds: item.rounds,
             reason: item.reason,
             evidence_ids: item.evidence_ids
@@ -428,7 +432,7 @@ const DEMO_SYSTEM_PROMPT = `你是 CS2 教练，正在解读一份从用户上�
 你不曾观看比赛画面，只能依据解析数据推断；不要声称看过 Demo 或视频，不要输出综合评分。
 每条 improvement_area 和 strength 至少引用一个输入中真实存在的 evidence_ids；如果某个想法在输入里找不到证据，就不要输出该条。
 优先给出可训练、可验证的行为建议：道具有无使用、死亡位置、经济局目标、首杀/首死的对枪选择、换人配合。
-weapon_highlights 是规则引擎提取的候选亮点，不是完整武器统计：重点点评 R8、沙鹰、双枪、SMG、霰弹枪等冷门或低成本武器在 eco/半起局的首杀、多杀、残局和 timing 击杀；普通 AK/M4/AWP 只在确实影响回合时简短提一句，不要因为使用普通长枪就夸大。所有武器击杀描述必须引用对应 evidence_ids；样本不足时明确写“样本较少”，不能推断玩家长期风格。weapon_transitions 只是快照采样到的武器变化，不一定是拾取或主动换枪，不能当成确定事件。
+weapon_highlights 是规则引擎按玩家聚合出的低成本/高影响候选摘要，不是单次击杀列表，也不是完整武器统计：重点点评 R8、沙鹰、双枪、SMG、霰弹枪等冷门或低成本武器在 eco/半起局的首杀、多杀、残局和 timing 击杀；普通 AK/M4/AWP 只在确实影响回合时简短提一句，不要因为使用普通长枪就夸大。所有武器击杀描述必须引用对应 evidence_ids；样本不足时明确写“样本较少”，不能推断玩家长期风格。weapon_transitions 只是快照采样到的武器变化，不一定是拾取或主动换枪，不能当成确定事件。
 只返回严格 JSON，结构必须是：
 {
   "summary": "string",

@@ -309,19 +309,28 @@ export interface Dust2SiteRecommendation {
   review?: Dust2RoundReview | null
 }
 
-export interface WeaponHighlight {
-  player_name: string
-  team_clan_name?: string | null
+export interface WeaponHighlightWeapon {
   weapon: string
   weapon_label: string
   category: string
   cost: number | null
+  kills: number
+  first_bloods: number
+  economy_kills: number
+  multi_kill_rounds: number
+}
+
+export interface WeaponHighlight {
+  player_name: string
+  team_clan_name?: string | null
   kills: number
   headshots: number
   first_bloods: number
   economy_kills: number
   low_cost_kills: number
   multi_kill_rounds: number
+  impact_score: number
+  weapons: WeaponHighlightWeapon[]
   rounds: number[]
   reason: string
   evidence_ids: string[]

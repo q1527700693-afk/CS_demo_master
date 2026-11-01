@@ -247,7 +247,7 @@ function extractWeaponImpact(payload) {
         bucket.economy_kills > 0 ||
         bucket.multi_kill_rounds > 0 ||
         bucket.kills >= 2;
-    const highlights = [];
+    const weaponHighlights = [];
     for (const bucket of buckets.values()) {
         if (!notableWeapon(bucket) || !highlightCondition(bucket)) continue;
         const reasons = [];
@@ -257,7 +257,7 @@ function extractWeaponImpact(payload) {
         if (bucket.multi_kill_rounds > 0) reasons.push(`${bucket.multi_kill_rounds} 个回合完成多杀`);
         if (bucket.low_cost_kills > 0 && bucket.cost !== null) reasons.push(`武器成本约 $${bucket.cost}`);
         if (bucket.enemy_full_kills > 0) reasons.push(`有 ${bucket.enemy_full_kills} 杀发生在对手较强经济回合`);
-        highlights.push({
+        weaponHighlights.push({
             steamid: bucket.steamid,
             player_name: bucket.player_name,
             side: bucket.side,
@@ -278,7 +278,65 @@ function extractWeaponImpact(payload) {
             reason: reasons.join('；') || '低成本武器产生了可点评的击杀。'
         });
     }
-    highlights.sort((a, b) => b.impact_score - a.impact_score || b.kills - a.kills);
+    weaponHighlights.sort((a, b) => b.impact_score - a.impact_score || b.kills - a.kills);
+
+    const highlightsByPlayer = new Map();
+    for (const item of weaponHighlights) {
+        const key = String(item.steamid);
+        const current = highlightsByPlayer.get(key) || {
+            steamid: key,
+            player_name: item.player_name,
+            side: item.side,
+            team_clan_name: item.team_clan_name,
+            kills: 0,
+            headshots: 0,
+            first_bloods: 0,
+            economy_kills: 0,
+            low_cost_kills: 0,
+            multi_kill_rounds: 0,
+            impact_score: 0,
+            weapons: [],
+            rounds: new Set(),
+            evidence_ids: new Set()
+        };
+        current.kills += item.kills;
+        current.headshots += item.headshots;
+        current.first_bloods += item.first_bloods;
+        current.economy_kills += item.economy_kills;
+        current.low_cost_kills += item.low_cost_kills;
+        current.multi_kill_rounds += item.multi_kill_rounds;
+        current.impact_score += item.impact_score;
+        current.weapons.push({
+            weapon: item.weapon,
+            weapon_label: item.weapon_label,
+            category: item.category,
+            cost: item.cost,
+            kills: item.kills,
+            headshots: item.headshots,
+            first_bloods: item.first_bloods,
+            economy_kills: item.economy_kills,
+            multi_kill_rounds: item.multi_kill_rounds,
+            evidence_ids: item.evidence_ids
+        });
+        for (const round of item.rounds) current.rounds.add(round);
+        for (const id of item.evidence_ids) current.evidence_ids.add(id);
+        highlightsByPlayer.set(key, current);
+    }
+    const highlights = [...highlightsByPlayer.values()].map((item) => {
+        const weapons = item.weapons.sort((a, b) => b.kills - a.kills || b.first_bloods - a.first_bloods);
+        const weaponPhrase = weapons.map((weapon) => `${weapon.weapon_label} ${weapon.kills} 杀${weapon.first_bloods ? `（${weapon.first_bloods} 首杀）` : ''}`).join('、');
+        const context = [];
+        if (item.economy_kills) context.push(`其中 ${item.economy_kills} 杀发生在经济/半起/手枪局`);
+        if (item.multi_kill_rounds) context.push(`${item.multi_kill_rounds} 个回合完成多杀`);
+        return {
+            ...item,
+            weapons,
+            rounds: [...item.rounds].sort((a, b) => a - b),
+            evidence_ids: [...item.evidence_ids],
+            impact_score: Math.round(item.impact_score * 10) / 10,
+            reason: `本场低成本/高影响武器集中在 ${weaponPhrase}${context.length ? `；${context.join('；')}` : ''}。`
+        };
+    }).sort((a, b) => b.impact_score - a.impact_score || b.kills - a.kills);
 
     const playerProfiles = [...playerBuckets.entries()].map(([steamid, list]) => {
         const player = players.byId.get(String(steamid)) || {};
@@ -303,7 +361,7 @@ function extractWeaponImpact(payload) {
 
     const playerWeaponImpact = [...playerBuckets.entries()].map(([steamid, list]) => {
         const player = players.byId.get(String(steamid)) || {};
-        const playerHighlights = highlights.filter((item) => item.steamid === String(steamid));
+        const playerHighlight = highlights.find((item) => item.steamid === String(steamid));
         return {
             steamid: String(steamid),
             name: player.name || list[0].player_name,
@@ -314,7 +372,8 @@ function extractWeaponImpact(payload) {
             first_bloods: list.reduce((sum, item) => sum + item.first_bloods, 0),
             economy_kills: list.reduce((sum, item) => sum + item.economy_kills, 0),
             low_cost_kills: list.reduce((sum, item) => sum + item.low_cost_kills, 0),
-            special_highlight_count: playerHighlights.length,
+            special_highlight_count: playerHighlight ? 1 : 0,
+            special_weapons: playerHighlight?.weapons || [],
             weapon_impact_score: Math.round(list.reduce((sum, item) => sum + item.impact_score, 0) * 10) / 10,
             top_weapons: [...list].sort((a, b) => b.kills - a.kills || b.impact_score - a.impact_score).slice(0, 3).map((item) => ({
                 weapon: item.weapon,
