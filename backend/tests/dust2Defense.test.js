@@ -73,6 +73,7 @@ test('builds an explainable CT defense profile from early rounds', () => {
     assert.equal(profile.weaknesses.weaker_site, 'A');
     assert.equal(profile.initial.A, 2);
     assert.equal(profile.initial.B, 1);
+    assert.ok(profile.rotation);
     assert.ok(profile.signals.length > 0);
 });
 
@@ -85,6 +86,9 @@ test('recommends a site for an upcoming T round without using future rounds', ()
     assert.ok(result.site_scores.A > 0 && result.site_scores.B > 0);
     assert.ok(result.recommended_tactic_id.startsWith('dust2_t_'));
     assert.equal(result.economy.own.buy_type, 'full');
+    assert.equal(result.economy.own.buy_label, '长枪局');
+    assert.ok(result.spawn_labels.includes('A 大第一身位'));
+    assert.ok(result.risks.every((risk) => !risk.includes('对手可能已经意识到')));
     assert.equal(result.profile.rounds_observed, 2);
 });
 
@@ -94,5 +98,6 @@ test('builds a match summary with per-round site recommendations', () => {
     assert.equal(summary.status, 'ok');
     assert.ok(summary.scout_defense_profile);
     assert.ok(summary.round_recommendations.length >= 1);
+    assert.ok(summary.round_recommendations[0].review);
     assert.match(summary.limitations.join(' '), /win probability/);
 });

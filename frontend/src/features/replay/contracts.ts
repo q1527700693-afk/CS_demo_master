@@ -254,9 +254,32 @@ export interface Dust2DefenseProfile {
   plant_rounds?: { A: number; B: number }
   hold_rate?: { A: number | null; B: number | null }
   retake_seconds?: { A: number | null; B: number | null }
+  rotation?: {
+    sampled_rounds: number
+    rotated_rounds: number
+    average_seconds: number | null
+    speed: string
+    abandoned_opposite_rounds: number
+    by_site?: {
+      A?: { sampled_rounds: number; average_seconds: number | null }
+      B?: { sampled_rounds: number; average_seconds: number | null }
+    }
+  }
   weaknesses?: { A: number; B: number; weaker_site: 'A' | 'B' | null }
   confidence?: 'low' | 'medium' | string
   signals?: string[]
+}
+
+export interface Dust2RoundReview {
+  outcome: 'win' | 'loss'
+  actual_site: 'A' | 'B' | null
+  actual_primary_tactic_id: string | null
+  followed_plan: boolean | null
+  opening_credit?: { steamid: string | null; name: string; weapon: string | null } | null
+  opening_death?: { steamid: string | null; name: string; weapon: string | null } | null
+  credits: string[]
+  causes: string[]
+  suggestions: string[]
 }
 
 export interface Dust2SiteRecommendation {
@@ -266,12 +289,15 @@ export interface Dust2SiteRecommendation {
   site_scores: { A: number; B: number }
   recommended_tactic_id: string
   recommended_tactic_name: string
+  recommendation_type?: string
   confidence: 'low' | 'medium' | string
   reasons: string[]
   risks: string[]
+  spawns?: { slot_id: string; slot_label?: string; steamid: string }[]
+  spawn_labels?: string[]
   economy?: {
-    own: { buy_type: string | null; equipment_value: number | null; players: number | null }
-    enemy: { buy_type: string | null; equipment_value: number | null; players: number | null }
+    own: { buy_type: string | null; buy_label?: string; equipment_value: number | null; players: number | null }
+    enemy: { buy_type: string | null; buy_label?: string; equipment_value: number | null; players: number | null }
   }
   utility?: {
     flashbangs: number
@@ -280,6 +306,7 @@ export interface Dust2SiteRecommendation {
     fire_grenades: number
     total: number
   }
+  review?: Dust2RoundReview | null
 }
 
 export interface WeaponHighlight {

@@ -398,7 +398,12 @@ function spawnAssignments(payload, roundNum, team, effectiveSide = null) {
         }
         if (best) {
             used.add(best);
-            assignments.push({ slot_id: slot.id, steamid: best, distance_to_target: Math.round(bestDistance) });
+            assignments.push({
+                slot_id: slot.id,
+                slot_label: slot.name || slot.id,
+                steamid: best,
+                distance_to_target: Math.round(bestDistance)
+            });
         }
     }
     return assignments;

@@ -155,12 +155,23 @@ onMounted(loadTeams)
               <strong>{{ percent(profile?.hold_rate?.B) }}</strong>
             </div>
             <div class="dust2-metric">
-              <span>A 回防时间</span>
-              <strong>{{ numberText(profile?.retake_seconds?.A) }} 秒</strong>
+              <span>观察到转点</span>
+              <strong>
+                {{ profile?.rotation?.rotated_rounds ?? 0 }}/{{ profile?.rotation?.sampled_rounds ?? 0 }} 回合
+              </strong>
             </div>
             <div class="dust2-metric">
-              <span>B 回防时间</span>
-              <strong>{{ numberText(profile?.retake_seconds?.B) }} 秒</strong>
+              <span>转点速度</span>
+              <strong>
+                {{ profile?.rotation?.speed || '未观察' }}
+                <small v-if="profile?.rotation?.average_seconds != null">
+                  · {{ numberText(profile.rotation.average_seconds) }} 秒
+                </small>
+              </strong>
+            </div>
+            <div class="dust2-metric">
+              <span>反向包点放空</span>
+              <strong>{{ profile?.rotation?.abandoned_opposite_rounds ?? 0 }} 回合</strong>
             </div>
           </div>
           <div class="dust2-signals">
@@ -206,9 +217,43 @@ onMounted(loadTeams)
                   <li v-for="reason in recommendation.reasons" :key="reason">{{ reason }}</li>
                 </ul>
               </div>
+              <div class="dust2-round-meta">
+                <span v-if="recommendation.economy">
+                  经济：{{ recommendation.economy.own.buy_label || recommendation.economy.own.buy_type || '未知' }}
+                  vs {{ recommendation.economy.enemy.buy_label || recommendation.economy.enemy.buy_type || '未知' }}
+                </span>
+                <span v-if="recommendation.spawn_labels?.length">
+                  身位：{{ recommendation.spawn_labels.join('、') }}
+                </span>
+              </div>
               <div v-if="recommendation.risks.length" class="dust2-risks">
                 <strong>风险</strong>
                 <span v-for="risk in recommendation.risks" :key="risk">{{ risk }}</span>
+              </div>
+              <div v-if="recommendation.review" class="dust2-round-review">
+                <p class="dust2-review-headline">
+                  实际结果：
+                  <strong :class="recommendation.review.outcome === 'win' ? 'win' : 'loss'">
+                    {{ recommendation.review.outcome === 'win' ? '胜利' : '失败' }}
+                  </strong>
+                  <span>实际方向：{{ recommendation.review.actual_site || '未识别' }}</span>
+                  <span>
+                    建议执行：
+                    {{ recommendation.review.followed_plan == null ? '无法判断' : recommendation.review.followed_plan ? '是' : '否' }}
+                  </span>
+                </p>
+                <div v-if="recommendation.review.credits.length" class="dust2-review-lines">
+                  <strong>本回合亮点</strong>
+                  <span v-for="item in recommendation.review.credits" :key="item">{{ item }}</span>
+                </div>
+                <div v-if="recommendation.review.causes.length" class="dust2-review-lines">
+                  <strong>复盘原因</strong>
+                  <span v-for="item in recommendation.review.causes" :key="item">{{ item }}</span>
+                </div>
+                <div v-if="recommendation.review.suggestions.length" class="dust2-review-lines suggestions">
+                  <strong>建议</strong>
+                  <span v-for="item in recommendation.review.suggestions" :key="item">{{ item }}</span>
+                </div>
               </div>
             </article>
           </div>
@@ -580,6 +625,57 @@ onMounted(loadTeams)
   background: rgba(255, 255, 255, 0.05);
   color: var(--muted, #aab4c3);
   font-size: 11px;
+}
+.dust2-round-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--muted, #8d97a8);
+  font-size: 11px;
+}
+.dust2-round-meta span {
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.dust2-round-review {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 8px;
+}
+.dust2-review-headline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  color: var(--muted, #aab4c3);
+  font-size: 12px;
+}
+.dust2-review-headline strong.win {
+  color: #8de0b4;
+}
+.dust2-review-headline strong.loss {
+  color: #ff9d9d;
+}
+.dust2-review-lines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--muted, #aab4c3);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.dust2-review-lines strong {
+  color: #ffb27d;
+}
+.dust2-review-lines span {
+  flex-basis: 100%;
+}
+.dust2-review-lines.suggestions strong {
+  color: #8de0b4;
 }
 @media (max-width: 760px) {
   .dust2-head,
