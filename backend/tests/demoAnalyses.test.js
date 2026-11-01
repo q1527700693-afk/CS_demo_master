@@ -408,3 +408,40 @@ test('an unavailable parser fails fast with 503 instead of storing the demo', as
         demoParser.probe = original;
     }
 });
+
+test('exposes Dust2 teams and tactical summary without changing the report contract', async () => {
+    const originalParser = demoParser.parseDemo;
+    demoParser.parseDemo = async ({ input, output }) => {
+        const bytes = fs.readFileSync(input);
+        const payload = build({ sha256: crypto.createHash('sha256').update(bytes).digest('hex'), sizeBytes: bytes.length, fileName: 'match.dem' });
+        payload.header.map_name = 'de_dust2';
+        fs.writeFileSync(output, JSON.stringify(payload));
+        return payload;
+    };
+    try {
+        const created = await upload(Buffer.concat([Buffer.from('PBDEMS2\0'), Buffer.alloc(4096, 9)]));
+        assert.equal(created.status, 202);
+        const id = created.body.data.demo_id;
+        await waitForDemo(id);
+        try {
+        const teams = await call(`/demo-analyses/${id}/teams`);
+        assert.equal(teams.status, 200);
+        assert.equal(teams.body.data.map, 'de_dust2');
+        assert.ok(teams.body.data.teams.some((team) => team.team_clan_name === 'Fixture'));
+        const summary = await call(`/demo-analyses/${id}/dust2-summary?team=Fixture&maxRounds=10&scoutRounds=6`);
+        assert.equal(summary.status, 200);
+        assert.equal(summary.body.data.map, 'de_dust2');
+        assert.equal(summary.body.data.own_team.team_clan_name, 'Fixture');
+        assert.ok(Array.isArray(summary.body.data.weapon_highlights));
+        assert.ok(Array.isArray(summary.body.data.weapon_profiles));
+        assert.ok(Array.isArray(summary.body.data.player_weapon_impact));
+        assert.ok(Array.isArray(summary.body.data.weapon_transitions));
+        assert.ok(Array.isArray(summary.body.data.round_recommendations));
+        assert.match(summary.body.data.limitations.join(' '), /win probability/);
+        } finally {
+            await call(`/demo-analyses/${id}`, { method: 'DELETE' });
+        }
+    } finally {
+        demoParser.parseDemo = originalParser;
+    }
+});

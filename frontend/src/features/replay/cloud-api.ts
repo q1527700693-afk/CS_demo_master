@@ -7,6 +7,8 @@ import type {
   ReplayMapItem,
   RoundDetail,
   AnalysisRun,
+  CloudTeam,
+  Dust2Summary,
 } from './contracts'
 // The new backend uses flat events and different round/module field names.
 // Adapt those differences once, before any existing report component sees them.
@@ -223,6 +225,22 @@ export async function getCloudEvents(id: string, details?: ReplayDetails, signal
     ),
   }
 }
+
+export const getCloudTeams = (id: string, signal?: AbortSignal) =>
+  request<{ map: string; teams: CloudTeam[] }>(`${cloudPath(id)}/teams`, { signal })
+
+export const getCloudDust2Summary = (
+  id: string,
+  team: string,
+  options: { maxRounds?: number; scoutRounds?: number } = {},
+  signal?: AbortSignal,
+) =>
+  request<Dust2Summary>(
+    `${cloudPath(id)}/dust2-summary?team=${encodeURIComponent(team)}&maxRounds=${
+      options.maxRounds ?? 10
+    }&scoutRounds=${options.scoutRounds ?? 6}`,
+    { signal },
+  )
 
 export const getCloudPlayers = (id: string, signal?: AbortSignal) =>
   request<{

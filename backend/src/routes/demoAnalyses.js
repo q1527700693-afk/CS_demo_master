@@ -23,6 +23,9 @@ const { db, root, directory } = require('../services/replayStore');
 const demoParser = require('../services/demoParser');
 const aiAnalysis = require('../services/aiAnalysis');
 const {selectPerspective, roster} = require('../services/demoSelection');
+const {teamRosters} = require('../services/dust2Tactics');
+const dust2Defense = require('../services/dust2Defense');
+const {extractWeaponImpact} = require('../services/weaponImpact');
 const { enqueueDemoAi } = require('../services/replayQueue');
 
 const VISIBLE = `kind='demo' AND owner_id=? AND (coalesce(json_extract(meta,'$.selection_mode'),'')!='choose' OR NOT EXISTS (SELECT 1 FROM replay_jobs child WHERE child.owner_id=replay_jobs.owner_id AND child.kind='demo' AND coalesce(json_extract(child.meta,'$.selection_mode'),'')!='choose' AND json_extract(child.meta,'$.demo_sha256')=json_extract(replay_jobs.meta,'$.demo_sha256')))`;
@@ -284,6 +287,42 @@ router.get('/:id/players', wrap(async (req, res) => {
     const meta = metaOf(row);
     success(res, {players:roster(payload),map:payload.header.map_name,started_at:meta.played_at || payload.match_started_at || null});
 }));
+async function parsedPayload(row) {
+    return JSON.parse(await fsp.readFile(path.join(directory(row.id), 'parse.json'), 'utf8'));
+}
+
+router.get('/:id/teams', wrap(async (req, res) => {
+    const row = demoRow(req.user.id, req.params.id);
+    if (row.status !== 'ready') throw errors.conflict('Demo is still parsing');
+    const payload = await parsedPayload(row);
+    success(res, {
+        map: payload.header?.map_name || null,
+        teams: teamRosters(payload)
+    });
+}));
+
+router.get('/:id/dust2-summary', wrap(async (req, res) => {
+    const row = demoRow(req.user.id, req.params.id);
+    if (row.status !== 'ready') throw errors.conflict('Report is not ready');
+    const payload = await parsedPayload(row);
+    if (String(payload.header?.map_name || '').toLowerCase() !== 'de_dust2') {
+        throw errors.invalidParameter('Dust2 tactical summary is only available for de_dust2 demos');
+    }
+    const team = String(req.query.team || '').trim();
+    if (!team) throw errors.invalidParameter('team is required');
+    const maxRounds = Math.max(1, Math.min(Number(req.query.maxRounds) || 10, 30));
+    const scoutRounds = Math.max(1, Math.min(Number(req.query.scoutRounds) || 6, 20));
+    const summary = dust2Defense.buildMatchSummary(payload, team, { maxRounds, scoutRounds });
+    if (summary.status !== 'ok') throw errors.invalidParameter(summary.reason || 'Invalid demo team');
+    const weapons = extractWeaponImpact(payload);
+    summary.weapon_highlights = weapons.highlights;
+    summary.weapon_profiles = weapons.player_profiles;
+    summary.player_weapon_impact = weapons.player_weapon_impact;
+    summary.weapon_transitions = weapons.weapon_transitions;
+    summary.weapon_limitations = weapons.limitations;
+    success(res, summary);
+}));
+
 router.post('/:id/analyses', wrap(async (req, res) => {
     const row = demoRow(req.user.id, req.params.id);
     if (typeof req.body?.target_player_id !== 'string') throw errors.invalidParameter('Select a player');

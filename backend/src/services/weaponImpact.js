@@ -117,6 +117,43 @@ function isStrongBuy(buyType) {
     return ['full', 'force'].includes(String(buyType || '').toLowerCase());
 }
 
+function extractWeaponTransitions(payload, limit = 80) {
+    const grouped = new Map();
+    for (const sample of payload?.all_player_samples || []) {
+        const weapon = sample?.active_weapon ? normalizeWeapon(sample.active_weapon) : null;
+        if (!weapon) continue;
+        const key = `${sample.steamid}:${sample.round_num}`;
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push(sample);
+    }
+    const transitions = [];
+    for (const samples of grouped.values()) {
+        samples.sort((a, b) => Number(a.tick) - Number(b.tick));
+        for (let index = 1; index < samples.length; index += 1) {
+            const previous = normalizeWeapon(samples[index - 1].active_weapon);
+            const current = normalizeWeapon(samples[index].active_weapon);
+            const previousInfo = weaponInfo(previous);
+            const currentInfo = weaponInfo(current);
+            if (!previous || !current || previous === current) continue;
+            if (['melee', 'utility', 'objective', 'other'].includes(previousInfo.category) ||
+                ['melee', 'utility', 'objective', 'other'].includes(currentInfo.category)) continue;
+            transitions.push({
+                steamid: String(samples[index].steamid),
+                player_name: samples[index].name || null,
+                round_num: Number(samples[index].round_num),
+                tick: Number(samples[index].tick),
+                from_weapon: previous,
+                to_weapon: current,
+                from_label: previousInfo.label,
+                to_label: currentInfo.label,
+                confidence: 'sampled',
+                kind: 'weapon_change_in_snapshots'
+            });
+        }
+    }
+    return transitions.sort((a, b) => a.tick - b.tick).slice(0, limit);
+}
+
 function extractWeaponImpact(payload) {
     const players = playerMaps(payload);
     const economy = economyMap(payload);
@@ -264,16 +301,52 @@ function extractWeaponImpact(payload) {
         };
     });
 
+    const playerWeaponImpact = [...playerBuckets.entries()].map(([steamid, list]) => {
+        const player = players.byId.get(String(steamid)) || {};
+        const playerHighlights = highlights.filter((item) => item.steamid === String(steamid));
+        return {
+            steamid: String(steamid),
+            name: player.name || list[0].player_name,
+            team_clan_name: player.team_clan_name || list[0].team_clan_name || null,
+            side: player.side ? normalizeSide(player.side) : list[0].side,
+            kills: list.reduce((sum, item) => sum + item.kills, 0),
+            headshots: list.reduce((sum, item) => sum + item.headshots, 0),
+            first_bloods: list.reduce((sum, item) => sum + item.first_bloods, 0),
+            economy_kills: list.reduce((sum, item) => sum + item.economy_kills, 0),
+            low_cost_kills: list.reduce((sum, item) => sum + item.low_cost_kills, 0),
+            special_highlight_count: playerHighlights.length,
+            weapon_impact_score: Math.round(list.reduce((sum, item) => sum + item.impact_score, 0) * 10) / 10,
+            top_weapons: [...list].sort((a, b) => b.kills - a.kills || b.impact_score - a.impact_score).slice(0, 3).map((item) => ({
+                weapon: item.weapon,
+                weapon_label: item.weapon_label,
+                category: item.category,
+                kills: item.kills,
+                first_bloods: item.first_bloods,
+                economy_kills: item.economy_kills
+            }))
+        };
+    }).sort((a, b) => b.weapon_impact_score - a.weapon_impact_score);
+
+    const weaponTransitions = extractWeaponTransitions(payload);
     return {
         schema_version: SCHEMA_VERSION,
         demo_sha256: payload?.demo?.sha256 || null,
         map: payload?.header?.map_name || null,
         highlights,
-        player_profiles: playerProfiles,
+        player_profiles: playerWeaponImpact.map((item) => ({
+            steamid: item.steamid,
+            name: item.name,
+            side: item.side,
+            team_clan_name: item.team_clan_name,
+            top_weapons: item.top_weapons
+        })),
+        player_weapon_impact: playerWeaponImpact,
+        weapon_transitions: weaponTransitions,
         limitations: [
             'Weapon highlights are candidate signals, not a complete player rating.',
             'A kill in an eco round is not automatically a mistake by the opponent.',
-            'Weapon prices are approximate CS2 values.'
+            'Weapon prices are approximate CS2 values.',
+            'weapon_transitions are sampled from snapshots; they are not proof of pickup/drop intent.'
         ]
     };
 }
@@ -283,5 +356,6 @@ module.exports = {
     WEAPONS,
     normalizeWeapon,
     weaponInfo,
-    extractWeaponImpact
+    extractWeaponImpact,
+    extractWeaponTransitions
 };

@@ -37,6 +37,10 @@ function payload() {
             { round_num: 2, side: 'terrorist', buy_type: 'force', equipment_value: 12000, n_players: 5 },
             { round_num: 2, side: 'counter-terrorist', buy_type: 'full', equipment_value: 25000, n_players: 5 }
         ],
+        all_player_samples: [
+            { steamid: '1', name: 'T1', round_num: 1, tick: 90, active_weapon: 'glock' },
+            { steamid: '1', name: 'T1', round_num: 1, tick: 110, active_weapon: 'revolver' }
+        ],
         kills: [
             kill('kill_0001', 1, 100, '1', 'T1', 'terrorist', 'revolver', '4'),
             kill('kill_0002', 1, 200, '1', 'T1', 'terrorist', 'revolver', '5'),
@@ -73,4 +77,13 @@ test('keeps weapon evidence IDs available for AI citation', () => {
     const highlighted = result.highlights.find((item) => item.weapon === 'revolver');
     assert.ok(highlighted.evidence_ids.includes('kill_0001'));
     assert.ok(highlighted.evidence_ids.includes('kill_0002'));
+});
+
+test('exposes a transparent per-player weapon impact score and sampled transitions', () => {
+    const result = extractWeaponImpact(payload());
+    const t1 = result.player_weapon_impact.find((item) => item.name === 'T1');
+    assert.ok(t1);
+    assert.ok(t1.weapon_impact_score > 0);
+    assert.equal(t1.special_highlight_count, 1);
+    assert.ok(result.weapon_transitions.some((item) => item.from_label === 'Glock-18' && item.to_label === 'R8 Revolver'));
 });

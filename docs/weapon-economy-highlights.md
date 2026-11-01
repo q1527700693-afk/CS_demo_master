@@ -66,3 +66,15 @@ The AI job reads that file and adds the compact highlights to its fact payload.
 - Bullet penetration, wallbang, smoke and flash interaction are not yet combined
   into the highlight score.
 - The frontend does not display a separate weapon-highlights tab yet.
+
+## Per-player impact and sampled transitions
+
+The extractor also emits:
+
+- `player_weapon_impact`: a transparent weapon-only score with kills, first
+  bloods, economy kills and top weapons;
+- `weapon_transitions`: sampled active-weapon changes from all-player snapshots.
+
+`weapon_transitions` are **not** proof of a pickup or deliberate weapon switch.
+They are compact context for the AI and must always be presented as sampled
+evidence, not as a definitive pickup/drop log.

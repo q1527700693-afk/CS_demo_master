@@ -1000,7 +1000,23 @@ Errors:
 | 50200 | 502 | Provider error, timeout, invalid JSON or unknown evidence ID |
 | 50300 | 503 | `DEEPSEEK_API_KEY` is not configured |
 
-## 10. Error Codes
+## 10. Dust2 tactical analysis
+
+Raw demo reports can additionally expose a team-facing Dust2 report without
+changing the existing report endpoints.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/v1/demo-analyses/{id}/teams` | yes | Demo team names and SteamID rosters |
+| GET | `/api/v1/demo-analyses/{id}/dust2-summary?team={team}&maxRounds=10&scoutRounds=6` | yes | Deterministic CT defense profile, per-T-round site recommendations and weapon/economy highlights |
+
+The summary is de_dust2-only. It is a rule-engine report, not a calibrated win
+probability. It includes `weapon_highlights`, `player_weapon_impact` and sampled
+`weapon_transitions`; sampled transitions are not proof of pickup/drop intent.
+The existing `/report`, `/details`, `/rounds`, `/evidence` and `/ai` contracts
+remain unchanged.
+
+## 11. Error Codes
 
 | Code | HTTP | Description |
 |---:|---:|---|
@@ -1017,7 +1033,7 @@ Errors:
 | 50300 | 503 | AI analysis is not configured |
 | 50310 | 503 | Demo parser unavailable (no Python/awpy) |
 
-## 11. Changelog
+## 12. Changelog
 
 | Version | Date | Author | Description |
 |---|---|---|---|
@@ -1029,3 +1045,4 @@ Errors:
 | v1.5 | 2026-10-23 | CS Demo Master Team | Added mutual friend requests, accept/reject/cancel, private friend list, remove friend, and authenticated user search with relationship states |
 | v1.6 | 2026-10-24 | CS Demo Master Team | Added optional AI coaching endpoints backed by a server-side DeepSeek/OpenAI-compatible provider; disabled without `DEEPSEEK_API_KEY` |
 | v1.7 | 2026-10-28 | CS Demo Master Team | Added raw `.dem` upload and analysis (`/api/v1/demo-analyses`): server-side awpy parsing, rule report, map points, evidence and queued demo-grounded AI coaching; new code `50310` |
+| v1.8 | 2026-10-31 | CS Demo Master Team | Added additive Dust2 team/defense/site-recommendation summary, weapon/economy highlights and AI weapon facts; existing report contracts unchanged |
