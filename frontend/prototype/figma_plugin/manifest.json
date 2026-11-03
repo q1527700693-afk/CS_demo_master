@@ -1,0 +1,15 @@
+{
+  "name": "CS Demo Master 原型连线",
+  "id": "1465724538964020912",
+  "api": "1.0.0",
+  "editorType": [
+    "figma"
+  ],
+  "main": "code.js",
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": [
+      "none"
+    ]
+  }
+}

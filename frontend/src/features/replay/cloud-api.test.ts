@@ -7,9 +7,22 @@ import {
   cloudKey,
   isCloudAnalysis,
   cloudRun,
+  getCloudTeams,
+  getCloudDust2Summary,
 } from './cloud-api'
+import { request } from '@/api/http'
 import { analysisName } from './analysis-name'
 describe('cloud compatibility boundary', () => {
+  it('queries the selected team without leaking cloud namespaces or query separators', async () => {
+    const signal = new AbortController().signal
+    await getCloudTeams('cloud:demo/123', signal)
+    expect(request).toHaveBeenLastCalledWith('/demo-analyses/demo%2F123/teams', { signal })
+    await getCloudDust2Summary('cloud:demo/123', 'A & B/中文', {}, signal)
+    expect(request).toHaveBeenLastCalledWith(
+      '/demo-analyses/demo%2F123/dust2-summary?team=A%20%26%20B%2F%E4%B8%AD%E6%96%87&maxRounds=10&scoutRounds=6',
+      { signal },
+    )
+  })
   it('wraps flat raw events without losing evidence or death context', () => {
     const raw = {
       event_id: 'hurt_1',

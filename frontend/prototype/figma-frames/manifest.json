@@ -1,0 +1,3747 @@
+{
+  "screens": [
+    {
+      "key": "index",
+      "title": "01 总览"
+    },
+    {
+      "key": "login",
+      "title": "02 登录"
+    },
+    {
+      "key": "register",
+      "title": "03 注册"
+    },
+    {
+      "key": "replays",
+      "title": "04 我的复盘"
+    },
+    {
+      "key": "upload",
+      "title": "05 新建复盘"
+    },
+    {
+      "key": "upload-manual",
+      "title": "06 手动上传"
+    },
+    {
+      "key": "upload-progress",
+      "title": "07 分析进度"
+    },
+    {
+      "key": "report-overview",
+      "title": "08 报告·比赛概览"
+    },
+    {
+      "key": "report-rounds",
+      "title": "09 报告·回合复盘"
+    },
+    {
+      "key": "report-utility",
+      "title": "10 报告·道具与生存"
+    },
+    {
+      "key": "report-data",
+      "title": "11 报告·详细数据"
+    },
+    {
+      "key": "training",
+      "title": "12 瞄准训练"
+    },
+    {
+      "key": "training-setup",
+      "title": "13 训练设置"
+    },
+    {
+      "key": "training-result",
+      "title": "14 训练结算"
+    },
+    {
+      "key": "lobbies",
+      "title": "15 校园车队"
+    },
+    {
+      "key": "lobbies-competitive",
+      "title": "16 车队·竞技匹配"
+    },
+    {
+      "key": "lobbies-premier",
+      "title": "17 车队·优先模式"
+    },
+    {
+      "key": "lobby-create",
+      "title": "18 发布车队"
+    },
+    {
+      "key": "lobby-created",
+      "title": "19 发布成功"
+    },
+    {
+      "key": "lobby-detail",
+      "title": "20 车队详情"
+    },
+    {
+      "key": "lobby-code",
+      "title": "21 领取组队码"
+    },
+    {
+      "key": "friends",
+      "title": "22 我的好友"
+    },
+    {
+      "key": "friends-search",
+      "title": "23 搜索玩家"
+    },
+    {
+      "key": "friends-request",
+      "title": "24 好友申请"
+    },
+    {
+      "key": "player",
+      "title": "25 玩家名片"
+    },
+    {
+      "key": "profile",
+      "title": "26 个人中心"
+    },
+    {
+      "key": "profile-edit",
+      "title": "27 编辑资料"
+    },
+    {
+      "key": "replay-library",
+      "title": "28 本地复盘库"
+    },
+    {
+      "key": "local-parser",
+      "title": "29 本地解析"
+    },
+    {
+      "key": "training-history",
+      "title": "30 训练记录"
+    },
+    {
+      "key": "training-guide",
+      "title": "31 训练教程"
+    },
+    {
+      "key": "report-map",
+      "title": "32 回合地图"
+    },
+    {
+      "key": "lobby-owner",
+      "title": "33 队长管理"
+    },
+    {
+      "key": "lobby-departed",
+      "title": "34 已发车"
+    }
+  ],
+  "links": 145,
+  "hotspots": {
+    "index": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "＋ 新建复盘",
+        "target": "upload",
+        "x": 1590,
+        "y": 188,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "开始我的复盘 →",
+        "target": "upload",
+        "x": 501,
+        "y": 479,
+        "width": 136,
+        "height": 41
+      },
+      {
+        "label": "查看复盘 →",
+        "target": "replays",
+        "x": 483,
+        "y": 1027,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "进入训练 →",
+        "target": "training",
+        "x": 902,
+        "y": 1027,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "寻找车队 →",
+        "target": "lobbies",
+        "x": 1320,
+        "y": 1027,
+        "width": 108,
+        "height": 44
+      }
+    ],
+    "login": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "登录并进入 →",
+        "target": "index",
+        "x": 1111,
+        "y": 523,
+        "width": 122,
+        "height": 44
+      },
+      {
+        "label": "创建账号 →",
+        "target": "register",
+        "x": 1243,
+        "y": 523,
+        "width": 108,
+        "height": 44
+      }
+    ],
+    "register": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "创建账号并完善资料 →",
+        "target": "profile-edit",
+        "x": 483,
+        "y": 616,
+        "width": 178,
+        "height": 44
+      },
+      {
+        "label": "返回登录",
+        "target": "login",
+        "x": 671,
+        "y": 616,
+        "width": 90,
+        "height": 44
+      }
+    ],
+    "replays": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "＋ 新建复盘",
+        "target": "upload",
+        "x": 1590,
+        "y": 188,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "查看本地复盘库 →",
+        "target": "replay-library",
+        "x": 458,
+        "y": 261,
+        "width": 150,
+        "height": 44
+      },
+      {
+        "label": "查看报告 →",
+        "target": "report-overview",
+        "x": 1565,
+        "y": 391,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "查看报告 →",
+        "target": "report-overview",
+        "x": 1565,
+        "y": 471,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "查看报告 →",
+        "target": "report-overview",
+        "x": 1565,
+        "y": 551,
+        "width": 108,
+        "height": 44
+      }
+    ],
+    "upload": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "自动导入",
+        "target": "upload",
+        "x": 483,
+        "y": 339,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "手动上传 ZIP",
+        "target": "upload-manual",
+        "x": 563,
+        "y": 339,
+        "width": 82,
+        "height": 44
+      },
+      {
+        "label": "使用示例分析包 →",
+        "target": "upload-progress",
+        "x": 483,
+        "y": 531,
+        "width": 150,
+        "height": 44
+      },
+      {
+        "label": "返回复盘列表",
+        "target": "replays",
+        "x": 643,
+        "y": 531,
+        "width": 118,
+        "height": 44
+      },
+      {
+        "label": "本地解析 Demo →",
+        "target": "local-parser",
+        "x": 458,
+        "y": 619,
+        "width": 153,
+        "height": 44
+      }
+    ],
+    "upload-manual": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "自动导入",
+        "target": "upload",
+        "x": 483,
+        "y": 306,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "手动上传 ZIP",
+        "target": "upload-manual",
+        "x": 563,
+        "y": 306,
+        "width": 82,
+        "height": 44
+      },
+      {
+        "label": "上传示例分析包 →",
+        "target": "upload-progress",
+        "x": 483,
+        "y": 520,
+        "width": 150,
+        "height": 44
+      },
+      {
+        "label": "取消",
+        "target": "replays",
+        "x": 643,
+        "y": 520,
+        "width": 62,
+        "height": 44
+      }
+    ],
+    "upload-progress": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "查看 Pose 的报告 →",
+        "target": "report-overview",
+        "x": 483,
+        "y": 606,
+        "width": 164,
+        "height": 44
+      },
+      {
+        "label": "返回复盘列表",
+        "target": "replays",
+        "x": 657,
+        "y": 606,
+        "width": 118,
+        "height": 44
+      }
+    ],
+    "report-overview": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "← 我的复盘",
+        "target": "replays",
+        "x": 1590,
+        "y": 188,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "比赛概览",
+        "target": "report-overview",
+        "x": 458,
+        "y": 451,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "回合复盘",
+        "target": "report-rounds",
+        "x": 538,
+        "y": 451,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "道具与生存",
+        "target": "report-utility",
+        "x": 618,
+        "y": 451,
+        "width": 70,
+        "height": 44
+      },
+      {
+        "label": "详细数据",
+        "target": "report-data",
+        "x": 712,
+        "y": 451,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "查看关键回合 →",
+        "target": "report-rounds",
+        "x": 483,
+        "y": 793,
+        "width": 136,
+        "height": 41
+      },
+      {
+        "label": "定位到回合复盘 →",
+        "target": "report-rounds",
+        "x": 1111,
+        "y": 747,
+        "width": 150,
+        "height": 41
+      }
+    ],
+    "report-rounds": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "← 我的复盘",
+        "target": "replays",
+        "x": 1590,
+        "y": 188,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "比赛概览",
+        "target": "report-overview",
+        "x": 458,
+        "y": 451,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "回合复盘",
+        "target": "report-rounds",
+        "x": 538,
+        "y": 451,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "道具与生存",
+        "target": "report-utility",
+        "x": 618,
+        "y": 451,
+        "width": 70,
+        "height": 44
+      },
+      {
+        "label": "详细数据",
+        "target": "report-data",
+        "x": 712,
+        "y": 451,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "查看回合地图 →",
+        "target": "report-map",
+        "x": 1537,
+        "y": 640,
+        "width": 136,
+        "height": 44
+      },
+      {
+        "label": "查看回合地图 →",
+        "target": "report-utility",
+        "x": 1537,
+        "y": 720,
+        "width": 136,
+        "height": 44
+      },
+      {
+        "label": "查看详细数据 →",
+        "target": "report-data",
+        "x": 1537,
+        "y": 800,
+        "width": 136,
+        "height": 44
+      }
+    ],
+    "report-utility": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "← 我的复盘",
+        "target": "replays",
+        "x": 1590,
+        "y": 188,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "比赛概览",
+        "target": "report-overview",
+        "x": 458,
+        "y": 451,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "回合复盘",
+        "target": "report-rounds",
+        "x": 538,
+        "y": 451,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "道具与生存",
+        "target": "report-utility",
+        "x": 618,
+        "y": 451,
+        "width": 70,
+        "height": 44
+      },
+      {
+        "label": "详细数据",
+        "target": "report-data",
+        "x": 712,
+        "y": 451,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "返回相关回合 →",
+        "target": "report-rounds",
+        "x": 1111,
+        "y": 613,
+        "width": 136,
+        "height": 41
+      }
+    ],
+    "report-data": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "← 我的复盘",
+        "target": "replays",
+        "x": 1590,
+        "y": 188,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "比赛概览",
+        "target": "report-overview",
+        "x": 458,
+        "y": 451,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "回合复盘",
+        "target": "report-rounds",
+        "x": 538,
+        "y": 451,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "道具与生存",
+        "target": "report-utility",
+        "x": 618,
+        "y": 451,
+        "width": 70,
+        "height": 44
+      },
+      {
+        "label": "详细数据",
+        "target": "report-data",
+        "x": 712,
+        "y": 451,
+        "width": 56,
+        "height": 44
+      }
+    ],
+    "training": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "训练记录 →",
+        "target": "training-history",
+        "x": 458,
+        "y": 261,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "操作教程 →",
+        "target": "training-guide",
+        "x": 576,
+        "y": 261,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "选择模式 →",
+        "target": "training-setup",
+        "x": 483,
+        "y": 406,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "选择模式 →",
+        "target": "training-setup",
+        "x": 902,
+        "y": 406,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "选择模式 →",
+        "target": "training-setup",
+        "x": 1320,
+        "y": 406,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "选择模式 →",
+        "target": "training-setup",
+        "x": 483,
+        "y": 592,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "选择模式 →",
+        "target": "training-setup",
+        "x": 902,
+        "y": 592,
+        "width": 108,
+        "height": 44
+      }
+    ],
+    "training-setup": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "开始训练并查看示例结算 →",
+        "target": "training-result",
+        "x": 483,
+        "y": 487,
+        "width": 206,
+        "height": 44
+      },
+      {
+        "label": "返回模式选择",
+        "target": "training",
+        "x": 699,
+        "y": 487,
+        "width": 118,
+        "height": 44
+      }
+    ],
+    "training-result": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "再来一轮 →",
+        "target": "training-setup",
+        "x": 458,
+        "y": 449,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "查看个人名片 →",
+        "target": "profile",
+        "x": 576,
+        "y": 449,
+        "width": 136,
+        "height": 44
+      }
+    ],
+    "lobbies": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "＋ 发布车队",
+        "target": "lobby-create",
+        "x": 1590,
+        "y": 188,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "全部模式",
+        "target": "lobbies",
+        "x": 458,
+        "y": 333,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "竞技匹配",
+        "target": "lobbies-competitive",
+        "x": 538,
+        "y": 333,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "优先模式",
+        "target": "lobbies-premier",
+        "x": 618,
+        "y": 333,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "查看详情 →",
+        "target": "lobby-detail",
+        "x": 483,
+        "y": 544,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "领取组队码 →",
+        "target": "lobby-code",
+        "x": 601,
+        "y": 544,
+        "width": 122,
+        "height": 44
+      },
+      {
+        "label": "查看详情 →",
+        "target": "lobby-detail",
+        "x": 902,
+        "y": 544,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "领取组队码 →",
+        "target": "lobby-code",
+        "x": 1020,
+        "y": 544,
+        "width": 122,
+        "height": 44
+      },
+      {
+        "label": "查看详情 →",
+        "target": "lobby-detail",
+        "x": 1320,
+        "y": 544,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "领取组队码 →",
+        "target": "lobby-code",
+        "x": 1438,
+        "y": 544,
+        "width": 122,
+        "height": 44
+      }
+    ],
+    "lobbies-competitive": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "＋ 发布车队",
+        "target": "lobby-create",
+        "x": 1590,
+        "y": 188,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "全部模式",
+        "target": "lobbies",
+        "x": 458,
+        "y": 261,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "竞技匹配",
+        "target": "lobbies-competitive",
+        "x": 538,
+        "y": 261,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "优先模式",
+        "target": "lobbies-premier",
+        "x": 618,
+        "y": 261,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "查看详情 →",
+        "target": "lobby-detail",
+        "x": 483,
+        "y": 427,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "领取组队码 →",
+        "target": "lobby-code",
+        "x": 601,
+        "y": 427,
+        "width": 122,
+        "height": 44
+      }
+    ],
+    "lobbies-premier": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "＋ 发布车队",
+        "target": "lobby-create",
+        "x": 1590,
+        "y": 188,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "全部模式",
+        "target": "lobbies",
+        "x": 458,
+        "y": 261,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "竞技匹配",
+        "target": "lobbies-competitive",
+        "x": 538,
+        "y": 261,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "优先模式",
+        "target": "lobbies-premier",
+        "x": 618,
+        "y": 261,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "查看详情 →",
+        "target": "lobby-detail",
+        "x": 483,
+        "y": 427,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "领取组队码 →",
+        "target": "lobby-code",
+        "x": 601,
+        "y": 427,
+        "width": 122,
+        "height": 44
+      }
+    ],
+    "lobby-create": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "确认发布 →",
+        "target": "lobby-created",
+        "x": 483,
+        "y": 628,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "取消",
+        "target": "lobbies",
+        "x": 601,
+        "y": 628,
+        "width": 62,
+        "height": 44
+      }
+    ],
+    "lobby-created": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "管理我的车队 →",
+        "target": "lobby-owner",
+        "x": 483,
+        "y": 370,
+        "width": 136,
+        "height": 44
+      },
+      {
+        "label": "返回大厅",
+        "target": "lobbies",
+        "x": 629,
+        "y": 370,
+        "width": 90,
+        "height": 44
+      }
+    ],
+    "lobby-detail": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "← 返回大厅",
+        "target": "lobbies",
+        "x": 1590,
+        "y": 188,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "领取组队码 →",
+        "target": "lobby-code",
+        "x": 483,
+        "y": 542,
+        "width": 122,
+        "height": 44
+      },
+      {
+        "label": "查看队长名片 →",
+        "target": "player",
+        "x": 615,
+        "y": 542,
+        "width": 136,
+        "height": 44
+      }
+    ],
+    "lobby-code": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "返回车队详情 →",
+        "target": "lobby-detail",
+        "x": 483,
+        "y": 431,
+        "width": 136,
+        "height": 44
+      },
+      {
+        "label": "回到大厅",
+        "target": "lobbies",
+        "x": 629,
+        "y": 431,
+        "width": 90,
+        "height": 44
+      }
+    ],
+    "friends": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "我的名片",
+        "target": "player",
+        "x": 1608,
+        "y": 188,
+        "width": 90,
+        "height": 44
+      },
+      {
+        "label": "我的好友",
+        "target": "friends",
+        "x": 458,
+        "y": 261,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "搜索玩家",
+        "target": "friends-search",
+        "x": 538,
+        "y": 261,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "好友申请",
+        "target": "friends-request",
+        "x": 618,
+        "y": 261,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "查看名片 →",
+        "target": "player",
+        "x": 483,
+        "y": 427,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "查看名片 →",
+        "target": "player",
+        "x": 902,
+        "y": 427,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "查看名片 →",
+        "target": "player",
+        "x": 1320,
+        "y": 427,
+        "width": 108,
+        "height": 44
+      }
+    ],
+    "friends-search": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "我的好友",
+        "target": "friends",
+        "x": 458,
+        "y": 261,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "搜索玩家",
+        "target": "friends-search",
+        "x": 538,
+        "y": 261,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "好友申请",
+        "target": "friends-request",
+        "x": 618,
+        "y": 261,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "搜索并查看 Alice →",
+        "target": "player",
+        "x": 483,
+        "y": 449,
+        "width": 161,
+        "height": 41
+      }
+    ],
+    "friends-request": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "我的好友",
+        "target": "friends",
+        "x": 458,
+        "y": 261,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "搜索玩家",
+        "target": "friends-search",
+        "x": 538,
+        "y": 261,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "好友申请",
+        "target": "friends-request",
+        "x": 618,
+        "y": 261,
+        "width": 56,
+        "height": 44
+      },
+      {
+        "label": "接受申请 →",
+        "target": "friends",
+        "x": 483,
+        "y": 473,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "拒绝",
+        "target": "friends",
+        "x": 601,
+        "y": 473,
+        "width": 62,
+        "height": 44
+      },
+      {
+        "label": "查看名片 →",
+        "target": "player",
+        "x": 1111,
+        "y": 445,
+        "width": 108,
+        "height": 41
+      }
+    ],
+    "player": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "← 玩家与好友",
+        "target": "friends",
+        "x": 1576,
+        "y": 188,
+        "width": 122,
+        "height": 44
+      },
+      {
+        "label": "发送好友申请 →",
+        "target": "friends-request",
+        "x": 483,
+        "y": 419,
+        "width": 136,
+        "height": 44
+      },
+      {
+        "label": "寻找车队 →",
+        "target": "lobbies",
+        "x": 629,
+        "y": 419,
+        "width": 108,
+        "height": 44
+      }
+    ],
+    "profile": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "编辑资料 →",
+        "target": "profile-edit",
+        "x": 1590,
+        "y": 188,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "管理好友 →",
+        "target": "friends",
+        "x": 483,
+        "y": 419,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "寻找车队 →",
+        "target": "lobbies",
+        "x": 601,
+        "y": 419,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "前往训练场 →",
+        "target": "training",
+        "x": 1111,
+        "y": 434,
+        "width": 122,
+        "height": 41
+      }
+    ],
+    "profile-edit": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "保存资料 →",
+        "target": "profile",
+        "x": 483,
+        "y": 628,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "取消",
+        "target": "profile",
+        "x": 601,
+        "y": 628,
+        "width": 62,
+        "height": 44
+      }
+    ],
+    "replay-library": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "＋ 新建复盘",
+        "target": "upload",
+        "x": 1590,
+        "y": 188,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "查看复盘 →",
+        "target": "report-overview",
+        "x": 1565,
+        "y": 322,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "查看复盘 →",
+        "target": "report-overview",
+        "x": 1565,
+        "y": 439,
+        "width": 108,
+        "height": 44
+      }
+    ],
+    "local-parser": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "解析示例 Demo →",
+        "target": "upload-progress",
+        "x": 483,
+        "y": 517,
+        "width": 155,
+        "height": 44
+      },
+      {
+        "label": "已有 ZIP，手动上传 →",
+        "target": "upload-manual",
+        "x": 648,
+        "y": 517,
+        "width": 176,
+        "height": 44
+      }
+    ],
+    "training-history": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "← 返回训练模式",
+        "target": "training",
+        "x": 1562,
+        "y": 188,
+        "width": 136,
+        "height": 44
+      },
+      {
+        "label": "再次训练 →",
+        "target": "training-setup",
+        "x": 483,
+        "y": 520,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "查看个人最佳 →",
+        "target": "profile",
+        "x": 601,
+        "y": 520,
+        "width": 136,
+        "height": 44
+      }
+    ],
+    "training-guide": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "← 返回训练模式",
+        "target": "training",
+        "x": 1562,
+        "y": 188,
+        "width": 136,
+        "height": 44
+      },
+      {
+        "label": "开始训练 →",
+        "target": "training-setup",
+        "x": 1111,
+        "y": 380,
+        "width": 108,
+        "height": 41
+      }
+    ],
+    "report-map": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "← 返回回合复盘",
+        "target": "report-rounds",
+        "x": 1562,
+        "y": 188,
+        "width": 136,
+        "height": 44
+      },
+      {
+        "label": "查看道具分析 →",
+        "target": "report-utility",
+        "x": 1111,
+        "y": 492,
+        "width": 136,
+        "height": 41
+      }
+    ],
+    "lobby-owner": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "← 返回大厅",
+        "target": "lobbies",
+        "x": 1590,
+        "y": 188,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "队长发车 →",
+        "target": "lobby-departed",
+        "x": 483,
+        "y": 558,
+        "width": 108,
+        "height": 44
+      },
+      {
+        "label": "编辑招募",
+        "target": "lobby-create",
+        "x": 601,
+        "y": 558,
+        "width": 90,
+        "height": 44
+      }
+    ],
+    "lobby-departed": [
+      {
+        "label": "⌖ CS DEMO MASTER",
+        "target": "index",
+        "x": 20,
+        "y": 28,
+        "width": 195,
+        "height": 36
+      },
+      {
+        "label": "⌗ 总览",
+        "target": "index",
+        "x": 20,
+        "y": 141,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "▤ 我的复盘",
+        "target": "replays",
+        "x": 20,
+        "y": 196,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◎ 瞄准训练",
+        "target": "training",
+        "x": 20,
+        "y": 250,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♧ 校园车队",
+        "target": "lobbies",
+        "x": 20,
+        "y": 304,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "♙ 玩家与好友",
+        "target": "friends",
+        "x": 20,
+        "y": 359,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "◯ 个人中心",
+        "target": "profile",
+        "x": 20,
+        "y": 413,
+        "width": 195,
+        "height": 46
+      },
+      {
+        "label": "Demo Player",
+        "target": "profile",
+        "x": 1684,
+        "y": 20,
+        "width": 105,
+        "height": 29
+      },
+      {
+        "label": "登录 / 注册",
+        "target": "login",
+        "x": 1790,
+        "y": 20,
+        "width": 90,
+        "height": 29
+      },
+      {
+        "label": "返回车队大厅 →",
+        "target": "lobbies",
+        "x": 483,
+        "y": 373,
+        "width": 136,
+        "height": 44
+      },
+      {
+        "label": "再发布一条招募",
+        "target": "lobby-create",
+        "x": 629,
+        "y": 373,
+        "width": 132,
+        "height": 44
+      }
+    ]
+  }
+}

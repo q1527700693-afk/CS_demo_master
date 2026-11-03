@@ -1,0 +1,32 @@
+const assert = require('node:assert/strict')
+const path = require('node:path')
+const { pathToFileURL } = require('node:url')
+const { chromium } = require(path.join(process.env.USERPROFILE, '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'))
+
+;(async () => {
+  const browser = await chromium.launch({ headless: true, executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe' })
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+    const url = pathToFileURL(path.join(__dirname, 'cs-demo-master-modao-single.html')).href
+    await page.goto(url)
+    assert.equal(await page.locator('.screen:visible').count(), 1)
+    assert.equal(await page.locator('#index').isVisible(), true)
+    await page.goto(`${url}#report-overview`)
+    await page.locator('#report-overview a[href="#report-rounds"]').first().click()
+    await page.locator('#report-rounds').waitFor({ state: 'visible' })
+    await page.locator('#report-rounds a[href="#report-utility"]').first().click()
+    await page.locator('#report-utility').waitFor({ state: 'visible' })
+    await page.locator('#report-utility a[href="#report-data"]').click()
+    await page.locator('#report-data').waitFor({ state: 'visible' })
+    await page.goto(`${url}#lobbies`)
+    await page.locator('#lobbies a[href="#lobby-create"]').first().click()
+    await page.locator('#lobby-create').waitFor({ state: 'visible' })
+    await page.locator('#lobby-create a[href="#lobby-detail"]').click()
+    await page.locator('#lobby-detail').waitFor({ state: 'visible' })
+    await page.locator('#lobby-detail a[href="#lobby-code"]').click()
+    await page.locator('#lobby-code').waitFor({ state: 'visible' })
+    await page.goto(`${url}#index`)
+    await page.screenshot({ path: path.join(__dirname, 'single-preview.png'), fullPage: true })
+    console.log('Browser checked report tabs and lobby flow')
+  } finally { await browser.close() }
+})().catch(error => { console.error(error); process.exitCode = 1 })

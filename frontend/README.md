@@ -1,3 +1,7 @@
+# 当前网页版：1.3.0
+
+Dust2 战术分析、武器亮点、转点与逐回合复盘已接入。部署与 GitHub 交付请先阅读 [HANDOFF](HANDOFF.md) 和 [1.3.0 接口说明](docs/CLOUD-DEMO-v1.3.0.md)。
+
 # CS Demo Master 前端框架
 
 ## 服务器部署说明

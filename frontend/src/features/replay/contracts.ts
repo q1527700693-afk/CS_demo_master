@@ -238,3 +238,154 @@ export interface AiCoachReport {
   strengths?: AiStrength[]
   data_limitations?: string[]
 }
+
+export interface CloudTeam {
+  team_clan_name: string
+  names: string[]
+  steamids: string[]
+  sides?: string[]
+}
+
+export interface Dust2DefenseProfile {
+  status: string
+  rounds_observed: number
+  scout_rounds?: number[]
+  initial?: { A: number | null; B: number | null; MID: number | null }
+  plant_rounds?: { A: number; B: number }
+  hold_rate?: { A: number | null; B: number | null }
+  retake_seconds?: { A: number | null; B: number | null }
+  rotation?: {
+    sampled_rounds: number
+    rotated_rounds: number
+    average_seconds: number | null
+    speed: string
+    abandoned_opposite_rounds: number
+    by_site?: {
+      A?: { sampled_rounds: number; average_seconds: number | null }
+      B?: { sampled_rounds: number; average_seconds: number | null }
+    }
+  }
+  weaknesses?: { A: number; B: number; weaker_site: 'A' | 'B' | null }
+  confidence?: 'low' | 'medium' | string
+  signals?: string[]
+}
+
+export interface Dust2RoundReview {
+  outcome: 'win' | 'loss'
+  actual_site: 'A' | 'B' | null
+  actual_primary_tactic_id: string | null
+  followed_plan: boolean | null
+  opening_credit?: { steamid: string | null; name: string; weapon: string | null } | null
+  opening_death?: { steamid: string | null; name: string; weapon: string | null } | null
+  credits: string[]
+  causes: string[]
+  suggestions: string[]
+}
+
+export interface Dust2SiteRecommendation {
+  round_num: number
+  primary_site: 'A' | 'B'
+  secondary_site: 'A' | 'B'
+  site_scores: { A: number; B: number }
+  recommended_tactic_id: string
+  recommended_tactic_name: string
+  recommendation_type?: string
+  confidence: 'low' | 'medium' | string
+  reasons: string[]
+  risks: string[]
+  spawns?: { slot_id: string; slot_label?: string; steamid: string }[]
+  spawn_labels?: string[]
+  economy?: {
+    own: {
+      buy_type: string | null
+      buy_label?: string
+      equipment_value: number | null
+      players: number | null
+    }
+    enemy: {
+      buy_type: string | null
+      buy_label?: string
+      equipment_value: number | null
+      players: number | null
+    }
+  }
+  utility?: {
+    flashbangs: number
+    smoke_grenades: number
+    he_grenades: number
+    fire_grenades: number
+    total: number
+  }
+  review?: Dust2RoundReview | null
+}
+
+export interface WeaponHighlightWeapon {
+  weapon: string
+  weapon_label: string
+  category: string
+  cost: number | null
+  kills: number
+  first_bloods: number
+  economy_kills: number
+  multi_kill_rounds: number
+}
+
+export interface WeaponHighlight {
+  player_name: string
+  team_clan_name?: string | null
+  kills: number
+  headshots: number
+  first_bloods: number
+  economy_kills: number
+  low_cost_kills: number
+  multi_kill_rounds: number
+  impact_score: number
+  weapons?: WeaponHighlightWeapon[]
+  weapon?: string
+  weapon_label?: string
+  category?: string
+  cost?: number | null
+  rounds: number[]
+  reason: string
+  evidence_ids: string[]
+}
+
+export interface Dust2PlayerWeaponImpact {
+  name: string
+  team_clan_name?: string | null
+  side?: string | null
+  kills: number
+  first_bloods: number
+  economy_kills: number
+  weapon_impact_score: number
+  top_weapons: { weapon: string; weapon_label: string; category: string; kills: number }[]
+}
+
+export interface Dust2WeaponTransition {
+  player_name: string
+  round_num: number
+  from_label: string
+  to_label: string
+  confidence: string
+  evidence_hint?: string
+}
+
+export interface Dust2Summary {
+  status: string
+  map: string
+  own_team: { label: string; team_clan_name: string | null; steamids: string[] | null }
+  opponent_team: { label: string; team_clan_name: string | null; steamids: string[] | null }
+  scout_defense_profile: Dust2DefenseProfile
+  round_recommendations: Dust2SiteRecommendation[]
+  weapon_highlights?: WeaponHighlight[]
+  weapon_profiles?: {
+    name: string
+    team_clan_name?: string | null
+    side?: string | null
+    top_weapons: { weapon: string; weapon_label: string; category: string; kills: number }[]
+  }[]
+  limitations: string[]
+  player_weapon_impact?: Dust2PlayerWeaponImpact[]
+  weapon_transitions?: Dust2WeaponTransition[]
+  weapon_limitations?: string[]
+}

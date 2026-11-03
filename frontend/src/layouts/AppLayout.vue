@@ -60,7 +60,7 @@ async function signOut() {
         ><span class="brand-mark"><AppIcon name="crosshair" :size="25" /></span
         ><span>CS DEMO<span class="brand-sub">MASTER</span></span></RouterLink
       >
-      <div class="workspace-caption">PLAYER WORKSPACE <span>v1.2.1</span></div>
+      <div class="workspace-caption">PLAYER WORKSPACE <span>v1.3.0</span></div>
       <nav aria-label="主导航">
         <RouterLink
           v-for="item in nav"
@@ -88,7 +88,7 @@ async function signOut() {
             }}
           </p>
         </div>
-        <div class="team-credit"><span class="online-dot" /> SOFTWARE_CLAN <span>1.2.1</span></div>
+        <div class="team-credit"><span class="online-dot" /> SOFTWARE_CLAN <span>1.3.0</span></div>
       </div>
     </aside>
     <div class="workspace-main">

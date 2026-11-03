@@ -23,6 +23,7 @@ import type { ReplayEvent } from './contracts'
 import ReviewOverview from './ReviewOverview.vue'
 import ReviewRounds from './ReviewRounds.vue'
 import ReviewUtility from './ReviewUtility.vue'
+import ReviewDust2 from './ReviewDust2.vue'
 import ReviewAi from './ReviewAi.vue'
 import ReviewData from './ReviewData.vue'
 import MetricHint from './MetricHint.vue'
@@ -372,6 +373,16 @@ watch(rows, (value) => {
             当前报告未提供回合地图数据。
           </section></template
         >
+        <ReviewDust2
+          v-else-if="active === 'dust2'"
+          :key="report.analysis_id"
+          :analysis-id="report.analysis_id"
+          :map="report.match.map"
+          :target-player-id="report.target_player_id"
+          :events="events"
+          @round="selectRound"
+          @event="selectEvent"
+        />
         <ReviewUtility
           v-else-if="active === 'utility'"
           :report="report"

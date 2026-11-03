@@ -1,0 +1,36 @@
+# 墨刀 v2 画布清单
+
+- `index.html` — 01 总览
+- `login.html` — 02 登录
+- `register.html` — 03 注册
+- `replays.html` — 04 我的复盘
+- `upload.html` — 05 新建复盘
+- `upload-manual.html` — 06 手动上传
+- `upload-progress.html` — 07 分析进度
+- `report-overview.html` — 08 报告·比赛概览
+- `report-rounds.html` — 09 报告·回合复盘
+- `report-utility.html` — 10 报告·道具与生存
+- `report-data.html` — 11 报告·详细数据
+- `training.html` — 12 瞄准训练
+- `training-setup.html` — 13 训练设置
+- `training-result.html` — 14 训练结算
+- `lobbies.html` — 15 校园车队
+- `lobbies-competitive.html` — 16 车队·竞技匹配
+- `lobbies-premier.html` — 17 车队·优先模式
+- `lobby-create.html` — 18 发布车队
+- `lobby-created.html` — 19 发布成功
+- `lobby-detail.html` — 20 车队详情
+- `lobby-code.html` — 21 领取组队码
+- `friends.html` — 22 我的好友
+- `friends-search.html` — 23 搜索玩家
+- `friends-request.html` — 24 好友申请
+- `player.html` — 25 玩家名片
+- `profile.html` — 26 个人中心
+- `profile-edit.html` — 27 编辑资料
+- `replay-library.html` — 28 本地复盘库
+- `local-parser.html` — 29 本地解析
+- `training-history.html` — 30 训练记录
+- `training-guide.html` — 31 训练教程
+- `report-map.html` — 32 回合地图
+- `lobby-owner.html` — 33 队长管理
+- `lobby-departed.html` — 34 已发车
