@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
 import UploadTaskBanner from '@/features/replay/UploadTaskBanner.vue'
+import WebUpdateNotice from '@/app/WebUpdateNotice.vue'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
@@ -19,6 +20,7 @@ onUnmounted(() => window.removeEventListener('auth:expired', expired))
 <template>
   <AppLayout><RouterView /></AppLayout>
   <UploadTaskBanner />
+  <WebUpdateNotice />
   <div class="toast-stack" aria-live="polite">
     <div v-for="item in toast.messages" :key="item.id" class="toast" :class="item.kind">
       {{ item.text }}

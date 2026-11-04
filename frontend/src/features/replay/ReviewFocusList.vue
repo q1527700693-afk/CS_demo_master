@@ -11,6 +11,7 @@ defineEmits<{ select: [focus: ReviewFocus] }>()
       :key="item.id"
       class="focus-card"
       :data-priority="item.priority >= 3 ? 'high' : 'normal'"
+      :data-tone="item.positive ? 'positive' : 'review'"
     >
       <div class="focus-index">{{ String(index + 1).padStart(2, '0') }}</div>
       <div class="focus-body">
@@ -18,7 +19,8 @@ defineEmits<{ select: [focus: ReviewFocus] }>()
           <span
             >{{ item.round == null ? '比赛事件' : `第 ${item.round} 回合` }} ·
             {{ clockText(item.seconds) }}</span
-          ><span v-if="item.priority >= 3" class="priority-label">优先回看</span>
+          ><span v-if="item.positive" class="priority-label positive-label">精彩表现</span>
+          <span v-else-if="item.priority >= 3" class="priority-label">优先回看</span>
         </div>
         <h3>{{ item.title }}</h3>
         <p class="focus-fact">{{ item.observation }}</p>
@@ -39,6 +41,10 @@ defineEmits<{ select: [focus: ReviewFocus] }>()
   </div>
 </template>
 <style scoped>
+.focus-card .positive-label {
+  color: #9ccbb5;
+  background: rgba(115, 184, 151, 0.12);
+}
 .focus-card {
   display: flex;
   align-items: flex-start;

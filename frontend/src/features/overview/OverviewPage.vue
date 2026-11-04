@@ -22,20 +22,6 @@ const items = ref<Replay[]>([])
 const loading = ref(false)
 const error = ref('')
 const completed = computed(() => items.value.filter((x) => x.status === 'completed'))
-const average = (key: 'rating' | 'adr') => {
-  const rows = completed.value.filter((row) => row[key] !== null)
-  return rows.length ? rows.reduce((sum, row) => sum + row[key]!, 0) / rows.length : null
-}
-const scoredMatches = computed(() => completed.value.filter((x) => x.scoreKnown !== false))
-const winRate = computed(() =>
-  scoredMatches.value.length
-    ? Math.round(
-        (scoredMatches.value.filter((x) => x.score[0] > x.score[1]).length /
-          scoredMatches.value.length) *
-          100,
-      )
-    : null,
-)
 const metrics = computed(() => [
   {
     label: '已复盘对局',
@@ -45,25 +31,29 @@ const metrics = computed(() => [
     detail: '把每一场经验留下来',
   },
   {
-    label: '平均 Rating',
-    value: average('rating')?.toFixed(2) ?? '—',
-    unit: '',
-    icon: 'bolt',
-    detail: '综合战斗表现',
+    label: '覆盖地图',
+    value: String(new Set(completed.value.map((r) => r.map)).size).padStart(2, '0'),
+    unit: '张',
+    icon: 'map',
+    detail: '已完成报告涉及的地图',
   },
   {
-    label: '平均 ADR',
-    value: average('adr')?.toFixed(1) ?? '—',
-    unit: '',
-    icon: 'target',
-    detail: '每回合平均伤害',
+    label: '处理中',
+    value: String(
+      items.value.filter((r) => r.status === 'analyzing' || r.status === 'queued').length,
+    ).padStart(2, '0'),
+    unit: '份',
+    icon: 'clock',
+    detail: '等待解析或分析的记录',
   },
   {
-    label: '对局胜率',
-    value: winRate.value?.toString() ?? '—',
-    unit: '%',
-    icon: 'shield',
-    detail: '来自已完成复盘',
+    label: '待处理记录',
+    value: String(
+      items.value.filter((r) => r.status === 'failed' || r.status === 'uploaded').length,
+    ).padStart(2, '0'),
+    unit: '份',
+    icon: 'replay',
+    detail: '待选人或需要重新处理',
   },
 ])
 async function load() {

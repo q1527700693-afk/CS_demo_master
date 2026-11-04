@@ -120,6 +120,13 @@ const otherTeam = computed(() =>
 )
 const overviewCards = computed(() => [
   {
+    label: basic.value?.rating_estimated === 1 ? 'Rating（估算）' : 'Rating',
+    value: valueText(basic.value?.rating, 2),
+    note: basic.value?.rating_estimated === 1 ? 'Awpy 公开近似公式' : '本场个人表现',
+    description: metricDefinitions.rating,
+    progress: null,
+  },
+  {
     label: '击杀 / 死亡 / 助攻',
     value: [basic.value?.kills, basic.value?.deaths, basic.value?.assists]
       .map((v) => valueText(v, 0))
@@ -148,6 +155,18 @@ const overviewCards = computed(() => [
     note: '爆头击杀占比',
     description: metricDefinitions.headshot_pct,
     progress: basic.value?.headshot_pct,
+  },
+  {
+    label: '手雷 / 火焰对敌伤害',
+    value: [
+      report.value?.report.modules.utility?.metrics?.he_damage,
+      report.value?.report.modules.utility?.metrics?.fire_damage,
+    ]
+      .map((v) => valueText(v, 0))
+      .join(' / '),
+    note: report.value?.performance?.damage_basis === 'raw' ? '原始伤害口径' : '本场道具表现',
+    description: '高爆手雷与燃烧道具的对敌伤害，排除自伤与队伤；原始伤害可能包含过量伤害。',
+    progress: null,
   },
 ])
 function setTab(id: ReviewTab) {
@@ -319,6 +338,7 @@ watch(rows, (value) => {
           <button
             v-for="tab in reviewTabs"
             :key="tab.id"
+            :aria-label="tab.label"
             :aria-current="active === tab.id ? 'page' : undefined"
             @click="setTab(tab.id)"
           >

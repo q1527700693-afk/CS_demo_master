@@ -1,7 +1,15 @@
-# Frontend 1.3.0 handoff
+## 1.3.1 utility follow-up
 
-Copy this directory's contents into repository frontend/. Do not nest the version directory. This release adds the Dust2 tactical view and weapon highlights to the 1.2.1 upload/history/AI fixes, and preserves the deployed rotation, spawn, economy, round-review and grouped weapon enhancements that were not yet on GitHub.
+Actual per-player throw counts are now recorded for all six utility types. See [throw-count fix](docs/UTILITY-v1.3.1.md). Version stays 1.3.1.
 
-See [integration and validation](docs/CLOUD-DEMO-v1.3.0.md). Backend endpoints already exist in production; this release only deploys frontend code and static files. The local backend_service checkout and its uncommitted changes are preserved.
+# Frontend 1.3.1 handoff
 
-The browser source is front_end; the standalone handoff is front_end_v1.3.0. Existing desktop files and installers are unchanged. No Git commit or GitHub push is performed; upload frontend sources yourself. Exclude node_modules, dist, local environment files, test output and credentials when committing.
+Copy this folder's sources into repository frontend/ without nesting the version folder. Exclude dist, node_modules and local environment files from GitHub.
+
+See docs/REVIEW-v1.3.1.md for corrected grenade/fire damage, relevant positive/negative moments, trade definitions, per-round economy, estimated Rating and the revised overview. Dust2 v1.3.0 features remain included. The public profile showcase backend is still unavailable and the frontend flow is unchanged.
+
+This version requires the additive performance endpoint and future-analysis normalization in docs/BACKEND-v1.3.1.patch. The matching patch has been deployed to production; apply it separately when integrating backend source into GitHub. It does not migrate or overwrite stored reports.
+
+Active source: front_end. Delivery snapshot: front_end_v1.3.1. Production verification and rollback: workspace docs/frontend-v1.3.1/DEPLOYMENT.md. Desktop files/installers are unchanged. No Git commits or GitHub push are performed.
+
+Web cache follow-up: deploy the HTML/version.json cache rules in deploy/nginx-web-cache.conf. Each production build now emits its own version.json; publish it with the matching index.html. An open tab detects subsequent builds and offers a safe manual refresh. See docs/WEB-UPDATE-v1.3.1.md. The product version remains 1.3.1.

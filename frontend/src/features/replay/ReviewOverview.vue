@@ -13,6 +13,8 @@ const props = defineProps<{
 defineEmits<{ round: [round: number]; focus: [focus: ReviewFocus]; allFocus: [] }>()
 const rows = computed(() => (props.details ? roundRows(props.details) : []))
 const basic = computed(() => props.report.report.modules.basic_stats?.metrics)
+const trading = computed(() => props.report.report.modules.trading?.metrics)
+const keyFocuses = computed(() => props.focuses.filter((f) => f.priority >= 3))
 const weapons = computed(() =>
   [...(props.details?.statistics.tables?.by_weapon || [])]
     .filter((w) => (w.kills ?? 0) > 0)
@@ -139,6 +141,23 @@ const economy = computed(() => ({
           >
         </div>
       </div>
+      <div v-if="trading" class="impact-summary trading-summary" :title="metricDefinitions.trading">
+        <div>
+          <span>补枪击杀（5秒）</span
+          ><strong>{{ valueText(trading.trade_kills, 0) }} <i>次</i></strong>
+        </div>
+        <div>
+          <span>本人补枪转化</span
+          ><strong>{{ valueText(trading.trade_conversion_pct) }} <i>%</i></strong>
+        </div>
+        <div>
+          <span>阵亡后被队友补枪</span
+          ><strong>{{ valueText(trading.traded_death_pct) }} <i>%</i></strong>
+        </div>
+      </div>
+      <p v-if="trading" class="review-muted">
+        被补枪率排除最后存活时阵亡。补枪转化不判断距离，不等同于配合失误率。
+      </p>
       <ReportChart
         v-if="rows.length"
         :option="performance"
@@ -150,12 +169,12 @@ const economy = computed(() => ({
     <section class="review-panel focus-panel">
       <header class="review-section-heading">
         <div>
-          <h2>优先复盘</h2>
-          <p>已记录的事件，直接定位回合</p>
+          <h2>关键表现</h2>
+          <p>值得保留的好表现，以及需要回看的关键回合</p>
         </div>
-        <span class="subtle-tag">{{ focuses.length }} 处</span>
+        <span class="subtle-tag">{{ keyFocuses.length }} 处</span>
       </header>
-      <ReviewFocusList :items="focuses.slice(0, 3)" compact @select="$emit('focus', $event)" />
+      <ReviewFocusList :items="keyFocuses.slice(0, 3)" compact @select="$emit('focus', $event)" />
       <button
         v-if="focuses.length"
         class="review-text-button full-width"
@@ -220,6 +239,7 @@ const economy = computed(() => ({
 }
 .impact-summary {
   display: flex;
+  flex-wrap: wrap;
   gap: 36px;
   padding: 3px 0 20px;
 }

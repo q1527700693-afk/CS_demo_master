@@ -2,8 +2,9 @@
 import { computed, ref, watch } from 'vue'
 import type { AnalysisReport, ReplayDetails, ReplayEvent } from './contracts'
 import { valueText, weaponName, type ReviewFocus } from './review-presentation'
-import { utilityDamage } from './combat-facts'
+import { combatRelation, utilityKind, utilityDamage } from './combat-facts'
 import ReviewFocusList from './ReviewFocusList.vue'
+import { utilityUsage } from './utility-usage'
 const props = defineProps<{
   report: AnalysisReport
   details: ReplayDetails | null
@@ -12,11 +13,29 @@ const props = defineProps<{
   eventsAvailable?: boolean
 }>()
 defineEmits<{ focus: [focus: ReviewFocus] }>()
-const filter = ref('all'),
+const filter = ref('key'),
   focusPage = ref(1)
 watch(filter, () => (focusPage.value = 1))
 const utility = computed(() => props.report.report.modules.utility?.metrics)
-const damage = computed(() => utilityDamage(props.events || [], props.report.target_player_id))
+const facts = computed(() => props.report.performance)
+const damage = computed(() => {
+  const metrics = facts.value?.modules.utility
+  return metrics
+    ? { he: metrics.he_damage, fire: metrics.fire_damage, team: metrics.utility_team_damage }
+    : utilityDamage(props.events || [], props.report.target_player_id)
+})
+const damageAvailable = computed(
+  () =>
+    !!facts.value ||
+    (props.eventsAvailable &&
+      !(props.events || []).some(
+        (e) =>
+          e.type === 'damage' &&
+          e.data.record?.attacker_steamid === props.report.target_player_id &&
+          utilityKind(e.data.record.weapon) &&
+          combatRelation(e.data.record) === 'unknown',
+      )),
+)
 const death = computed(() => props.report.report.modules.death_context?.metrics)
 const flashes = computed(() => [
   { label: '敌方致盲', value: utility.value?.enemies_blinded, color: '#9ccbb5' },
@@ -33,29 +52,16 @@ const deathRows = computed(() => [
   { label: '受闪时阵亡', value: death.value?.deaths_blinded },
   { label: '携带未使用道具阵亡', value: death.value?.deaths_with_unused_utility },
 ])
-const throws = computed(() =>
-  (props.details?.statistics.tables?.by_weapon || []).filter((w) =>
-    [
-      'flashbang',
-      'smokegrenade',
-      'hegrenade',
-      'molotov',
-      'incgrenade',
-      'inferno',
-      'decoy',
-    ].includes(w.weapon),
-  ),
-)
+const throws = computed(() => utilityUsage(props.report, props.details))
 const filtered = computed(() =>
-  props.focuses.filter(
-    (f) =>
-      filter.value === 'all' ||
-      (filter.value === 'flash'
-        ? f.rule.includes('flash')
-        : filter.value === 'team'
-          ? f.rule === 'team_kill'
-          : f.rule.startsWith('death_')),
-  ),
+  props.focuses.filter((f) => {
+    if (filter.value === 'all') return true
+    if (filter.value === 'key') return f.priority >= 3
+    if (filter.value === 'positive') return !!f.positive
+    if (filter.value === 'flash') return f.rule.includes('flash')
+    if (filter.value === 'team') return f.rule === 'team_kill'
+    return filter.value === 'death' && f.rule.startsWith('death_')
+  }),
 )
 </script>
 <template>
@@ -120,34 +126,48 @@ const filtered = computed(() =>
     <header class="review-section-heading">
       <div>
         <h2>手雷与燃烧伤害</h2>
-        <p>仅计对敌伤害，优先使用有效生命伤害；缺少有效值时使用原始伤害。队伤单列。</p>
+        <p>
+          对敌伤害与队伤分别统计。{{
+            facts?.damage_basis === 'raw'
+              ? '当前解析仅提供原始伤害，数值可能含过量伤害。'
+              : '优先使用有效生命伤害；缺少时使用原始伤害。'
+          }}
+        </p>
       </div>
     </header>
     <div class="utility-totals">
       <div>
-        <strong>{{ eventsAvailable ? valueText(damage.he, 0) : '—' }}</strong
+        <strong>{{ damageAvailable ? valueText(damage.he, 0) : '—' }}</strong
         ><span>高爆手雷伤害</span>
       </div>
       <div>
-        <strong>{{ eventsAvailable ? valueText(damage.fire, 0) : '—' }}</strong
+        <strong>{{ damageAvailable ? valueText(damage.fire, 0) : '—' }}</strong
         ><span>燃烧伤害</span>
       </div>
       <div>
-        <strong>{{ eventsAvailable ? valueText(damage.team, 0) : '—' }}</strong
+        <strong>{{ damageAvailable ? valueText(damage.team, 0) : '—' }}</strong
         ><span>道具误伤队友</span>
       </div>
     </div>
-    <p v-if="!eventsAvailable" class="review-empty">伤害事件未载入，请重新读取报告。</p>
+    <p v-if="!damageAvailable" class="review-empty">伤害事件未载入，请重新读取报告。</p>
   </section>
-  <section v-if="throws.length" class="review-panel throw-panel">
+  <p v-if="(facts?.modules.utility?.utility_unclassified_damage || 0) > 0" class="review-empty">
+    另有
+    {{ facts?.modules.utility?.utility_unclassified_damage }}
+    点道具伤害无法确认阵营，未计入对敌或队伤。
+  </p>
+  <p v-if="facts && !facts.complete" class="review-empty">
+    解析事件存在截断，显示已记录部分的统计。
+  </p>
+  <section class="review-panel throw-panel" data-testid="utility-throws">
     <header class="review-section-heading">
       <div>
         <h2>道具使用分布</h2>
-        <p>来自已归属到分析玩家的投掷记录</p>
+        <p>按本场玩家的实际投掷事件统计，每次投掷计一次；不按命中人数或伤害次数累计。</p>
       </div>
     </header>
     <div class="throw-grid">
-      <article v-for="w in throws" :key="w.weapon">
+      <article v-for="w in throws.items" :key="w.weapon" :data-weapon="w.weapon">
         <span class="throw-symbol" :class="w.weapon"
           ><svg
             width="22"
@@ -163,19 +183,27 @@ const filtered = computed(() =>
         ></span>
         <div>
           <span>{{ weaponName(w.weapon) }}</span
-          ><strong>{{ valueText(w.shots, 0) }}<small> 次</small></strong>
+          ><strong v-if="w.count != null"
+            >{{ w.lowerBound ? '≥ ' : '' }}{{ valueText(w.count, 0) }}<small> 次</small></strong
+          >
+          <span v-else class="muted small-text">未提供投掷记录</span>
         </div>
       </article>
     </div>
+    <p v-if="!throws.complete" class="review-empty">
+      部分类型缺少完整投掷记录，已知次数保留显示；没有记录不代表投掷了 0 次。
+    </p>
   </section>
   <section class="review-panel" id="report-findings">
     <header class="review-section-heading">
       <div>
-        <h2>复盘重点</h2>
-        <p>先看事件事实，再检查处理时机与团队配合</p>
+        <h2>关键表现与复盘</h2>
+        <p>记录首杀、首死、补枪、多杀与经济翻盘；普通经济局失利不单列。</p>
       </div>
       <select v-model="filter" aria-label="复盘重点类型">
-        <option value="all">全部重点（{{ focuses.length }}）</option>
+        <option value="key">关键表现</option>
+        <option value="positive">打得好的</option>
+        <option value="all">全部记录（{{ focuses.length }}）</option>
         <option value="flash">闪光配合</option>
         <option value="death">阵亡状态</option>
         <option value="team">误杀队友（TK）</option>

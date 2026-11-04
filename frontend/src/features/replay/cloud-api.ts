@@ -1,4 +1,5 @@
 import { ApiError, request, upload } from '@/api/http'
+import { TOKEN_KEY } from '@/app/config'
 import type { Page } from '@/types'
 import type {
   AnalysisReport,
@@ -9,6 +10,7 @@ import type {
   AnalysisRun,
   CloudTeam,
   Dust2Summary,
+  PerformanceFacts,
 } from './contracts'
 // The new backend uses flat events and different round/module field names.
 // Adapt those differences once, before any existing report component sees them.
@@ -158,10 +160,85 @@ export function normalizeCloudDetails(raw: Wire): ReplayDetails {
   } as ReplayDetails
 }
 export async function getCloudDetails(id: string, signal?: AbortSignal) {
-  return normalizeCloudDetails(await request<Wire>(`${cloudPath(id)}/details`, { signal }))
+  const [raw, facts] = await Promise.all([
+    request<Wire>(`${cloudPath(id)}/details`, { signal }),
+    getCloudPerformance(id),
+  ])
+  const result = normalizeCloudDetails(raw)
+  if (!facts) return result
+  if (facts.target_player_id !== result.target_player_id) throw new ApiError('统计与分析玩家不一致')
+  const fixed = new Map(facts.rounds.map((r) => [r.round_num, r]))
+  return {
+    ...result,
+    performance: facts,
+    statistics: {
+      ...result.statistics,
+      modules: mergeModules(result.statistics.modules || {}, facts),
+    },
+    findings: [
+      ...facts.findings,
+      ...result.findings.filter(
+        (f) => !['eco_loss', 'untraded_death', 'opening_death'].includes(f.rule_id),
+      ),
+    ],
+    rounds: result.rounds.map((r) => {
+      const p = fixed.get(r.round_num)
+      return p
+        ? {
+            ...r,
+            target_side: p.target_side,
+            team_economy: p.team_economy,
+            target_summary: { ...r.target_summary, ...p.target_summary },
+          }
+        : r
+    }),
+  }
+}
+const performanceCache = new Map<
+  string,
+  { at: number; pending: Promise<PerformanceFacts | null> }
+>()
+export function getCloudPerformance(id: string): Promise<PerformanceFacts | null> {
+  const key =
+    (typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : '') + ':' + id
+  const cached = performanceCache.get(key)
+  if (cached && Date.now() - cached.at < 30_000) return cached.pending
+  const pending = request<PerformanceFacts>(`${cloudPath(id)}/performance`).catch(() => {
+    performanceCache.delete(key)
+    return null
+  })
+  performanceCache.set(key, { at: Date.now(), pending })
+  if (performanceCache.size > 20) performanceCache.delete(performanceCache.keys().next().value!)
+  return pending
+}
+function mergeModules(modules: AnalysisReport['report']['modules'], facts: PerformanceFacts) {
+  const merged = { ...modules }
+  for (const [key, metrics] of Object.entries(facts.modules))
+    merged[key] = {
+      ...modules[key],
+      module_version: facts.version,
+      status: 'completed',
+      reason: null,
+      sample_count: facts.rounds.length,
+      evidence_ids: [],
+      metrics: { ...modules[key]?.metrics, ...metrics },
+    }
+  return merged
 }
 export async function getCloudReport(id: string, signal?: AbortSignal): Promise<AnalysisReport> {
-  const r = await request<AnalysisReport>(`${cloudPath(id)}/report`, { signal })
+  const [original, facts] = await Promise.all([
+    request<AnalysisReport>(`${cloudPath(id)}/report`, { signal }),
+    getCloudPerformance(id),
+  ])
+  if (facts && facts.target_player_id !== original.target_player_id)
+    throw new ApiError('统计与分析玩家不一致')
+  const r = facts
+    ? {
+        ...original,
+        performance: facts,
+        report: { ...original.report, modules: mergeModules(original.report.modules, facts) },
+      }
+    : original
   if (r.analysis_id !== cloudId(id)) throw new ApiError('云端报告与任务编号不一致')
   const modules = Object.fromEntries(
     Object.entries(r.report.modules).map(([key, value]) => [

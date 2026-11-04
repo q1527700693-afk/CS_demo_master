@@ -91,6 +91,10 @@ export const metricDefinitions: Record<string, string> = {
   headshot_pct: '爆头击杀数占全部击杀数的比例。',
   opening: '每回合第一起敌我击杀中，由你完成首杀或首先阵亡的次数。',
   raw_damage: '逐条伤害事件的原始合计，包含过量伤害，不等同于场均伤害。',
+  rating:
+    '采用 Awpy 2.x 公开的 HLTV-like 近似公式，由本场 KAST、每回合击杀/死亡/助攻及 ADR 计算；不是 HLTV 官方 Rating。缺少输入时不计算。',
+  trading:
+    '5 秒内击杀刚刚击杀队友的同一名对手，记为补枪。转化率分母是本人仍存活时的队友对敌阵亡次数，不判断距离和可见性。自己最后存活时阵亡不进入被补枪率分母。',
 }
 export const valueText = (value: unknown, digits = 1) =>
   typeof value === 'number' && Number.isFinite(value) ? numberText(value, digits) : '—'
@@ -110,9 +114,24 @@ export interface ReviewFocus {
   action: string
   evidenceIds: string[]
   priority: number
+  positive?: boolean
 }
 type RuleCopy = { title: string; action: string; priority: number }
 export const reviewRules: Record<string, RuleCopy> = {
+  opening_kill: {
+    title: '取得首杀',
+    action: '回看信息、预瞄和接敌选择，保留有效做法。',
+    priority: 4,
+  },
+  opening_death: { title: '首死', action: '回看首次接敌的信息、站位和队友距离。', priority: 4 },
+  trade_kill: { title: '完成补枪', action: '回看与队友同步接敌和补枪的时机。', priority: 3 },
+  multikill: { title: '多杀回合', action: '回看连续交火、换位和弹药管理。', priority: 4 },
+  eco_win: { title: '经济劣势翻盘', action: '回看首杀、缴枪和团队协作带来的优势。', priority: 5 },
+  anti_eco_loss: {
+    title: '装备优势局被翻',
+    action: '回看武器距离、补枪和掉枪后的处理。',
+    priority: 5,
+  },
   team_kill: {
     title: '误杀队友（TK）',
     action: '回看交火路线、队友位置与开火时机，避免误伤。',
@@ -167,8 +186,39 @@ export function reviewFocus(
       (e.data.record?.attacker_steamid === report.target_player_id ||
         e.data.record?.victim_steamid === report.target_player_id),
   )
+  const openingEvents = new Map<number, ReplayEvent>()
+  for (const e of [...events].sort((a, b) => a.tick - b.tick))
+    if (
+      e.type === 'kill' &&
+      e.round_num != null &&
+      combatRelation(e.data.record || {}) === 'enemy' &&
+      (e.live_elapsed_seconds == null || e.live_elapsed_seconds >= 0) &&
+      !openingEvents.has(e.round_num)
+    )
+      openingEvents.set(e.round_num, e)
+  const openingFallback = [...openingEvents.values()].flatMap((e) => {
+    const rule =
+      e.data.record?.attacker_steamid === report.target_player_id
+        ? 'opening_kill'
+        : e.data.record?.victim_steamid === report.target_player_id
+          ? 'opening_death'
+          : null
+    return rule && !findings.some((f) => f.rule_id === rule && f.evidence_ids.includes(e.event_id))
+      ? [
+          {
+            finding_id: `${rule}:${e.event_id}`,
+            rule_id: rule,
+            round_num: e.round_num,
+            tick: e.tick,
+            evidence_ids: [e.event_id],
+            observation: rule === 'opening_kill' ? '本回合取得首杀。' : '本回合首先阵亡。',
+          },
+        ]
+      : []
+  })
   const allFindings = [
     ...findings,
+    ...openingFallback,
     ...teamKills
       .filter(
         (e) =>
@@ -185,6 +235,7 @@ export function reviewFocus(
   ]
   return allFindings
     .filter((f) => {
+      if (!reviewRules[f.rule_id]) return false
       if (!['team_flash', 'self_flash'].includes(f.rule_id)) return true
       const e = f.evidence_ids.map((id) => index.get(id)).find(Boolean)
       const duration = e?.data.record?.duration ?? e?.data.duration_seconds
@@ -233,8 +284,18 @@ export function reviewFocus(
                 ? 2
                 : 0
             : (copy?.priority ?? 0),
+        positive: ['opening_kill', 'trade_kill', 'multikill', 'eco_win'].includes(f.rule_id),
       }
     })
+    .filter(
+      (f, index, list) =>
+        list.findIndex(
+          (other) =>
+            other.rule === f.rule &&
+            other.evidenceIds.join() === f.evidenceIds.join() &&
+            other.round === f.round,
+        ) === index,
+    )
     .sort((a, b) => b.priority - a.priority || (a.round ?? 0) - (b.round ?? 0) || a.tick - b.tick)
 }
 export function isTargetEvent(e: ReplayEvent, player: string) {

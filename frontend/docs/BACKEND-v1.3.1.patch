@@ -1,0 +1,545 @@
+--- a/backend/src/routes/demoAnalyses.js
++++ b/backend/src/routes/demoAnalyses.js
+@@ -26,6 +26,7 @@
+ const {teamRosters} = require('../services/dust2Tactics');
+ const dust2Defense = require('../services/dust2Defense');
+ const {extractWeaponImpact} = require('../services/weaponImpact');
++const {buildPerformance} = require('../services/reviewFacts');
+ const { enqueueDemoAi } = require('../services/replayQueue');
+ 
+ const VISIBLE = `kind='demo' AND owner_id=? AND (coalesce(json_extract(meta,'$.selection_mode'),'')!='choose' OR NOT EXISTS (SELECT 1 FROM replay_jobs child WHERE child.owner_id=replay_jobs.owner_id AND child.kind='demo' AND coalesce(json_extract(child.meta,'$.selection_mode'),'')!='choose' AND json_extract(child.meta,'$.demo_sha256')=json_extract(replay_jobs.meta,'$.demo_sha256')))`;
+@@ -331,6 +332,42 @@
+     success(res, publicDemo(run), run.status === 'ready' ? 'success' : 'queued', run.status === 'ready' ? 200 : 202);
+ }));
+ 
++// Small cached projections fix older reports without rewriting their artifacts.
++const performanceCache = new Map();
++let performanceQueue = Promise.resolve();
++router.get('/:id/performance', wrap(async (req, res) => {
++    const row = demoRow(req.user.id, req.params.id);
++    if (row.status !== 'ready') throw errors.conflict('Report is not ready');
++    const target = metaOf(row).target_player_id;
++    const file = path.join(directory(row.id), 'parse.json');
++    const stat = await fsp.stat(file);
++    const throwsFile = path.join(directory(row.id), 'utility-throws.json');
++    const throwsStat = await fsp.stat(throwsFile).catch(e => {if(e.code !== 'ENOENT') throw e; return null;});
++    const key = row.id + ':' + target + ':' + stat.mtimeMs + ':' + (throwsStat?.mtimeMs || 0);
++    let entry = performanceCache.get(key);
++    if (!entry) {
++        const pending = performanceQueue.then(async () => {
++            const payload = JSON.parse(await fsp.readFile(file, 'utf8'));
++            if (!Array.isArray(payload.utility_throws) && throwsStat) {
++                const recorded = JSON.parse(await fsp.readFile(throwsFile, 'utf8'));
++                if (recorded.demo_sha256 === payload.demo?.sha256) {
++                    payload.utility_throws = recorded.utility_throws;
++                    payload.utility_throws_complete = recorded.complete === true;
++                }
++            }
++            const result = buildPerformance(payload, target || payload.target_player_id);
++            delete result.enriched_damage;
++            return result;
++        });
++        performanceQueue = pending.catch(() => {});
++        entry = {pending};
++        performanceCache.set(key, entry);
++        if (performanceCache.size > 10) performanceCache.delete(performanceCache.keys().next().value);
++        pending.catch(() => performanceCache.delete(key));
++    }
++    success(res, await entry.pending);
++}));
++
+ router.get('/:id/report', wrap(async (req, res) => {
+     const { dir } = readyDir(req);
+     await sendJsonFile(res, path.join(dir, 'cloud-report.json'));
+--- a/backend/src/services/demoCompatibility.js
++++ b/backend/src/services/demoCompatibility.js
+@@ -1,5 +1,6 @@
+  'use strict';
+ const {applyCombatFacts, relation, MIN_BLIND_SECONDS} = require('./combatFacts');
++const {buildPerformance, applyPerformance} = require('./reviewFacts');
+ function upgradeDemoAnalysis(details, payload, events) {
+   const target = details.target_player_id;
+   const records = events.map(e => ({...e, data: {record: e.data}}));
+@@ -41,6 +42,7 @@
+   const known = new Set(payload.stats.map(s => s.steamid));
+   details.players = payload.players.filter(p => known.has(p.steamid));
+   details.map = {counts:{player_samples:payload.target_samples.length, all_player_samples:payload.all_player_samples?.length || 0, trajectories:payload.grenades.length}};
+-  details.replay_version = '1.2.1';
++  applyPerformance(details, buildPerformance(payload,target), events);
++  details.replay_version = '1.3.1';
+ }
+ module.exports = {upgradeDemoAnalysis};
+--- a/backend/src/services/demoSelection.js
++++ b/backend/src/services/demoSelection.js
+@@ -55,6 +55,7 @@
+     // Each perspective owns its input links: deleting another perspective cannot break it.
+     if (id !== source.id) {
+         await fs.copyFile(path.join(directory(source.id), 'parse.json'), path.join(dir, 'parse.json'));
++        await fs.copyFile(path.join(directory(source.id), 'utility-throws.json'), path.join(dir, 'utility-throws.json')).catch(e => {if(e.code !== 'ENOENT') throw e;});
+         try { await fs.link(path.join(directory(source.id), 'match.dem'), path.join(dir, 'match.dem')); }
+         catch (e) { if (e.code !== 'EEXIST') throw e; }
+     }
+--- /dev/null
++++ b/backend/src/services/reviewFacts.js
+@@ -0,0 +1,200 @@
++'use strict';
++
++// Measured per-round facts. Never infer a post-halftime side from the initial roster.
++const VERSION = 'review-1.3.1';
++const {utilityThrows} = require('./utilityThrows');
++const SIDES = new Set(['terrorist', 'counter-terrorist']);
++const finite = x => typeof x === 'number' && Number.isFinite(x);
++const pct = (n, d) => d > 0 ? Math.round(n / d * 1000) / 10 : null;
++const rounded = x => finite(x) ? Math.round(x * 100) / 100 : null;
++const weaponKind = x => /^(hegrenade|he)$/.test(String(x).replace(/^weapon_/, '')) ? 'he'
++    : /^(inferno|molotov|incgrenade|incendiary|fire)$/.test(String(x).replace(/^weapon_/, '')) ? 'fire' : null;
++
++function buildPerformance(payload, targetId = payload.target_player_id) {
++    targetId = String(targetId);
++    const rate = payload.tick_rate || 64;
++    const rounds = (payload.rounds || []).filter(r => !r.is_knife_round);
++    const roundMap = new Map(rounds.map(r => [r.round_num, r]));
++    const sides = new Map();
++    function observe(round, id, side) {
++        if (!id || !SIDES.has(side)) return;
++        const key = round + ':' + id;
++        if (!sides.has(key)) sides.set(key, side);
++        else if (sides.get(key) !== side) sides.set(key, null);
++    }
++    for (const s of payload.all_player_samples || []) observe(s.round_num, s.steamid, s.side);
++    for (const s of payload.target_samples || []) observe(s.round_num, s.steamid || targetId, s.side);
++    for (const e of [...(payload.kills || []), ...(payload.damages || []), ...(payload.blinds || [])]) {
++        observe(e.round_num, e.attacker_steamid, e.attacker_side);
++        observe(e.round_num, e.victim_steamid, e.victim_side);
++    }
++    const sideOf = (round, id) => sides.get(round + ':' + id) || null;
++    const relation = e => {
++        if (e.attacker_steamid === e.victim_steamid) return 'self';
++        const a = e.attacker_side || sideOf(e.round_num, e.attacker_steamid);
++        const b = e.victim_side || sideOf(e.round_num, e.victim_steamid);
++        return SIDES.has(a) && SIDES.has(b) ? (a === b ? 'team' : 'enemy') : 'unknown';
++    };
++    const live = e => {
++        const r = roundMap.get(e.round_num);
++        return r && finite(e.tick) && (r.freeze_end_tick == null || e.tick >= r.freeze_end_tick) &&
++            (r.end_tick == null || e.tick <= r.end_tick);
++    };
++    const kills = (payload.kills || []).filter(live).sort((a,b) => a.tick-b.tick);
++    const hostile = kills.filter(e => relation(e) === 'enemy');
++    const ownKills = hostile.filter(e => String(e.attacker_steamid) === targetId);
++    const ownDeaths = kills.filter(e => String(e.victim_steamid) === targetId);
++    const stat = (payload.stats || []).find(s => String(s.steamid) === targetId) || {};
++    const findings = [], perRound = [];
++    let tradeKills = 0, opportunities = 0, eligibleDeaths = 0, tradedDeaths = 0, lastAliveDeaths = 0;
++    let openings = 0, openingDeaths = 0, assists = 0, kastRounds = 0;
++    const find = (rule, event, observation, action, positive = false) => {
++        const r = roundMap.get(event.round_num);
++        findings.push({
++            finding_id: rule + ':' + (event.event_id || 'r'+event.round_num), rule_id: rule,
++            rule_version: VERSION, round_num: event.round_num, tick: event.tick ?? r?.freeze_end_tick ?? null,
++            live_elapsed_seconds: finite(event.tick) && r?.freeze_end_tick != null ? (event.tick-r.freeze_end_tick)/rate : null,
++            evidence_ids: event.event_id ? [event.event_id] : [], observation,
++            review_prompt: action, classification: positive ? 'positive' : 'review_candidate'
++        });
++    };
++    const economy = new Map();
++    for (const row of payload.round_economy || []) {
++        if (!economy.has(row.round_num)) economy.set(row.round_num, {});
++        economy.get(row.round_num)[row.side] = {
++            side: row.side, equipment_value: finite(row.equipment_value) ? row.equipment_value : null,
++            buy_type: row.buy_type || null, players: row.n_players || null
++        };
++    }
++    for (const r of rounds) {
++        const roundKills = kills.filter(e => e.round_num === r.round_num);
++        const hs = hostile.filter(e => e.round_num === r.round_num);
++        const targetSide = sideOf(r.round_num, targetId);
++        const deadBefore = (id, tick) => roundKills.some(e => e.victim_steamid === id && e.tick < tick);
++        const roster = [...sides].filter(([key, side]) => key.startsWith(r.round_num+':') && side === targetSide)
++            .map(([key]) => key.slice(key.indexOf(':')+1));
++        const rk = hs.filter(e => e.attacker_steamid === targetId);
++        const rd = roundKills.filter(e => e.victim_steamid === targetId);
++        const ra = hs.filter(e => e.assister_steamid === targetId && e.attacker_steamid !== targetId).length;
++        assists += ra;
++        let traded = false;
++        const opening = hs[0];
++        if (opening?.attacker_steamid === targetId) {
++            openings++;
++            find('opening_kill', opening, '本回合取得首杀，为队伍建立人数优势。', '回看信息、预瞄和交火选择，保留有效做法。', true);
++        } else if (opening?.victim_steamid === targetId) {
++            openingDeaths++;
++            find('opening_death', opening, '本回合首先阵亡，队伍进入人数劣势。', '结合信息与队友位置，回看首次接敌的选择。');
++        }
++        for (const k of hs) {
++            if (k.attacker_steamid === targetId) {
++                const prior = hs.find(e => e.tick < k.tick && k.tick-e.tick <= 5*rate &&
++                    e.attacker_steamid === k.victim_steamid && e.victim_steamid !== targetId &&
++                    sideOf(r.round_num,e.victim_steamid) === targetSide);
++                if (prior) {
++                    tradeKills++;
++                    find('trade_kill',k,'在队友阵亡后 5 秒内击杀同一名对手，完成补枪。','回看站位间距和同步接敌的时机。',true);
++                }
++            }
++            if (k.victim_steamid !== targetId && sideOf(r.round_num,k.victim_steamid) === targetSide &&
++                !deadBefore(targetId,k.tick)) opportunities++;
++        }
++        for (const d of rd) {
++            const aliveMates = roster.filter(id => id !== targetId && !deadBefore(id,d.tick));
++            if (!aliveMates.length) { lastAliveDeaths++; continue; }
++            eligibleDeaths++;
++            const response = hs.find(k => k.tick > d.tick && k.tick-d.tick <= 5*rate &&
++                k.victim_steamid === d.attacker_steamid && aliveMates.includes(k.attacker_steamid));
++            if (response) { tradedDeaths++; traded = true; }
++        }
++        if (rk.length || ra || !rd.length || traded) kastRounds++;
++        if (rk.length >= 3) find('multikill',rk.at(-1),'本回合完成 '+rk.length+' 次对敌击杀。','回看连续交火、换位与弹药管理。',true);
++        const buys = economy.get(r.round_num) || {};
++        const own = buys[targetSide], enemy = buys[targetSide === 'terrorist' ? 'counter-terrorist' : 'terrorist'];
++        perRound.push({
++            round_num:r.round_num,target_side:targetSide,
++            team_economy:Object.values(buys),
++            target_summary:{round_num:r.round_num,kills:rk.length,deaths:rd.length,assists:ra}
++        });
++        // Compare both sides per player; force-buy labels alone do not identify an eco.
++        if (!own || !enemy || !finite(own.equipment_value) || !finite(enemy.equipment_value) ||
++            !own.players || !enemy.players || own.buy_type === 'pistol' || enemy.buy_type === 'pistol') continue;
++        const a = own.equipment_value/own.players, b=enemy.equipment_value/enemy.players;
++        const won = r.winner_side === targetSide;
++        const anchor = {round_num:r.round_num,tick:r.freeze_end_tick ?? r.start_tick};
++        if (a <= 2500 && b >= 3500 && a <= b*0.65 && won)
++            find('eco_win',anchor,'我方人均装备 $'+Math.round(a)+'，对方 $'+Math.round(b)+'，经济劣势下获胜。','回看如何通过首杀、缴枪和协同创造翻盘。',true);
++        if (b <= 2500 && a >= 3500 && b <= a*0.65 && !won && SIDES.has(r.winner_side))
++            find('anti_eco_loss',anchor,'我方人均装备 $'+Math.round(a)+'，对方 $'+Math.round(b)+'，装备优势局被翻盘。','回看武器距离、补枪与丢枪后的处理，避免逐个接敌。');
++    }
++    const utility = {he_damage:0,fire_damage:0,utility_team_damage:0,utility_unclassified_damage:0};
++    let rawFallback = false;
++    const enrichedDamage = [];
++    for (const d of payload.damages || []) {
++        const e = {...d,attacker_side:d.attacker_side || sideOf(d.round_num,d.attacker_steamid),
++            victim_side:d.victim_side || sideOf(d.round_num,d.victim_steamid)};
++        enrichedDamage.push(e);
++        if (d.attacker_steamid !== targetId || !live(d)) continue;
++        const kind=weaponKind(d.weapon);
++        const amount=d.dmg_health_real ?? d.dmg_health;
++        if (!kind || !finite(amount) || amount<0) continue;
++        if (!finite(d.dmg_health_real)) rawFallback=true;
++        const rel=relation(e);
++        if (rel==='enemy') utility[kind+'_damage']+=amount;
++        else if (rel==='team') utility.utility_team_damage+=amount;
++        else if (rel==='unknown') utility.utility_unclassified_damage+=amount;
++    }
++    utility.utility_damage=utility.he_damage+utility.fire_damage;
++    const throwsSummary=utilityThrows(payload,targetId);
++    if(throwsSummary.complete) utility.flashes_thrown=throwsSummary.items.find(e=>e.weapon==='flashbang').throws;
++    const played = finite(stat.rounds_played) && stat.rounds_played>0 ? stat.rounds_played : rounds.length;
++    const complete = !(payload.truncated || []).some(x => /kills|damages|samples/.test(x));
++    const ownBuys=perRound.flatMap(r=>r.team_economy.filter(e=>e.side===r.target_side&&finite(e.equipment_value)));
++    const kast = rounds.length && played===rounds.length ? pct(kastRounds,rounds.length) : stat.kast;
++    // Awpy 2.x's public HLTV-like approximation; never presented as official HLTV.
++    const kpr=ownKills.length/played, dpr=ownDeaths.length/played, apr=assists/played;
++    const rating=complete && played>0 && finite(stat.adr) && finite(kast)
++        ? rounded(0.0073*kast+0.3591*kpr-0.5329*dpr+0.2372*(2.13*kpr+0.42*apr-0.41)+0.0032*stat.adr+0.1587) : null;
++    return {
++        version:VERSION,target_player_id:targetId,complete,damage_basis:rawFallback?'raw':'effective',
++        modules:{
++            basic_stats:{kills:ownKills.length,deaths:ownDeaths.length,assists,rounds_played:played,
++                adr:finite(stat.adr)?stat.adr:null,kast_pct:kast,rating,rating_estimated:1,
++                opening_kills:openings,opening_deaths:openingDeaths},
++            utility,
++            trading:{trade_kills:tradeKills,teammate_deaths_while_alive:opportunities,
++                trade_conversion_pct:pct(tradeKills,opportunities),eligible_deaths:eligibleDeaths,
++                traded_deaths:tradedDeaths,traded_death_pct:pct(tradedDeaths,eligibleDeaths),
++                last_alive_deaths:lastAliveDeaths,window_seconds:5},
++            death_context:{untraded_deaths:eligibleDeaths-tradedDeaths,last_alive_deaths:lastAliveDeaths},
++            economy:{rounds_with_economy:ownBuys.length,
++                average_equipment_value:ownBuys.length?rounded(ownBuys.reduce((n,e)=>n+e.equipment_value,0)/ownBuys.length):null,
++                buy_types:ownBuys.reduce((counts,e)=>{counts[e.buy_type||'unknown']=(counts[e.buy_type||'unknown']||0)+1;return counts},{})}
++        },
++        findings,rounds:perRound,enriched_damage:enrichedDamage,utility_throws:throwsSummary
++    };
++}
++
++function applyPerformance(details, performance, events) {
++    for (const [key, metrics] of Object.entries(performance.modules)) {
++        const module = details.statistics.modules[key] ||= {module_version:VERSION,status:'completed',reason:null,sample_count:details.rounds.length,evidence_ids:[]};
++        module.metrics={...module.metrics,...metrics};
++    }
++    details.statistics.definitions={...details.statistics.definitions,
++        review_policy:VERSION, rating:'Awpy 2.x HLTV-like approximation; not official HLTV',
++        damage_basis:performance.damage_basis};
++    details.findings=[...performance.findings,...details.findings.filter(f=>
++        ['team_kill','team_flash','self_flash','death_reloading','death_holding_utility','death_unused_utility'].includes(f.rule_id))];
++    const byRound=new Map(performance.rounds.map(r=>[r.round_num,r]));
++    for(const round of details.rounds) {
++        const fixed=byRound.get(round.round_num);
++        if(fixed) {round.target_side=fixed.target_side;round.team_economy=fixed.team_economy;
++            round.target_summary={...round.target_summary,...fixed.target_summary};}
++    }
++    if(events) {
++        const byId=new Map(performance.enriched_damage.map(e=>[e.event_id,e]));
++        for(const e of events) if(e.type==='damage'&&byId.has(e.event_id)) e.data=byId.get(e.event_id);
++    }
++    return details;
++}
++module.exports={buildPerformance,applyPerformance,VERSION};
+--- /dev/null
++++ b/backend/src/services/utilityThrows.js
+@@ -0,0 +1,32 @@
++'use strict';
++const TYPES=['flashbang','smokegrenade','hegrenade','molotov','incgrenade','decoy'];
++function utilityWeapon(value) {
++    const key=String(value||'').toLowerCase().replace(/^weapon_/,'');
++    return ({flash:'flashbang',smoke:'smokegrenade',he:'hegrenade',incendiary:'incgrenade'})[key] ||
++        (TYPES.includes(key)?key:null);
++}
++function utilityThrows(payload,targetId) {
++    const counts=Object.fromEntries(TYPES.map(k=>[k,0]));
++    const recorded=Array.isArray(payload.utility_throws);
++    const complete=recorded && payload.utility_throws_complete===true &&
++        !(payload.truncated||[]).includes('utility_throws');
++    const seen=new Set();
++    if(recorded) for(const e of payload.utility_throws) {
++        const weapon=utilityWeapon(e.weapon);
++        if(!weapon || String(e.steamid)!==String(targetId) || !Number.isFinite(e.tick))continue;
++        const key=[e.steamid,e.tick,weapon].join(':');
++        if(seen.has(key))continue;
++        seen.add(key);counts[weapon]++;
++    }
++    // A damage row, flash victim, or unowned trajectory never proves a throw.
++    const stat=(payload.stats||[]).find(s=>String(s.steamid)===String(targetId));
++    return {
++        source:recorded?'weapon_fire':null,complete,
++        items:TYPES.map(weapon=>({
++            weapon,throws:complete?counts[weapon]:recorded&&counts[weapon]>0?counts[weapon]:
++                weapon==='flashbang'&&Number.isFinite(stat?.flashes_thrown)?stat.flashes_thrown:null,
++            lower_bound:recorded&&!complete&&counts[weapon]>0
++        }))
++    };
++}
++module.exports={utilityWeapon,utilityThrows};
+--- a/backend/tests/demoAnalyses.test.js
++++ b/backend/tests/demoAnalyses.test.js
+@@ -168,6 +168,38 @@
+     assert.equal(report.status, 'completed');
+     assert.equal(report.perspective.player_team_id, 'team-terrorist');
+     assert.equal(report.report.ai_status, 'not_configured');
++});
++
++test('performance projection is owner-checked, complete and does not expose raw streams', async () => {
++    const result = await call('/demo-analyses/' + demoId + '/performance');
++    assert.equal(result.status, 200, JSON.stringify(result.body));
++    assert.equal(result.body.data.target_player_id, TARGET);
++    assert.equal(result.body.data.version, 'review-1.3.1');
++    assert.ok(result.body.data.modules.utility.he_damage >= 0);
++    assert.ok(result.body.data.findings.some(f => f.rule_id === 'opening_kill'));
++    assert.equal(result.body.data.enriched_damage, undefined);
++    const foreign = await call('/demo-analyses/' + demoId + '/performance', {}, otherToken);
++    assert.equal(foreign.status, 404);
++});
++
++test('old reports read exact private throw sidecars and invalidate cached projections', async () => {
++    const dir = path.join(tmp, 'private', demoId);
++    const parsed = JSON.parse(fs.readFileSync(path.join(dir, 'parse.json')));
++    const file = path.join(dir, 'utility-throws.json');
++    fs.writeFileSync(file, JSON.stringify({demo_sha256:parsed.demo.sha256,complete:true,utility_throws:[
++        {steamid:TARGET,tick:1000,round_num:1,weapon:'hegrenade'},
++        {steamid:TARGET,tick:1100,round_num:1,weapon:'flashbang'},
++        {steamid:'76561198000000002',tick:1200,round_num:1,weapon:'hegrenade'}
++    ]}));
++    try {
++        const response = await call('/demo-analyses/' + demoId + '/performance');
++        assert.equal(response.status, 200);
++        const usage = response.body.data.utility_throws;
++        assert.equal(usage.complete, true);
++        assert.equal(usage.items.find(x=>x.weapon==='hegrenade').throws,1);
++        assert.equal(usage.items.find(x=>x.weapon==='smokegrenade').throws,0);
++        assert.equal(response.body.data.modules.utility.flashes_thrown,1);
++    } finally { fs.unlinkSync(file); }
+ });
+ 
+ test('rounds, map pages and evidence are readable and paginated', async () => {
+--- /dev/null
++++ b/backend/tests/reviewFacts.test.js
+@@ -0,0 +1,61 @@
++'use strict';
++const {test}=require('node:test');
++const assert=require('node:assert/strict');
++const {buildPerformance}=require('../src/services/reviewFacts');
++function fixture() {
++ const rounds=[1,2,3,4,5].map(n=>({round_num:n,start_tick:n*1000,freeze_end_tick:n*1000,end_tick:n*1000+900,winner_side:'terrorist'}));
++ const players=['p','m','e','f'];
++ const all_player_samples=rounds.flatMap(r=>players.map((id,i)=>({round_num:r.round_num,steamid:id,side:(i<2)!==(r.round_num>=4)?'terrorist':'counter-terrorist'})));
++ const side=(id,n)=>all_player_samples.find(s=>s.steamid===id&&s.round_num===n).side;
++ const kill=(n,t,a,v)=>({event_id:'k'+n+'-'+t,tick:n*1000+t,round_num:n,attacker_steamid:a,victim_steamid:v,attacker_side:side(a,n),victim_side:side(v,n),weapon:'ak47'});
++ return {tick_rate:64,target_player_id:'p',rounds,all_player_samples,
++ stats:[{steamid:'p',rounds_played:5,adr:80,kast:80}],target_samples:[],
++ kills:[kill(1,10,'e','m'),kill(1,100,'p','e'),kill(2,10,'e','m'),kill(2,100,'f','p'),
++ kill(3,10,'e','p'),kill(3,100,'m','e'),kill(4,10,'p','e'),kill(5,10,'p','f')],
++ damages:[{event_id:'he',tick:4050,round_num:4,attacker_steamid:'p',victim_steamid:'e',weapon:'hegrenade',dmg_health:40},
++ {event_id:'fire',tick:4051,round_num:4,attacker_steamid:'p',victim_steamid:'f',weapon:'inferno',dmg_health:130,dmg_health_real:60},
++ {event_id:'tk',tick:4052,round_num:4,attacker_steamid:'p',victim_steamid:'m',weapon:'inferno',dmg_health:5}],
++ round_economy:rounds.flatMap(r=>[{round_num:r.round_num,side:'terrorist',equipment_value:20000,n_players:5,buy_type:'force'},
++ {round_num:r.round_num,side:'counter-terrorist',equipment_value:5000,n_players:5,buy_type:'eco'}])};
++}
++test('restores missing damage sides from per-round observations across halftime',()=>{
++ const p=fixture(),r=buildPerformance(p);
++ assert.equal(r.modules.utility.he_damage,40);assert.equal(r.modules.utility.fire_damage,60);
++ assert.equal(r.modules.utility.utility_team_damage,5);assert.equal(r.damage_basis,'raw');
++ assert.equal(r.enriched_damage[0].attacker_side,'counter-terrorist');
++ assert.equal(p.damages[0].attacker_side,undefined);
++});
++test('separates trading for a living teammate from last-alive deaths',()=>{
++ const r=buildPerformance(fixture());
++ assert.equal(r.modules.trading.trade_kills,1);
++ assert.equal(r.modules.trading.last_alive_deaths,1);
++ assert.equal(r.modules.trading.eligible_deaths,1);
++ assert.equal(r.modules.trading.traded_deaths,1);
++ assert.equal(r.modules.trading.traded_death_pct,100);
++ assert.ok(!r.findings.some(f=>f.rule_id==='untraded_death'));
++});
++test('records positive openings and economy upsets without generic force losses',()=>{
++ const p=fixture();p.rounds[4].winner_side='counter-terrorist';
++ const r=buildPerformance(p);
++ assert.equal(r.modules.basic_stats.opening_kills,2);
++ assert.equal(r.modules.basic_stats.opening_deaths,1);
++ assert.ok(r.findings.some(f=>f.rule_id==='eco_win'&&f.round_num===5));
++ assert.ok(!r.findings.some(f=>f.rule_id==='eco_loss'));
++ assert.equal(r.rounds[3].target_side,'counter-terrorist');
++ assert.ok(r.modules.basic_stats.rating>0);
++});
++test('does not turn unknown damage into enemy damage or estimate a truncated Rating',()=>{
++ const p=fixture();p.damages.push({...p.damages[0],event_id:'unknown',victim_steamid:'spectator'});
++ p.truncated=['damages'];
++ const r=buildPerformance(p);
++ assert.equal(r.modules.utility.he_damage,40);
++ assert.equal(r.modules.utility.utility_unclassified_damage,40);
++ assert.equal(r.modules.basic_stats.rating,null);
++});
++test('recognizes being upset by a real eco, excludes pistol and symmetric force losses',()=>{
++ const p=fixture();p.rounds[0].winner_side='counter-terrorist';
++ p.round_economy[2].buy_type='pistol';
++ const r=buildPerformance(p);
++ assert.ok(r.findings.some(f=>f.rule_id==='anti_eco_loss'&&f.round_num===1));
++ assert.ok(!r.findings.some(f=>f.rule_id==='anti_eco_loss'&&f.round_num===2));
++});
+--- /dev/null
++++ b/backend/tests/utilityThrows.test.js
+@@ -0,0 +1,30 @@
++'use strict';
++const {test}=require('node:test'),assert=require('node:assert/strict');
++const {utilityThrows}=require('../src/services/utilityThrows');
++test('counts one event per throw, all six types, and real zeroes',()=>{
++ const payload={utility_throws_complete:true,utility_throws:[
++  {steamid:'1',tick:1,weapon:'weapon_hegrenade'},{steamid:'1',tick:1,weapon:'hegrenade'},
++  {steamid:'2',tick:2,weapon:'hegrenade'},{steamid:'1',tick:3,weapon:'smokegrenade'},
++  {steamid:'1',tick:4,weapon:'molotov'},{steamid:'1',tick:5,weapon:'incgrenade'},
++  {steamid:'1',tick:6,weapon:'inferno'}],stats:[{steamid:'1',flashes_thrown:99}],
++  damages:[{attacker_steamid:'1',weapon:'hegrenade'}]};
++ const result=utilityThrows(payload,'1');
++ const count=w=>result.items.find(r=>r.weapon===w).throws;
++ assert.equal(count('hegrenade'),1);assert.equal(count('smokegrenade'),1);
++ assert.equal(count('flashbang'),0);assert.equal(count('decoy'),0);
++ assert.equal(count('molotov'),1);assert.equal(count('incgrenade'),1);
++ assert.equal(result.complete,true);
++});
++test('missing ownership and damage records never fabricate counts',()=>{
++ const r=utilityThrows({grenades:[{type:'he',thrower_steamid:null}],
++  damages:[{weapon:'hegrenade'}],stats:[{steamid:'1',flashes_thrown:3}]},'1');
++ assert.equal(r.items.find(x=>x.weapon==='flashbang').throws,3);
++ assert.equal(r.items.find(x=>x.weapon==='hegrenade').throws,null);
++ assert.equal(r.complete,false);
++});
++test('a truncated stream only provides a lower bound, not an exact zero',()=>{
++ const r=utilityThrows({utility_throws_complete:false,
++  utility_throws:[{steamid:'1',tick:1,weapon:'hegrenade'}]},'1');
++ assert.equal(r.items.find(x=>x.weapon==='hegrenade').lower_bound,true);
++ assert.equal(r.items.find(x=>x.weapon==='decoy').throws,null);
++});
+--- a/parser/parse_demo.py
++++ b/parser/parse_demo.py
+@@ -281,6 +281,7 @@
+             "y": row.get("y"),
+         })
+ 
++    utility_throws, throws_complete = collect_utility_throws(demo, index, rounds, truncated, warnings)
+     grenades = build_grenades(demo, index, truncated, warnings)
+     smokes, cut = collect_utility(getattr(demo, "smokes", None), "smoke", index)
+     if cut:
+@@ -344,6 +345,8 @@
+         "blinds": blinds,
+         "bomb": bomb,
+         "grenades": grenades,
++        "utility_throws": utility_throws,
++        "utility_throws_complete": throws_complete,
+         "smokes": smokes,
+         "fires": fires,
+         "round_economy": round_economy,
+@@ -460,6 +463,40 @@
+     return snapshots
+ 
+ 
++def collect_utility_throws(demo: Any, index: RoundIndex, rounds: list[dict[str, Any]],
++                           truncated: list[str], warnings: list[str]) -> tuple[list[dict[str, Any]], bool]:
++    """One normalized weapon_fire per thrown grenade; never count victims or damage."""
++    try:
++        frame = demo.shots
++        types = {"flashbang", "smokegrenade", "hegrenade", "molotov", "incgrenade", "decoy"}
++        by_round = {r["round_num"]: r for r in rounds if not r.get("is_knife_round")}
++        output = []
++        seen = set()
++        for row in frame.to_dicts():
++            weapon = str(row.get("weapon") or "").removeprefix("weapon_")
++            sid = steamid(row.get("steamid"))
++            tick = row.get("tick")
++            if weapon not in types or not sid or not isinstance(tick, (int, float)):
++                continue
++            rn = index.at(tick)
++            current = by_round.get(rn)
++            if not current or (current.get("freeze_end_tick") is not None and tick < current["freeze_end_tick"]):
++                continue
++            key = (sid, tick, weapon)
++            if key in seen:
++                continue
++            seen.add(key)
++            output.append({"event_id": f"throw_{len(output)+1:04d}", "tick": tick,
++                           "round_num": rn, "steamid": sid, "weapon": weapon})
++            if len(output) >= MAX_GRENADES:
++                truncated.append("utility_throws")
++                return output, False
++        return output, True
++    except Exception as error:
++        warnings.append(f"utility throws unavailable: {error}")
++        return [], False
++
++
+ def build_grenades(demo: Any, index: RoundIndex, truncated: list[str],
+                    warnings: list[str]) -> list[dict[str, Any]]:
+     try:
+@@ -557,6 +594,7 @@
+     parser.add_argument("--max-rounds", type=int, default=DEFAULT_MAX_ROUNDS)
+     parser.add_argument("--sample-every", type=int, default=DEFAULT_SAMPLE_EVERY)
+     parser.add_argument("--check", action="store_true")
++    parser.add_argument("--utility-only", action="store_true", help="extract a private throw-event sidecar without rebuilding reports")
+     args = parser.parse_args(list(argv) if argv is not None else None)
+ 
+     if args.check:
+@@ -574,6 +612,19 @@
+ 
+     started = time.time()
+     demo = load_demo(args.input)
++    if args.utility_only:
++        round_rows, rounds_cut = rows(demo.rounds, max(1, args.max_rounds))
++        truncated, warnings = [], []
++        events, complete = collect_utility_throws(demo, RoundIndex(round_rows), round_rows, truncated, warnings)
++        result = {"schema_version": "utility-throws-1.0.0", "demo_sha256": file_sha256(args.input),
++                  "complete": complete and not rounds_cut, "utility_throws": events, "warnings": warnings}
++        temporary = args.output + ".tmp"
++        with open(temporary, "w", encoding="utf-8") as handle:
++            json.dump(result, handle, ensure_ascii=False, separators=(",", ":"))
++        os.replace(temporary, args.output)
++        print(json.dumps({"ok": True, "throws": len(events), "complete": result["complete"]}))
++        return 0
++
+     payload = collect(demo, args.target_player or None, max(1, args.max_rounds), max(8, args.sample_every))
+ 
+     result = {

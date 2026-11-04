@@ -1,4 +1,14 @@
-# 当前网页版：1.3.0
+## 1.3.1 utility follow-up
+
+The web cache and open-tab update check are also fixed. See [web update deployment](docs/WEB-UPDATE-v1.3.1.md); version remains 1.3.1.
+
+Actual per-player throw counts are now recorded for all six utility types. See [throw-count fix](docs/UTILITY-v1.3.1.md). Version stays 1.3.1.
+
+# 当前网页版：1.3.1
+
+道具伤害、关键表现、补枪与经济判定、个人 Rating 和主页状态已更新。见 [1.3.1 说明](docs/REVIEW-v1.3.1.md) 及 [交付说明](HANDOFF.md)。
+
+# 历史网页版：1.3.0
 
 Dust2 战术分析、武器亮点、转点与逐回合复盘已接入。部署与 GitHub 交付请先阅读 [HANDOFF](HANDOFF.md) 和 [1.3.0 接口说明](docs/CLOUD-DEMO-v1.3.0.md)。
 

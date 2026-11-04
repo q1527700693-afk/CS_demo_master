@@ -37,6 +37,7 @@ export interface AnalysisRun {
   analyzed_at?: string | null
 }
 export interface AnalysisReport extends AcceptedPackage {
+  performance?: PerformanceFacts
   report_schema_version: string
   analysis_id: string
   status: string
@@ -125,6 +126,7 @@ export interface DetailedRound {
   target_summary?: RoundStatistics
 }
 export interface ReplayDetails {
+  performance?: PerformanceFacts
   analysis_version?: string
   players?: { player_id: string; name: string }[]
   match?: { map?: string; tick_rate?: number; started_at?: string | null }
@@ -166,6 +168,25 @@ export interface ReplayDetails {
   }
   map: { counts: Record<string, number>; sampling?: Record<string, unknown> }
   data_quality?: { warnings?: string[] }
+}
+export interface PerformanceFacts {
+  utility_throws?: {
+    source: string | null
+    complete: boolean
+    items: { weapon: string; throws: number | null; lower_bound?: boolean }[]
+  }
+  version: string
+  target_player_id: string
+  complete: boolean
+  damage_basis: 'raw' | 'effective'
+  modules: Record<string, Record<string, number | null>>
+  findings: ReplayDetails['findings']
+  rounds: {
+    round_num: number
+    target_side: string | null
+    team_economy: NonNullable<DetailedRound['team_economy']>
+    target_summary: RoundStatistics
+  }[]
 }
 export interface ReplayMapItem {
   kind: string

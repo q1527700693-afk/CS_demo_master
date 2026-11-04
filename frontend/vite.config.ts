@@ -5,12 +5,28 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  const webBuildId = `web-${Date.now().toString(36)}`
+  const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
   const tokenFile =
     env.LOCAL_PARSER_TOKEN_FILE ||
     fileURLToPath(new URL('../local_parser/token.txt', import.meta.url))
   return {
     plugins: [
       vue(),
+      {
+        name: 'web-release-info',
+        apply: 'build',
+        transformIndexHtml() {
+          return [{ tag: 'meta', attrs: { name: 'web-build-id', content: webBuildId }, injectTo: 'head' }]
+        },
+        generateBundle() {
+          this.emitFile({
+            type: 'asset',
+            fileName: 'version.json',
+            source: JSON.stringify({ version, revision: webBuildId }),
+          })
+        },
+      },
       {
         name: 'local-analysis-connection',
         configureServer(server) {
