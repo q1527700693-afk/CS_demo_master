@@ -20,10 +20,17 @@ Implemented:
 - Optional AI coaching analysis API (DeepSeek/OpenAI-compatible; disabled when `DEEPSEEK_API_KEY` is empty)
 - AI coach tab in the replay report: improvement areas, evidence references and training suggestions
 - Demo-file AI coaching queued as its own job, grounded on the parsed demo facts only
+- Dust2 tactical engine: curated map/utility/tactic knowledge, tactic classification, CT defense profile, per-round site recommendations and post-round review
+- Dust2 tactical report tab with team selection, rotation analysis, economy labels and evidence-backed recommendations
+- Weapon/economy highlights aggregated per player: off-meta/low-cost weapons, eco first bloods, SMG/shotgun timing kills and a transparent weapon-impact score
 
 Not implemented yet:
 
 - Mini-game APIs
+- A calibrated win-probability/tactical-choice model (no random forest/XGBoost model is trained or deployed yet)
+- Maps other than Dust2 for the tactical engine
+- Exact smoke line-of-sight, pre-aim scoring and voice-comms understanding
+- A true pickup/drop event log (weapon changes are sampled from snapshots; they are not proof of intent)
 
 ## Demo File Analysis
 
@@ -41,6 +48,553 @@ reports whether the parser and the AI provider are ready.
 
 Design, contracts and failure matrix: [docs/ai-demo-analysis-design.md](docs/ai-demo-analysis-design.md).
 Parser installation and CLI: [parser/README.md](parser/README.md).
+
+
+## Dust2 Tactical Engine / Dust2 战术引擎
+
+> **Scope:** Dust2 only. The engine is a deterministic fact extractor and
+> explainable recommendation layer. It is **not** a trained win-probability model.
+> The LLM receives facts produced here; it does not invent the tactics.
+
+### 1. What the engine is trying to answer
+
+The normal replay report answers questions such as:
+
+```text
+How many kills did the target player get?
+What was the ADR?
+Which utility events happened?
+```
+
+The Dust2 tactical engine answers different questions:
+
+```text
+What did our team try to do this round?
+Did we actually execute the plan?
+Which CT site looks weaker after the first few rounds?
+How fast did the opponent rotate from the opposite site?
+When they knew we were hitting A, did they abandon B?
+Should the next round go A or B?
+If we lost, was it economy, first death, missing utility or not following the plan?
+If we won, who opened the round?
+Which player produced unusual value with an R8, Deagle, dual-wield, SMG or shotgun?
+```
+
+### 2. End-to-end pipeline
+
+```text
+raw .dem
+  ↓
+parser/parse_demo.py (awpy)
+  ↓
+all-player samples + kills + utility + bomb + economy
+  ↓
+team selection and side tracking across halftime
+  ↓
+round timeline normalization
+  ↓
+deterministic tactical fact extraction
+  ↓
+┌─────────────────────────────────────────────────────────────┐
+│ tactic classification                                       │
+│ execution checks against tactic templates                   │
+│ CT defense profile                                          │
+│ site recommendation                                         │
+│ post-round review                                           │
+│ weapon/economy highlights                                   │
+└─────────────────────────────────────────────────────────────┘
+  ↓
+evidence-linked facts
+  ↓
+DeepSeek API writes the Chinese coach narrative
+```
+
+The engine only uses information available before the decision point when
+recommending a site. The post-round review is a separate layer: it may use the
+actual outcome to explain what happened, but it never feeds that outcome back
+into the recommendation for the same round.
+
+### 3. Dust2 knowledge base
+
+The knowledge pack lives in:
+
+```text
+knowledge/dust2/
+├── zones.json
+├── utility.json
+├── tactics.json
+├── meta.json
+├── sources.json
+├── sources.md
+├── callouts.md
+├── validation-notes.md
+└── recommendation-design.md
+```
+
+Current v0.1 contents:
+
+```text
+19 个 Dust2 区域
+8 个逻辑出生位
+10 个核心道具意图
+6 个战术模板
+6 个来源/校验记录
+```
+
+The zone file contains radar/world calibration, callout aliases and draft
+polygons. It includes, among others:
+
+```text
+t_spawn / ct_spawn
+a_site / a_long / long_doors / a_long_pit
+a_short / a_short_stairs / catwalk
+mid / mid_doors / xbox
+b_tunnel / lower_tunnels / upper_tunnels
+b_window / b_site
+ct_ramp / t_ramp
+```
+
+`b_window` is the team-facing **狗洞 / B窗口 / B洞窗口**. Team aliases are kept
+separate from the engine's stable zone IDs:
+
+```text
+匪家左手方向 -> B洞 / B通
+中间方向     -> 中路
+右手方向     -> A大
+B洞下层       -> lower_tunnels
+B洞上层       -> upper_tunnels
+狗洞 / B窗口  -> b_window
+B包点         -> b_site
+```
+
+Directional terms are display aliases only. The engine classifies by world
+coordinates and zone IDs because player view direction and side changes make
+left/right unreliable.
+
+The strategy templates currently include:
+
+```text
+T side:
+- A 大快打
+- B 洞 rush
+- A 小夹 A
+- 中路默认 / 假打转点
+
+CT side:
+- CT 常规默认
+- CT A 大前压
+```
+
+Every template records:
+
+- required spawn slots
+- required/optional utility
+- required map areas
+- ordered execution steps
+- success conditions
+- known failure modes
+- detection rules
+- adaptations when the opponent rotates/plays passively
+- confidence and validation status
+
+### 4. Team selection and sides
+
+The engine accepts:
+
+```text
+demo team_clan_name
+SteamID roster
+T / CT (debug-only side selection)
+```
+
+A team selected by roster is followed through halftime: if the team starts T and
+switches to CT, the engine evaluates the correct side for each round. Persistent
+binding between a demo team and a CS Demo Master software account is intentionally
+deferred.
+
+### 5. Timeline normalization
+
+The parser emits all-player samples, kills, utility events, bomb events and
+round economy. The tactical layer adds:
+
+- starts movement analysis at `round.freeze_end_tick`, not `round.start_tick`
+- maps world positions to Dust2 zones and draft polygons
+- recognizes the logical side of each team in each round
+- maps utility detonations to target zones
+- infers missing smoke/fire throwers from grenade trajectories when possible
+- keeps event IDs so later AI claims can point back to evidence
+
+Utility throwers are often `null` in CS2 demos. The engine infers a thrower from
+the nearest player sample to the grenade's first trajectory point (or the nearest
+molly endpoint for fires), then marks the attribution as `medium` or `low`
+confidence. It must never be presented as a certainty.
+
+### 6. Tactic classification
+
+For a selected team and round, the engine counts distinct players entering known
+areas in the early action window, checks utility events, first contact, bomb site
+and round economy, then returns tactic candidates.
+
+Current T-side detections:
+
+```text
+dust2_t_a_long_rush
+dust2_t_b_tunnel_rush
+dust2_t_a_short_split
+dust2_t_mid_default_fake
+```
+
+Current CT-side detections:
+
+```text
+dust2_ct_default
+dust2_ct_a_long_pressure
+```
+
+The bomb site is a strong objective signal. For example:
+
+```text
+early B tunnel pressure + final A plant
+```
+
+is treated as a fake/default-rotate candidate, not blindly as a B rush.
+
+The engine returns `confidence: draft` and evidence facts. It does **not** claim
+that a tactic was optimal just because it was classified.
+
+### 7. Execution checks
+
+Every tactic template has structured requirements:
+
+```text
+required_zone_presence
+required_spawn_slots
+required_utility
+steps with role/action/deadline
+success conditions
+failure modes
+```
+
+The engine compares the actual round to the template and returns checks such as:
+
+```text
+zone:a_long            passed
+spawn:t_a_long_first   passed
+utility:mid_fast_smoke missing
+```
+
+This separates two different questions:
+
+```text
+1. Was the plan a reasonable choice for this round?
+2. Was the chosen plan actually executed?
+```
+
+A good plan can fail because nobody threw the smoke; a bad plan can be rescued by
+individual aim. The UI/report should distinguish these cases.
+
+### 8. CT defense profile
+
+The scouting profile uses the first few CT rounds of the opponent (default
+`scoutRounds = 6`) and only rounds before the target round.
+
+For each CT round it extracts:
+
+- end-of-setup initial A/B/mid presence
+- first contact area
+- planted site
+- whether CT won or lost after the plant
+- which CT players rotated from the opposite site to the target site
+- rotation seconds and rotation speed
+- whether the opposite site was left empty
+- first CT death site and whether it was traded
+- economy context
+
+The resulting profile contains:
+
+```text
+initial average setup
+plant counts by site
+hold rate by site
+rotation sample count
+rotation speed / average seconds
+abandoned opposite-site count
+untraded first-death counts
+confidence (low / medium)
+```
+
+The old misleading metric "A 回防时间 0.2 秒" has been removed. A rotation is now
+only counted when an initial opposite-site defender actually reaches the target
+site. If no such movement is observed, the output says:
+
+```text
+未观察到有效转点
+```
+
+It does not turn a sample interval into a rotation time.
+
+### 9. Site recommendation
+
+For each upcoming T round, the engine computes a transparent A/B score using
+information available before that round:
+
+```text
+CT initial defender imbalance
+CT hold-rate difference
+CT rotation-time difference
+our spawn-route advantage
+our smoke/flash inventory
+our previous A/B attempts and wins in this match
+our economy and enemy economy
+```
+
+The output includes:
+
+```text
+primary_site
+secondary_site
+recommended_tactic_id / recommended_tactic_name
+site_scores
+spawn_labels (human-readable)
+economy labels
+reasons
+risks
+confidence
+round review
+```
+
+Economy labels are translated to:
+
+```text
+pistol -> 手枪局
+eco -> 经济局
+force -> 强起/半起
+full -> 长枪局
+```
+
+Spawn labels are translated to human language, for example:
+
+```text
+t_a_long_first -> A 大第一身位
+t_awper_mid -> T 中门狙位
+t_b_tunnel_first -> B 洞第一身位
+t_mid_fast_smoke -> 中门快烟位
+t_short_first -> A 小第一身位
+```
+
+Risks focus on our own situation rather than vague "the opponent may be alert":
+
+- short gun / economy disadvantage
+- short guns are worse on long A-long duels
+- no A-long or B-tunnel first spawn evidence
+- no smoke or no flash
+- opponent rotation speed, only when actually sampled
+- low sample count
+
+Site scores are **heuristic scores**, not probabilities. They explain why the
+engine prefers a site; they are not calibrated `P(win)` values.
+
+### 10. Post-round review
+
+For every recommended round the summary also returns a review:
+
+```text
+actual outcome (win/loss)
+actual site / actual primary tactic
+whether the team followed the recommended site
+opening credit (who got the first kill)
+opening death (who died first)
+economy of both teams
+loss causes
+win credits
+suggestions for the next round
+```
+
+If the team loses, causes may include:
+
+```text
+economy/gun disadvantage
+did not execute the recommended site
+our first death
+missing required utility/zone/spawn conditions
+no bomb plant
+```
+
+If the team wins, the review names the opening player and says whether the
+actual direction matched the recommendation. If the evidence is insufficient,
+it says so instead of inventing a cause.
+
+### 11. Weapon and economy highlights
+
+Low-cost/off-meta impact is aggregated **per player**, not per weapon event. A
+player gets one highlight card containing all relevant weapons.
+
+The engine extracts:
+
+- R8 revolver, Desert Eagle, dual-wield pistols
+- SMGs and shotguns
+- eco/force/pistol-round kills
+- first bloods with low-cost weapons
+- multi-kill rounds with special weapons
+- approximate weapon cost
+- per-player weapon-impact score
+- normal top-weapon profile for AK/M4/AWP context
+
+Example output shape:
+
+```json
+{
+  "player_name": "豆腐干号",
+  "kills": 7,
+  "first_bloods": 2,
+  "economy_kills": 6,
+  "multi_kill_rounds": 2,
+  "weapons": [
+    { "weapon_label": "MAC-10", "kills": 2, "first_bloods": 1 },
+    { "weapon_label": "MP9", "kills": 2, "first_bloods": 0 },
+    { "weapon_label": "PP-Bizon", "kills": 1, "first_bloods": 1 }
+  ],
+  "reason": "本场低成本/高影响武器集中在 ..."
+}
+```
+
+The AI prompt receives `weapon_highlights`, `weapon_profiles`,
+`player_weapon_impact` and sampled `weapon_transitions`. It is instructed to:
+
+- use ordinary AK/M4/AWP only briefly
+- highlight special/low-cost weapons only when impact is evidenced
+- cite `evidence_ids`
+- state "sample is small" when appropriate
+- treat weapon transitions as snapshots, not a confirmed pickup/drop log
+
+### 12. Evidence and confidence contract
+
+The engine distinguishes:
+
+```text
+verified  — checked against a real demo/in-game
+community — public convention, needs demo check
+draft     — initial knowledge, never hard blame
+unknown   — no data, no claim
+```
+
+It avoids saying:
+
+```text
+A definitely threw a bad smoke
+```
+
+when the parser cannot prove the smoke's line-of-sight effect. The current
+engine can report observed landing/timing/rotations and candidate issues, then
+the AI must phrase limitations explicitly.
+
+### 13. API and UI
+
+The existing report contracts remain unchanged. Additive Dust2 endpoints:
+
+```http
+GET /api/v1/demo-analyses/:id/teams
+GET /api/v1/demo-analyses/:id/dust2-summary?team=<team>&maxRounds=10&scoutRounds=6
+```
+
+The Dust2 summary includes:
+
+```text
+scout_defense_profile
+round_recommendations
+own_tactic_summary
+weapon_highlights
+weapon_profiles
+player_weapon_impact
+weapon_transitions
+limitations
+```
+
+The web report exposes a new:
+
+```text
+战术分析
+```
+
+tab. It is available for cloud-uploaded `.dem` reports and shows the opponent CT
+profile, per-round site recommendations, post-round review and weapon/economy
+highlights. The old overview, rounds, utility, AI and data tabs are unchanged.
+
+### 14. What is deliberately not done
+
+- No random forest/XGBoost/trained win-probability model yet.
+- No claim that heuristic site scores are calibrated probabilities.
+- No exact pickup/drop event log; `weapon_transitions` are sampled changes.
+- No smoke line-of-sight/occlusion solver yet; smoke landing/timing is observed,
+  not a definitive visual check.
+- No pre-aim scoring.
+- No voice-comms or intent understanding.
+- No maps other than Dust2 in the tactical engine.
+- No cross-match persistent team/opponent profile yet.
+
+### 15. Validation status
+
+The first five local Dust2 demos were used to calibrate the parser and engine:
+
+```text
+5 demos
+108 parsed rounds
+all de_dust2
+```
+
+Calibration corrected:
+
+- freeze-time misclassification
+- CT spawn location
+- T spawn radius
+- radar polygons and B-window/dog-hole distinction
+- utility thrower inference
+- bomb-site-aware fake/rotate classification
+- misleading retake-time display
+- human-readable spawn/economy labels
+
+Automated checks include:
+
+```text
+Dust2 knowledge structural validation
+tactic classification tests
+CT defense profile tests
+site recommendation tests
+post-round review tests
+utility attribution tests
+weapon/economy aggregation tests
+AI fact shape and prompt-regression tests
+```
+
+### 16. Main files
+
+```text
+knowledge/dust2/                  curated map/utility/tactic knowledge
+backend/src/services/dust2Knowledge.js
+backend/src/services/dust2Tactics.js
+backend/src/services/dust2Defense.js
+backend/src/services/utilityAttribution.js
+backend/src/services/weaponImpact.js
+backend/src/services/aiAnalysis.js
+backend/src/routes/demoAnalyses.js
+backend/scripts/analyze-dust2-parse.js
+backend/scripts/analyze-dust2-match.js
+frontend/src/features/replay/ReviewDust2.vue
+frontend/src/features/replay/cloud-api.ts
+docs/weapon-economy-highlights.md
+docs/ai-demo-analysis-design.md
+```
+
+### 17. Roadmap
+
+```text
+1. Manually validate more Dust2 demo rounds.
+2. Calibrate overlapping callout polygons and utility lineups.
+3. Add a true utility/smoke-effect layer where demos provide enough data.
+4. Add a player-composite score (currently only weapon-impact score exists).
+5. Collect enough labeled rounds before training any tactical-choice model.
+6. Keep the LLM as a narrator over evidence; never let it invent tactical facts.
+```
 
 ## Replay Analysis Documentation
 
