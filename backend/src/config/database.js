@@ -168,6 +168,15 @@ CREATE TABLE IF NOT EXISTS lobby_claims (
     PRIMARY KEY (lobby_id, user_id)
 );
 
+CREATE TABLE IF NOT EXISTS demo_showcases (
+    user_id       INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+    enabled       INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+    analysis_id   TEXT,
+    mode          TEXT NOT NULL DEFAULT 'stats' CHECK (mode IN ('stats', 'ai')),
+    snapshot_json TEXT,
+    updated_at    TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS friendships (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     user_low_id   INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,

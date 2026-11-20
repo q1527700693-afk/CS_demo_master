@@ -26,6 +26,7 @@ const {selectPerspective, roster} = require('../services/demoSelection');
 const {teamRosters} = require('../services/dust2Tactics');
 const dust2Defense = require('../services/dust2Defense');
 const {extractWeaponImpact} = require('../services/weaponImpact');
+const showcaseService = require('../services/showcaseService');
 const { enqueueDemoAi } = require('../services/replayQueue');
 
 const VISIBLE = `kind='demo' AND owner_id=? AND (coalesce(json_extract(meta,'$.selection_mode'),'')!='choose' OR NOT EXISTS (SELECT 1 FROM replay_jobs child WHERE child.owner_id=replay_jobs.owner_id AND child.kind='demo' AND coalesce(json_extract(child.meta,'$.selection_mode'),'')!='choose' AND json_extract(child.meta,'$.demo_sha256')=json_extract(replay_jobs.meta,'$.demo_sha256')))`;
@@ -469,6 +470,7 @@ router.delete('/:id', wrap(async (req, res) => {
             }
         }
     }
+    showcaseService.revokeForAnalysis(req.user.id, row.id);
     success(res);
 }));
 

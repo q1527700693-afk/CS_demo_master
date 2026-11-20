@@ -8,6 +8,7 @@ const { errors, success } = require('../utils/response');
 const authService = require('../services/authService');
 const friendService = require('../services/friendService');
 const profileService = require('../services/profileService');
+const showcaseService = require('../services/showcaseService');
 
 /**
  * Wrap an async handler so a rejected promise reaches the error middleware.
@@ -79,6 +80,35 @@ router.delete(
     asyncRoute(async (request, response) =>
         success(response, await profileService.deleteAvatar(request.user))
     )
+);
+
+// GET /api/v1/users/me/demo-showcase - own showcase settings
+router.get(
+    '/me/demo-showcase',
+    authenticate,
+    asyncRoute(async (request, response) => {
+        response.setHeader('Cache-Control', 'no-store');
+        success(response, await showcaseService.getMine(request.user));
+    })
+);
+
+// PUT /api/v1/users/me/demo-showcase - choose and publish a server-built snapshot
+router.put(
+    '/me/demo-showcase',
+    authenticate,
+    asyncRoute(async (request, response) => {
+        response.setHeader('Cache-Control', 'no-store');
+        success(response, await showcaseService.putMine(request.user, request.body));
+    })
+);
+
+// GET /api/v1/users/:userId/demo-showcase - public snapshot only
+router.get(
+    '/:userId/demo-showcase',
+    asyncRoute(async (request, response) => {
+        response.setHeader('Cache-Control', 'no-store');
+        success(response, await showcaseService.getPublic(request.params.userId));
+    })
 );
 
 // GET /api/v1/users/:userId/profile - public card

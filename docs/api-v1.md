@@ -1000,6 +1000,25 @@ Errors:
 | 50200 | 502 | Provider error, timeout, invalid JSON or unknown evidence ID |
 | 50300 | 503 | `DEEPSEEK_API_KEY` is not configured |
 
+## 10. Demo showcase / public highlight snapshot
+
+These endpoints are additive and use the existing JWT. The browser selects an
+analysis, but the server builds the snapshot; client-supplied snapshot data is
+never trusted.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/v1/users/me/demo-showcase` | yes | Return my showcase setting and saved snapshot |
+| PUT | `/api/v1/users/me/demo-showcase` | yes | Enable/disable or select `{enabled, analysis_id, mode}` |
+| GET | `/api/v1/users/{userId}/demo-showcase` | no | Public snapshot only; `Cache-Control: no-store` |
+
+`mode` is `stats | ai`. Enabling AI mode requires a completed AI report. Source
+reports must belong to the owner and be completed. Disabling returns
+`enabled:false`, `analysis_id:null`, `mode:"stats"`, `snapshot:null`. Deleting
+the selected analysis revokes the showcase immediately. The public response
+never exposes private report files, package IDs, paths, tokens or provider
+configuration.
+
 ## 10. Dust2 tactical analysis
 
 Raw demo reports can additionally expose a team-facing Dust2 report without
@@ -1016,7 +1035,7 @@ probability. It includes `weapon_highlights`, `player_weapon_impact` and sampled
 The existing `/report`, `/details`, `/rounds`, `/evidence` and `/ai` contracts
 remain unchanged.
 
-## 11. Error Codes
+## 12. Error Codes
 
 | Code | HTTP | Description |
 |---:|---:|---|
@@ -1033,7 +1052,7 @@ remain unchanged.
 | 50300 | 503 | AI analysis is not configured |
 | 50310 | 503 | Demo parser unavailable (no Python/awpy) |
 
-## 12. Changelog
+## 13. Changelog
 
 | Version | Date | Author | Description |
 |---|---|---|---|
@@ -1046,3 +1065,4 @@ remain unchanged.
 | v1.6 | 2026-10-24 | CS Demo Master Team | Added optional AI coaching endpoints backed by a server-side DeepSeek/OpenAI-compatible provider; disabled without `DEEPSEEK_API_KEY` |
 | v1.7 | 2026-10-28 | CS Demo Master Team | Added raw `.dem` upload and analysis (`/api/v1/demo-analyses`): server-side awpy parsing, rule report, map points, evidence and queued demo-grounded AI coaching; new code `50310` |
 | v1.8 | 2026-10-31 | CS Demo Master Team | Added additive Dust2 team/defense/site-recommendation summary, weapon/economy highlights and AI weapon facts; existing report contracts unchanged |
+| v1.9 | 2026-11-01 | CS Demo Master Team | Added owner/public Demo showcase snapshot APIs with server-side source validation, AI-mode gating, no-store public reads and automatic revocation on analysis deletion |

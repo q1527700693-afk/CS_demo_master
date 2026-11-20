@@ -12,6 +12,7 @@ const { success, errors } = require('../utils/response');
 const { db, root, directory, VERSION } = require('../services/replayStore');
 const { readGlobalPage } = require('../services/replayGlobal');
 const aiAnalysis = require('../services/aiAnalysis');
+const showcaseService = require('../services/showcaseService');
 const {pruneAnalysisPackage} = require('../services/replayCleanup');
 const router = express.Router();
 router.use(['/analysis-packages','/analyses','/matches'], authenticate);
@@ -245,7 +246,7 @@ router.get('/analyses/:id/details',wrap(async(req,res)=>{
 router.delete('/analyses/:id',wrap(async(req,res)=>{
     const job=getRun(req.user.id,req.params.id);
     if(job.status==='running') throw errors.conflict('Analysis is running');
-    await discard(job.id);pruneAnalysisPackage(req.user.id,job.package_id);success(res);
+    await discard(job.id);pruneAnalysisPackage(req.user.id,job.package_id);showcaseService.revokeForAnalysis(req.user.id,job.id);success(res);
 }));
 router.delete('/analysis-packages/:id',wrap(async(req,res)=>{
     const p=getPackage(req.user.id,req.params.id);
@@ -253,7 +254,7 @@ router.delete('/analysis-packages/:id',wrap(async(req,res)=>{
     if(jobs.some(j=>j.status==='running')) throw errors.conflict('Package has a running analysis');
     db.exec('BEGIN IMMEDIATE');
     try {
-        for(const job of jobs) db.prepare('DELETE FROM replay_jobs WHERE id=?').run(job.id);
+        for(const job of jobs) { db.prepare('DELETE FROM replay_jobs WHERE id=?').run(job.id); showcaseService.revokeForAnalysis(req.user.id,job.id); }
         db.prepare('DELETE FROM analysis_packages WHERE owner_id=? AND package_id=?').run(req.user.id,p.package_id);
         db.prepare('DELETE FROM replay_jobs WHERE id=?').run(p.storage_id);
         db.exec('COMMIT');
