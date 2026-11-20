@@ -1,10 +1,14 @@
-## 1.3.1 utility follow-up
+# 当前网页版：1.3.2
+
+修复训练靶球覆盖枪模的前后关系，保留原有瞄准和计分规则。见 [1.3.2 说明](docs/TRAINING-v1.3.2.md) 和 [交付说明](HANDOFF.md)。
+
+## 1.3.1 utility follow-up（历史）
 
 The web cache and open-tab update check are also fixed. See [web update deployment](docs/WEB-UPDATE-v1.3.1.md); version remains 1.3.1.
 
 Actual per-player throw counts are now recorded for all six utility types. See [throw-count fix](docs/UTILITY-v1.3.1.md). Version stays 1.3.1.
 
-# 当前网页版：1.3.1
+# 历史网页版：1.3.1
 
 道具伤害、关键表现、补枪与经济判定、个人 Rating 和主页状态已更新。见 [1.3.1 说明](docs/REVIEW-v1.3.1.md) 及 [交付说明](HANDOFF.md)。
 

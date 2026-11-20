@@ -2,6 +2,7 @@ import { fileURLToPath, URL } from 'node:url'
 import { readFileSync } from 'node:fs'
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { versionTrainingRuntime } from './scripts/training-release.mjs'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -25,6 +26,9 @@ export default defineConfig(({ mode }) => {
             fileName: 'version.json',
             source: JSON.stringify({ version, revision: webBuildId }),
           })
+        },
+        async writeBundle(options) {
+          await versionTrainingRuntime(options.dir || 'dist', webBuildId)
         },
       },
       {

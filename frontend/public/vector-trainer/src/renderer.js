@@ -112,9 +112,9 @@ export class ArenaRenderer {
     this.weaponAim.set(0,0,.5).unproject(this.weaponCamera);
     this.weaponAim.multiplyScalar(12/-this.weaponAim.z);this.weapon.aimAt?.(this.weaponAim);this.weapon.update(dt,this.recoil);
     this.renderer.setRenderTarget(null);this.renderer.render(this.scene,this.camera);
-    this.renderer.autoClear=false;this.renderer.clearDepth();this.renderer.render(this.weaponScene,this.weaponCamera);
-    // Targets are the interaction layer: draw them last so the viewmodel can never hide a ball.
-    this.renderer.clearDepth();this.renderer.render(this.targetScene,this.camera);this.renderer.autoClear=true;
+    // Targets share the room's depth; the close-up viewmodel belongs in front.
+    this.renderer.autoClear=false;this.renderer.render(this.targetScene,this.camera);
+    this.renderer.clearDepth();this.renderer.render(this.weaponScene,this.weaponCamera);this.renderer.autoClear=true;
   }
   project(target){const p=targetWorld(target),v=new THREE.Vector3(p.x,p.y,p.z).project(this.camera),r=this.canvas.getBoundingClientRect();return{x:r.left+(v.x+1)/2*r.width,y:r.top+(1-v.y)/2*r.height};}
   dispose(loseContext=false){

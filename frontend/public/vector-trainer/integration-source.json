@@ -33,8 +33,8 @@
     },
     {
       "path": "src/renderer.js",
-      "bytes": 12997,
-      "sha256": "164c49e72396527509032e66dd34faccf37a10c1c6e47bb22fd68df1b7114742"
+      "bytes": 12953,
+      "sha256": "6af624651dfd729b805016a8867ee89d564629ffd4073b80489f0ea90a86c753"
     },
     {
       "path": "src/session-id.js",

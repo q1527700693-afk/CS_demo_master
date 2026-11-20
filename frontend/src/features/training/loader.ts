@@ -48,7 +48,8 @@ export function loadTrainerModule(): Promise<TrainerModule> {
   pending = new Promise<TrainerModule>((resolve, reject) => {
     const script = document.createElement('script')
     script.type = 'module'
-    script.src = `${import.meta.env.BASE_URL}training-loader.js?attempt=${++attempt}`
+    const build = document.querySelector('meta[name="web-build-id"]')?.getAttribute('content') || 'dev'
+    script.src = `${import.meta.env.BASE_URL}training-loader.js?revision=${encodeURIComponent(build)}&attempt=${++attempt}`
     const timer = window.setTimeout(() => fail('训练资源加载超时，请刷新页面后重试'), 30_000)
 
     function cleanup() {
