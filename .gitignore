@@ -1,45 +1,6 @@
-﻿# Python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-env/
-.env
-.pytest_cache/
-.mypy_cache/
-
-# Node
 node_modules/
 dist/
-.vite/
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Uploads and runtime files.
-# The two folders from TASKS.md 2 are kept in the repo, their contents are not.
-uploads/*
-!uploads/avatars/
-!uploads/demo-logs/
-uploads/avatars/*
-!uploads/avatars/.gitkeep
-uploads/demo-logs/*
-!uploads/demo-logs/.gitkeep
-
-storage/
-data/logs/
-*.log
-
-# Test leftovers
-tests/_tmp/
-package-lock.json.bak
-
-# IDE
-.idea/
-.vscode/
-
-# OS
-.DS_Store
-Thumbs.db
+.env.local
+.env.*.local
+*.tsbuildinfo
+test-results/
