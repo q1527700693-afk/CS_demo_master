@@ -15,6 +15,8 @@ export const listReplays = async (): Promise<Page<Replay> & { warnings: string[]
       createdAt: item.updatedAt,
       score: item.score || [0, 0],
       scoreKnown: item.score !== null,
+      scoreFinal: item.scoreFinal,
+      ratingEstimated: item.ratingEstimated,
       status: item.available
         ? 'completed'
         : item.status === 'failed'

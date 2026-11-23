@@ -142,6 +142,15 @@ export const getReportDetails = (id: string) =>
   isCloudAnalysis(id)
     ? getCloudDetails(id)
     : analysisRequest<ReplayDetails>(`/analyses/${encodeURIComponent(id)}/details`)
+export async function readReportSummary(id: string) {
+  const result =
+    cachedReport(id) ||
+    (isCloudAnalysis(id)
+      ? await getCloudReport(id)
+      : await analysisRequest<AnalysisReport>(`/analyses/${encodeURIComponent(id)}/report`))
+  assertReportIdentity(result, { analysis_id: id })
+  return result
+}
 export const getRound = (id: string, round: number, signal?: AbortSignal) =>
   isCloudAnalysis(id)
     ? getCloudRound(id, round, signal)

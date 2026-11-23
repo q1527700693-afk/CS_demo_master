@@ -1,6 +1,7 @@
 import type { AnalysisReport, ReplayDetails, ReplayEvent } from './contracts'
 import { combatRelation, MIN_EFFECTIVE_BLIND_SECONDS } from './combat-facts'
 import { numberText } from './report-data'
+import { mapId } from './radar-data'
 
 // Presentation registry: backend keys never become user-facing labels by accident.
 export const reviewTabs = [
@@ -25,8 +26,21 @@ export const mapNames: Record<string, string> = {
   de_cache: '死城之谜',
   cs_office: '办公室',
   cs_italy: '意大利小镇',
+  de_cbble: '古堡激战',
+  ar_pool_day: '泳池派对',
+  ar_baggage: '行李仓库',
+  ar_shoots: '雨林遗迹',
+  ar_shoots_night: '雨林遗迹（夜间）',
+  de_ancient_night: '远古遗迹（夜间）',
+  de_eldorado: 'El Dorado',
+  de_poseidon: 'Poseidon',
+  de_debris: 'Debris',
+  cs_shelter: 'Shelter',
+  de_boulder: 'Boulder',
+  de_fachwerk: 'Fachwerk',
+  rush_001: 'Complex',
 }
-export const mapName = (id: string) => mapNames[id] || '自定义地图'
+export const mapName = (id: string) => mapNames[mapId(id)] || '自定义地图'
 export const sideName = (side?: string | null) =>
   side === 'terrorist' ? '进攻方' : side === 'counter-terrorist' ? '防守方' : '阵营未记录'
 export const weaponNames: Record<string, string> = {

@@ -12,26 +12,17 @@ export interface RadarAsset {
   labels?: { x: number; y: number; text: string }[]
 }
 export const RADAR_VERSION = '2000933'
-const supported = new Set([
-  'ar_baggage',
-  'ar_shoots',
-  'ar_shoots_night',
-  'cs_italy',
-  'cs_office',
-  'de_ancient',
-  'de_ancient_night',
-  'de_anubis',
-  'de_cache',
-  'de_dust2',
-  'de_inferno',
-  'de_mirage',
-  'de_nuke',
-  'de_overpass',
-  'de_train',
-  'de_vertigo',
-])
+export function mapId(map: string) {
+  return map
+    .toLowerCase()
+    .replace(/\\/g, '/')
+    .split('/')
+    .at(-1)!
+    .replace(/\.(bsp|vpk)$/, '')
+}
 export function radarAsset(map: string): RadarAsset | null {
-  if (!supported.has(map)) return null
+  map = mapId(map)
+  if (!Object.hasOwn(metadata, map)) return null
   const data = (
     metadata as Record<
       string,
@@ -39,15 +30,17 @@ export function radarAsset(map: string): RadarAsset | null {
         pos_x: number
         pos_y: number
         scale: number
-        verticalsections?: { lower?: { AltitudeMax: string } }
+        version?: string
+        verticalsections?: { lower?: { AltitudeMax: string | number } }
       }
     >
   )[map]
   if (!data || data.scale <= 0) return null
-  const base = `/maps/${RADAR_VERSION}/radars/${map}`
+  const version = data.version ?? RADAR_VERSION
+  const base = `/maps/${version}/radars/${map}`
   return {
     ...data,
-    version: RADAR_VERSION,
+    version,
     image: `${base}.png`,
     ...(data.verticalsections?.lower
       ? {
@@ -75,19 +68,77 @@ export function onRadarFloor(asset: RadarAsset, z: number | null | undefined, lo
   if (z == null || !Number.isFinite(z)) return false
   return lower ? z < asset.lowerMax : z >= asset.lowerMax
 }
-export function sampleAt(samples: ReplayMapItem[], tick: number, maxAge: number) {
+export function lastAt<T>(samples: T[], tick: number, time: (item: T) => number) {
   let low = 0,
     high = samples.length - 1,
-    result: ReplayMapItem | undefined
+    result = -1
   while (low <= high) {
     const mid = (low + high) >>> 1,
       sample = samples[mid]!
-    if ((sample.tick ?? Infinity) <= tick) {
-      result = sample
+    if (time(sample) <= tick) {
+      result = mid
       low = mid + 1
     } else high = mid - 1
   }
-  return result && tick - (result.tick ?? 0) <= maxAge ? result : undefined
+  return result
+}
+const sampleTime = (s: ReplayMapItem) => s.tick ?? Infinity
+export function sampleAt(samples: ReplayMapItem[], tick: number, maxAge: number) {
+  const sample = samples[lastAt(samples, tick, sampleTime)]
+  return sample && tick - sampleTime(sample) <= maxAge ? sample : undefined
+}
+export function continuous(
+  a: ReplayMapItem,
+  b: ReplayMapItem,
+  rate: number,
+  asset?: RadarAsset | null,
+) {
+  const p = a.state,
+    q = b.state
+  const gap = sampleTime(b) - sampleTime(a)
+  if (
+    !p ||
+    !q ||
+    gap <= 0 ||
+    gap > rate * 0.65 ||
+    p.health === 0 ||
+    q.health === 0 ||
+    p.side !== q.side ||
+    ![p.x, p.y, q.x, q.y].every(Number.isFinite)
+  )
+    return false
+  if (
+    asset?.lowerMax != null &&
+    (p.z == null || q.z == null || p.z < asset.lowerMax !== q.z < asset.lowerMax)
+  )
+    return false
+  return Math.hypot(q.x! - p.x!, q.y! - p.y!) <= 32 + (600 * gap) / rate
+}
+export function positionAt(
+  samples: ReplayMapItem[],
+  tick: number,
+  rate: number,
+  asset?: RadarAsset | null,
+) {
+  const index = lastAt(samples, tick, sampleTime)
+  const a = samples[index],
+    b = samples[index + 1]
+  if (!a || tick - sampleTime(a) > rate) return undefined
+  if (!b || tick === a.tick || !continuous(a, b, rate, asset)) return a
+  const t = (tick - a.tick!) / (b.tick! - a.tick!),
+    p = a.state!,
+    q = b.state!
+  return {
+    ...a,
+    state: {
+      ...p,
+      x: p.x! + (q.x! - p.x!) * t,
+      y: p.y! + (q.y! - p.y!) * t,
+      z: p.z != null && q.z != null ? p.z + (q.z - p.z) * t : p.z,
+      yaw:
+        p.yaw != null && q.yaw != null ? p.yaw + (((q.yaw - p.yaw + 540) % 360) - 180) * t : p.yaw,
+    },
+  }
 }
 export function trajectoryPoints(item: ReplayMapItem, tick: number, entire: boolean) {
   if (entire) return item.points || []

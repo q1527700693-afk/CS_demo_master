@@ -87,15 +87,145 @@ export function assertDetailsIdentity(details: ReplayDetails, report: AnalysisRe
     throw new Error('扩展详情与当前报告身份不一致，已停止接收')
 }
 type PlayerSide = 'terrorist' | 'counter-terrorist'
-function knownSide(value: unknown): PlayerSide | null {
-  return value === 'terrorist' || value === 'counter-terrorist' ? value : null
+export async function collectRoundEvents(
+  details: ReplayDetails,
+  read: (n: number) => Promise<RoundDetail>,
+) {
+  const events: ReplayEvent[] = []
+  const missing: number[] = []
+  let index = 0
+  async function worker() {
+    while (index < details.rounds.length) {
+      const n = details.rounds[index++]!.round_num
+      try {
+        const round = await read(n)
+        if (
+          round.round_num !== n ||
+          !Array.isArray(round.events) ||
+          (round.target_start_state?.steamid &&
+            round.target_start_state.steamid !== details.target_player_id)
+        )
+          throw new Error('回合不匹配')
+        for (const event of round.events) if (event.round_num === n) events.push(event)
+      } catch {
+        missing.push(n)
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(4, details.rounds.length) }, worker))
+  const seen = new Set<string>()
+  return {
+    events: events
+      .filter((event) => {
+        if (!event.event_id) return true
+        if (seen.has(event.event_id)) return false
+        seen.add(event.event_id)
+        return true
+      })
+      .sort((a, b) => a.tick - b.tick),
+    missing,
+  }
+}
+export function knownSide(value: unknown): PlayerSide | null {
+  const side = String(value ?? '')
+    .toLowerCase()
+    .replace(/_/g, '-')
+  if (side === 't' || side === 'terrorist' || side === '2') return 'terrorist'
+  if (side === 'ct' || side === 'counter-terrorist' || side === '3') return 'counter-terrorist'
+  return null
 }
 function targetSide(round: DetailedRound, playerId: string): PlayerSide | null {
   const direct = knownSide(round.target_side)
   if (direct) return direct
   const start = round.target_start_state
   if (start?.steamid && start.steamid !== playerId) return null
-  return knownSide(start?.side)
+  const side = knownSide(start?.side)
+  if (side) return side
+  const observed = new Set<PlayerSide>()
+  for (const event of (round as RoundDetail).events || []) {
+    const record = event.data?.record
+    for (const role of ['attacker', 'victim']) {
+      const found = knownSide(record?.[role + '_side'])
+      if (found && record?.[role + '_steamid'] === playerId) observed.add(found)
+    }
+  }
+  return observed.size === 1 ? [...observed][0]! : null
+}
+
+export function playerScore(
+  details?: ReplayDetails | null,
+  match = details?.match,
+  team = details?.target_player?.team_id,
+): [number, number] | null {
+  const teams = match?.teams || []
+  // Some exports call the two sides "team_counter-terrorist" and "team_terrorist".
+  if (teams.length === 2 && teams.every((t) => !knownSide(t.team_id.replace(/^team[-_]/i, '')))) {
+    const own = teams.find((t) => t.team_id === team)
+    const opponent = teams.find((t) => t !== own)
+    if (own && opponent && Number.isInteger(own.score) && Number.isInteger(opponent.score))
+      return [own.score!, opponent.score!]
+  }
+  const rounds = details?.rounds?.filter((r) => !r.is_knife_round && r.round_num > 0)
+  if (!details || !rounds?.length) return null
+  const score: [number, number] = [0, 0]
+  const seen = new Set<number>()
+  for (const round of rounds) {
+    const side = targetSide(round, details.target_player_id)
+    const winner = knownSide(round.winner_side)
+    if (!side || !winner || seen.has(round.round_num)) return null
+    seen.add(round.round_num)
+    score[side === winner ? 0 : 1]++
+  }
+  return score
+}
+
+export function playerRating(details?: ReplayDetails | null, report?: AnalysisReport | null) {
+  const sources = [
+    details?.performance?.modules?.basic_stats,
+    report?.performance?.modules?.basic_stats,
+    details?.statistics?.modules?.basic_stats?.metrics,
+    report?.report.modules.basic_stats?.metrics,
+    details?.statistics?.source_player_stats,
+  ]
+  const number = (...keys: string[]) => {
+    for (const source of sources)
+      for (const key of keys) {
+        const value = source?.[key]
+        if (typeof value === 'number' && Number.isFinite(value)) return value
+      }
+    return null
+  }
+  const recorded = number('rating')
+  if (recorded !== null) return { value: recorded, estimated: number('rating_estimated') === 1 }
+  const rounds =
+    number('rounds_played') ??
+    details?.rounds?.filter((r) => !r.is_knife_round && r.round_num > 0).length
+  const kast = number('kast_pct', 'kast'),
+    adr = number('adr')
+  const kills = number('kills'),
+    deaths = number('deaths'),
+    assists = number('assists')
+  if (
+    details?.performance?.complete === false ||
+    report?.performance?.complete === false ||
+    details?.data_quality?.warnings?.some((w) => /截断|truncat/i.test(w)) ||
+    !rounds ||
+    rounds < 1 ||
+    kast == null ||
+    adr == null ||
+    kills == null ||
+    deaths == null ||
+    assists == null
+  )
+    return { value: null, estimated: false }
+  const kpr = kills / rounds,
+    dpr = deaths / rounds,
+    apr = assists / rounds
+  const impact = 2.13 * kpr + 0.42 * apr - 0.41
+  return {
+    value: 0.0073 * kast + 0.3591 * kpr - 0.5329 * dpr + 0.2372 * impact + 0.0032 * adr + 0.1587,
+    estimated: true,
+  }
 }
 
 /** Older reports omit the target side in summaries but keep it in the round artifact. */
@@ -106,7 +236,9 @@ export async function completeRoundSides(
   const rounds = [...details.rounds]
   const missing = rounds
     .map((round, index) => ({ round, index }))
-    .filter(({ round }) => !targetSide(round, details.target_player_id) || !knownSide(round.winner_side))
+    .filter(
+      ({ round }) => !targetSide(round, details.target_player_id) || !knownSide(round.winner_side),
+    )
   let next = 0
   async function worker() {
     while (next < missing.length) {
@@ -114,7 +246,11 @@ export async function completeRoundSides(
       try {
         const full = await readRound(round.round_num)
         if (full.round_num !== round.round_num) continue
-        if (full.target_start_state?.steamid && full.target_start_state.steamid !== details.target_player_id) continue
+        if (
+          full.target_start_state?.steamid &&
+          full.target_start_state.steamid !== details.target_player_id
+        )
+          continue
         const side = targetSide(full, details.target_player_id)
         rounds[index] = {
           ...round,
@@ -130,9 +266,7 @@ export async function completeRoundSides(
   await Promise.all(Array.from({ length: Math.min(4, missing.length) }, worker))
   return { ...details, rounds }
 }
-export function roundRows(
-  details: ReplayDetails,
-): (DetailedRound & {
+export function roundRows(details: ReplayDetails): (DetailedRound & {
   stats: RoundStatistics
   ownEconomy: number | null
   enemyEconomy: number | null

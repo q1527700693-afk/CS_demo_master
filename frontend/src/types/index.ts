@@ -60,6 +60,8 @@ export interface AuthResult {
 export type AnalysisStatus = 'uploaded' | 'queued' | 'analyzing' | 'completed' | 'failed'
 export interface Replay {
   scoreKnown?: boolean
+  scoreFinal?: boolean
+  ratingEstimated?: boolean
   matchTimeKnown?: boolean
   id: string
   map: string

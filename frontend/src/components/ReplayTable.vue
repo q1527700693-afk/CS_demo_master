@@ -21,7 +21,7 @@ const status: Record<string, string> = {
       <thead>
         <tr>
           <th>对局 / 地图</th>
-          <th>比分</th>
+          <th>比分（我方 / 对手）</th>
           <th>Rating</th>
           <th>ADR</th>
           <th>报告</th>
@@ -52,9 +52,11 @@ const status: Record<string, string> = {
               >{{ item.score[0] }} <em>:</em> {{ item.score[1] }}</span
             >
             <span v-else class="muted">未确认</span>
+            <small v-if="item.scoreKnown && item.scoreFinal === false" class="muted"> 已记录</small>
           </td>
           <td class="numeric" :class="{ positive: (item.rating || 0) >= 1 }">
             {{ item.rating?.toFixed(2) ?? '—' }}
+            <small v-if="item.ratingEstimated" class="muted">估算</small>
           </td>
           <td class="numeric">{{ item.adr?.toFixed(1) ?? '—' }}</td>
           <td>

@@ -1,5 +1,7 @@
 import { ApiError, request, upload } from '@/api/http'
 import { TOKEN_KEY } from '@/app/config'
+import { knownSide } from './report-data'
+import { utilityKind } from './combat-facts'
 import type { Page } from '@/types'
 import type {
   AnalysisReport,
@@ -40,6 +42,7 @@ export interface CloudDemo {
     target_player_name?: string
     map?: string
     adr?: number | null
+    rating?: number | null
     started_at?: string | null
   }
 }
@@ -186,7 +189,7 @@ export async function getCloudDetails(id: string, signal?: AbortSignal) {
       return p
         ? {
             ...r,
-            target_side: p.target_side,
+            target_side: p.target_side ?? r.target_side,
             team_economy: p.team_economy,
             target_summary: { ...r.target_summary, ...p.target_summary },
           }
@@ -203,8 +206,8 @@ export function getCloudPerformance(id: string): Promise<PerformanceFacts | null
     (typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : '') + ':' + id
   const cached = performanceCache.get(key)
   if (cached && Date.now() - cached.at < 30_000) return cached.pending
-  const pending = request<PerformanceFacts>(`${cloudPath(id)}/performance`).catch(() => {
-    performanceCache.delete(key)
+  const pending = request<PerformanceFacts>(`${cloudPath(id)}/performance`).catch((error) => {
+    if (!(error instanceof ApiError && error.status === 404)) performanceCache.delete(key)
     return null
   })
   performanceCache.set(key, { at: Date.now(), pending })
@@ -282,6 +285,81 @@ export async function getCloudMap(id: string, round: number, offset: number, sig
       points: i.points?.map((p: Wire | number[]) => (Array.isArray(p) ? p : [p.x, p.y, p.z])),
     })) as ReplayMapItem[],
   }
+}
+/** Legacy damage rows often omit both sides. Only use observations from the same round. */
+export async function readCloudRoundEvidence(
+  id: string,
+  round: number,
+  target: string,
+  withDamage: boolean,
+  signal?: AbortSignal,
+) {
+  const full = await getCloudRound(id, round, signal)
+  if (full.round_num !== round) throw new ApiError('回合编号不一致')
+  const sides = new Map<string, ReturnType<typeof knownSide>>()
+  const observe = (player: unknown, value: unknown) => {
+    const side = knownSide(value)
+    if (typeof player !== 'string' || !side) return
+    if (!sides.has(player)) sides.set(player, side)
+    else if (sides.get(player) !== side) sides.set(player, null)
+  }
+  observe(target, full.target_side)
+  observe(full.target_start_state?.steamid, full.target_start_state?.side)
+  const needed = new Set([target])
+  for (const event of full.events) {
+    const r = event.data.record
+    if (!r || event.round_num !== round) continue
+    observe(r.attacker_steamid, r.attacker_side)
+    observe(r.victim_steamid, r.victim_side)
+    if (
+      withDamage &&
+      event.type === 'damage' &&
+      r.attacker_steamid === target &&
+      utilityKind(r.weapon) &&
+      typeof r.victim_steamid === 'string'
+    )
+      needed.add(r.victim_steamid)
+  }
+  let offset: number | null = 0
+  while (offset !== null && [...needed].some((player) => !sides.has(player))) {
+    try {
+      const page = await getCloudMap(id, round, offset, signal)
+      for (const s of page.items) {
+        if (
+          s.round_num === round &&
+          ['all_player_samples', 'player_samples', 'target_keyframes'].includes(s.kind)
+        )
+          observe(
+            s.state?.steamid ?? (s.kind === 'all_player_samples' ? null : target),
+            s.state?.side,
+          )
+      }
+      if (
+        page.next_offset != null &&
+        (!Number.isSafeInteger(page.next_offset) || page.next_offset <= offset)
+      )
+        break
+      offset = page.next_offset ?? null
+    } catch {
+      break
+    } // A missing map must not discard valid damage events.
+  }
+  const events = full.events.map((e) => {
+    const r = e.data.record
+    if (!r || e.type !== 'damage') return e
+    return {
+      ...e,
+      data: {
+        ...e.data,
+        record: {
+          ...r,
+          attacker_side: knownSide(r.attacker_side) ?? sides.get(String(r.attacker_steamid)),
+          victim_side: knownSide(r.victim_side) ?? sides.get(String(r.victim_steamid)),
+        },
+      },
+    }
+  })
+  return { ...full, target_side: sides.get(target), events }
 }
 export async function getCloudEvents(id: string, details?: ReplayDetails, signal?: AbortSignal) {
   const d = details || (await getCloudDetails(id, signal))

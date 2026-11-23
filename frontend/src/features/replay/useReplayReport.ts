@@ -15,7 +15,7 @@ import {
   startAnalysis,
 } from './analysis-api'
 import { waitForQueuedAi } from './ai-queue'
-import { isCloudAnalysis } from './cloud-api'
+import { isCloudAnalysis, readCloudRoundEvidence } from './cloud-api'
 import { reconcileCombat } from './combat-facts'
 import { normalizeAiReport } from './ai-report'
 import type {
@@ -24,8 +24,14 @@ import type {
   AnalysisRun,
   ReplayDetails,
   ReplayEvent,
+  RoundDetail,
 } from './contracts'
-import { assertDetailsIdentity, completeRoundSides, roundRows } from './report-data'
+import {
+  assertDetailsIdentity,
+  collectRoundEvents,
+  completeRoundSides,
+  roundRows,
+} from './report-data'
 import { reviewFocus } from './review-presentation'
 import { newRequestKey } from './browser-capabilities'
 
@@ -48,6 +54,7 @@ export function useReplayReport() {
     aiError = ref(''),
     aiLoading = ref(false)
   let aiController: AbortController | undefined
+  let evidenceController: AbortController | undefined
   let generation = 0,
     aiRevision = 0
   const rows = computed(() => (details.value ? roundRows(details.value) : []))
@@ -58,6 +65,9 @@ export function useReplayReport() {
     const current = ++generation,
       id = String(route.params.id)
     aiController?.abort()
+    evidenceController?.abort()
+    const controller = new AbortController()
+    evidenceController = controller
     aiRevision++
     ai.value = null
     aiError.value = ''
@@ -74,30 +84,53 @@ export function useReplayReport() {
       if (current !== generation) return
       report.value = value
       void loadAi(id, current)
+      const cloud = isCloudAnalysis(id)
       const results = await Promise.allSettled([
-        getReportEvents(value.package_id, id),
+        cloud ? Promise.resolve(null) : getReportEvents(value.package_id, id),
         getHistory(value.match_id, value.target_player_id),
         mockModules.replay ? Promise.resolve(null) : getReportDetails(id),
       ])
       if (current !== generation) return
       const [eventResult, historyResult, detailResult] = results
-      if (eventResult.status === 'fulfilled') {
+      if (eventResult.status === 'fulfilled' && eventResult.value) {
         if (
           eventResult.value.match_id !== value.match_id ||
           eventResult.value.package_id !== value.package_id
         )
           eventsError.value = '事件与当前比赛不一致，请重新读取。'
         else events.value = eventResult.value.events as ReplayEvent[]
-      } else eventsError.value = errorMessage(eventResult.reason)
+      } else if (eventResult.status === 'rejected')
+        eventsError.value = errorMessage(eventResult.reason)
+      else eventsError.value = '回合事件未载入'
       if (historyResult.status === 'fulfilled') history.value = historyResult.value.items
       else historyError.value = errorMessage(historyResult.reason)
       if (detailResult.status === 'fulfilled' && detailResult.value) {
         try {
           assertDetailsIdentity(detailResult.value, value)
-          const signal = AbortSignal.timeout(8_000)
-          const completed = await completeRoundSides(detailResult.value, (round) =>
-            getRound(value.analysis_id, round, signal),
-          )
+          const reads = new Map<number, Promise<RoundDetail>>()
+          const readRound = (n: number) => {
+            let pending = reads.get(n)
+            if (!pending) {
+              pending = cloud
+                ? readCloudRoundEvidence(id, n, value.target_player_id, true, controller.signal)
+                : getRound(id, n, controller.signal)
+              reads.set(n, pending)
+            }
+            return pending
+          }
+          const rawDetails = detailResult.value
+          const recovered =
+            (cloud || eventResult.status === 'rejected') && rawDetails.rounds.length
+              ? await collectRoundEvents(rawDetails, readRound)
+              : null
+          if (current !== generation) return
+          if (recovered) {
+            events.value = recovered.events
+            eventsError.value = recovered.missing.length
+              ? `有 ${recovered.missing.length} 个回合的事件未载入`
+              : ''
+          }
+          const completed = await completeRoundSides(rawDetails, readRound)
           if (current !== generation) return
           details.value = completed
         } catch (e) {
@@ -105,7 +138,7 @@ export function useReplayReport() {
         }
       } else if (detailResult.status === 'rejected')
         detailsError.value = errorMessage(detailResult.reason)
-      if (eventResult.status === 'fulfilled' && !eventsError.value) {
+      if (!eventsError.value) {
         const reconciled = reconcileCombat(value, details.value, events.value)
         report.value = reconciled.report
         details.value = reconciled.details
@@ -210,6 +243,7 @@ export function useReplayReport() {
   watch(() => [route.params.id, auth.user?.id], load, { immediate: true })
   onUnmounted(() => {
     generation++
+    evidenceController?.abort()
     aiController?.abort()
   })
   return {

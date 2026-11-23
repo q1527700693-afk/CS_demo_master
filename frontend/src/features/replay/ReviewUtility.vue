@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import type { AnalysisReport, ReplayDetails, ReplayEvent } from './contracts'
 import { valueText, weaponName, type ReviewFocus } from './review-presentation'
-import { combatRelation, utilityKind, utilityDamage } from './combat-facts'
+import { reportUtilityDamage } from './combat-facts'
 import ReviewFocusList from './ReviewFocusList.vue'
 import { utilityUsage } from './utility-usage'
 const props = defineProps<{
@@ -17,24 +17,16 @@ const filter = ref('key'),
   focusPage = ref(1)
 watch(filter, () => (focusPage.value = 1))
 const utility = computed(() => props.report.report.modules.utility?.metrics)
-const facts = computed(() => props.report.performance)
-const damage = computed(() => {
-  const metrics = facts.value?.modules.utility
-  return metrics
-    ? { he: metrics.he_damage, fire: metrics.fire_damage, team: metrics.utility_team_damage }
-    : utilityDamage(props.events || [], props.report.target_player_id)
-})
-const damageAvailable = computed(
-  () =>
-    !!facts.value ||
-    (props.eventsAvailable &&
-      !(props.events || []).some(
-        (e) =>
-          e.type === 'damage' &&
-          e.data.record?.attacker_steamid === props.report.target_player_id &&
-          utilityKind(e.data.record.weapon) &&
-          combatRelation(e.data.record) === 'unknown',
-      )),
+const damage = computed(() =>
+  reportUtilityDamage(
+    props.report,
+    props.details,
+    props.events || [],
+    props.eventsAvailable === true,
+  ),
+)
+const missingDamage = computed(() =>
+  [damage.value.he, damage.value.fire, damage.value.team].some((n) => n == null),
 )
 const death = computed(() => props.report.report.modules.death_context?.metrics)
 const flashes = computed(() => [
@@ -128,7 +120,7 @@ const filtered = computed(() =>
         <h2>手雷与燃烧伤害</h2>
         <p>
           对敌伤害与队伤分别统计。{{
-            facts?.damage_basis === 'raw'
+            damage.basis === 'raw'
               ? '当前解析仅提供原始伤害，数值可能含过量伤害。'
               : '优先使用有效生命伤害；缺少时使用原始伤害。'
           }}
@@ -137,28 +129,29 @@ const filtered = computed(() =>
     </header>
     <div class="utility-totals">
       <div>
-        <strong>{{ damageAvailable ? valueText(damage.he, 0) : '—' }}</strong
+        <strong>{{ valueText(damage.he, 0) }}</strong
         ><span>高爆手雷伤害</span>
       </div>
       <div>
-        <strong>{{ damageAvailable ? valueText(damage.fire, 0) : '—' }}</strong
+        <strong>{{ valueText(damage.fire, 0) }}</strong
         ><span>燃烧伤害</span>
       </div>
       <div>
-        <strong>{{ damageAvailable ? valueText(damage.team, 0) : '—' }}</strong
+        <strong>{{ valueText(damage.team, 0) }}</strong
         ><span>道具误伤队友</span>
       </div>
     </div>
-    <p v-if="!damageAvailable" class="review-empty">伤害事件未载入，请重新读取报告。</p>
+    <p v-if="missingDamage && damage.total != null" class="review-empty">
+      解析报告记录道具总伤害 {{ valueText(damage.total, 0) }}。
+    </p>
+    <p v-if="missingDamage" class="review-empty">此报告缺少部分分类明细。</p>
+    <p v-if="damage.unknown" class="review-empty">
+      另有 {{ damage.unknown }} 点道具伤害无法确认敌我归属。
+    </p>
+    <p v-if="damage.partial && !missingDamage" class="review-empty">
+      部分伤害记录缺失，以上为已确认的数值。
+    </p>
   </section>
-  <p v-if="(facts?.modules.utility?.utility_unclassified_damage || 0) > 0" class="review-empty">
-    另有
-    {{ facts?.modules.utility?.utility_unclassified_damage }}
-    点道具伤害无法确认阵营，未计入对敌或队伤。
-  </p>
-  <p v-if="facts && !facts.complete" class="review-empty">
-    解析事件存在截断，显示已记录部分的统计。
-  </p>
   <section class="review-panel throw-panel" data-testid="utility-throws">
     <header class="review-section-heading">
       <div>

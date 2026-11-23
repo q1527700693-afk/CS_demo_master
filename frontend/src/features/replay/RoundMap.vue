@@ -1,11 +1,20 @@
 <script setup lang="ts">
 import { isCloudAnalysis } from './cloud-api'
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { getRound, getRoundMap, getGlobalMapPage } from './analysis-api'
 import { errorMessage } from '@/api/http'
 import type { ReplayEvent, ReplayMapItem, RoundDetail } from './contracts'
 import { clockText, mapName as displayMapName, weaponName } from './review-presentation'
-import { onRadarFloor, radarAsset, sampleAt, trajectoryPoints, worldToRadar } from './radar-data'
+import {
+  onRadarFloor,
+  radarAsset,
+  sampleAt,
+  positionAt,
+  continuous,
+  lastAt,
+  trajectoryPoints,
+  worldToRadar,
+} from './radar-data'
 import {
   groupPlayerSamples,
   playerColor,
@@ -27,8 +36,8 @@ const props = defineProps<{
   seek?: { tick: number; nonce: number } | null
 }>()
 const emit = defineEmits<{ cursor: [tick: number]; event: [event: ReplayEvent] }>()
-const items = ref<ReplayMapItem[]>([]),
-  roundDetail = ref<RoundDetail | null>(null)
+const items = shallowRef<ReplayMapItem[]>([]),
+  roundDetail = shallowRef<RoundDetail | null>(null)
 const loading = ref(false),
   error = ref(''),
   imageError = ref(false)
@@ -93,7 +102,7 @@ function point(x: number, y: number) {
 function validState(i?: ReplayMapItem) {
   return i?.state && Number.isFinite(i.state.x) && Number.isFinite(i.state.y)
 }
-const current = computed(() => sampleAt(samples.value, tick.value, rate.value))
+const current = computed(() => positionAt(samples.value, tick.value, rate.value, asset.value))
 const selfColor = computed(() =>
   playerColor(current.value?.state?.side ?? roundDetail.value?.target_start_state?.side, true),
 )
@@ -112,7 +121,7 @@ const neighbors = computed(() => {
     return [...playerGroups.value]
       .filter(([id]) => id !== props.playerId)
       .flatMap(([id, list]) => {
-        const s = sampleAt(list, tick.value, rate.value)?.state
+        const s = positionAt(list, tick.value, rate.value, asset.value)?.state
         const killed = (roundDetail.value?.events || []).some(
           (e) => e.type === 'kill' && e.tick <= tick.value && e.data.record?.victim_steamid === id,
         )
@@ -149,41 +158,56 @@ const neighbors = computed(() => {
         onRadarFloor(asset.value!, n.z, lower.value),
     )
 })
-const segments = computed(() => {
-  if (!asset.value) return []
-  return [...playerGroups.value].flatMap(([id, list]) => {
-    if (id !== props.playerId && !showNeighbors.value) return []
-    const paths: { points: string; color: string; self: boolean }[] = []
-    let last: (typeof paths)[number] | undefined
-    const visible = list.filter(
-      (i) => (i.tick ?? 0) >= extent.value.min && (entire.value || (i.tick ?? 0) <= tick.value),
-    )
-    visible.slice(1).forEach((s, index) => {
-      const p = visible[index]!
+// Project each route once. Playback only clips the prepared line at the current tick.
+const routes = computed(() => {
+  const radar = asset.value
+  if (!radar) return []
+  type Route = {
+    points: string
+    ends: { tick: number; length: number }[]
+    color: string
+    self: boolean
+  }
+  const paths: Route[] = []
+  for (const [id, list] of playerGroups.value) {
+    let route: Route | undefined
+    for (let index = 1; index < list.length; index++) {
+      const a = list[index - 1]!,
+        b = list[index]!
       if (
-        !validState(s) ||
-        !validState(p) ||
-        s.state!.health === 0 ||
-        p.state!.health === 0 ||
-        (s.tick ?? 0) - (p.tick ?? 0) > rate.value ||
-        !onRadarFloor(asset.value!, s.state!.z, lower.value) ||
-        !onRadarFloor(asset.value!, p.state!.z, lower.value)
+        (a.tick ?? 0) < extent.value.min ||
+        !continuous(a, b, rate.value, radar) ||
+        !onRadarFloor(radar, b.state?.z, lower.value)
       ) {
-        last = undefined
-        return
+        route = undefined
+        continue
       }
-      const a = point(p.state!.x!, p.state!.y!),
-        b = point(s.state!.x!, s.state!.y!)
-      const color = playerColor(s.state?.side, id === props.playerId)
-      if (last && last.color === color) last.points += ` ${b.x},${b.y}`
-      else {
-        last = { points: `${a.x},${a.y} ${b.x},${b.y}`, color, self: id === props.playerId }
-        paths.push(last)
+      if (!route) {
+        const p = point(a.state!.x!, a.state!.y!)
+        const first = `${p.x},${p.y}`
+        route = {
+          points: first,
+          ends: [{ tick: a.tick!, length: first.length }],
+          color: playerColor(a.state?.side, id === props.playerId),
+          self: id === props.playerId,
+        }
+        paths.push(route)
       }
-    })
-    return paths
-  })
+      const p = point(b.state!.x!, b.state!.y!)
+      route.points += ` ${p.x},${p.y}`
+      route.ends.push({ tick: b.tick!, length: route.points.length })
+    }
+  }
+  return paths
 })
+const segments = computed(() =>
+  routes.value.flatMap((route) => {
+    if (!route.self && !showNeighbors.value) return []
+    if (entire.value) return [route]
+    const end = lastAt(route.ends, tick.value, (row) => row.tick)
+    return end < 1 ? [] : [{ ...route, points: route.points.slice(0, route.ends[end]!.length) }]
+  }),
+)
 const utilityLines = computed(() => {
   if (!asset.value || !showUtility.value) return []
   return utilities.value
@@ -401,15 +425,20 @@ watch(
   },
 )
 watch(tick, (value) => emit('cursor', value))
-watch(playing, (active) => {
+watch([playing, speed], ([active]) => {
   if (timer) clearInterval(timer)
   if (!active) return
   entire.value = false
   if (tick.value >= extent.value.max) tick.value = extent.value.min
+  const start = tick.value,
+    startedAt = performance.now()
   timer = setInterval(() => {
-    tick.value = Math.min(extent.value.max, tick.value + rate.value * 0.1 * speed.value)
+    tick.value = Math.min(
+      extent.value.max,
+      start + ((performance.now() - startedAt) * rate.value * speed.value) / 1000,
+    )
     if (tick.value >= extent.value.max) playing.value = false
-  }, 100)
+  }, 100 / speed.value)
 })
 onUnmounted(() => {
   generation++
@@ -638,7 +667,7 @@ onUnmounted(() => {
         }}</span
         ><span>{{
           fullReplay
-            ? '全员位置 · 每 0.5 秒采样 · 存活玩家按游标时刻显示'
+            ? '全员位置 · 每 0.1 秒回放 · 相邻采样间平滑移动'
             : isCloudAnalysis(analysisId)
               ? '云端解析展示所选玩家位置与道具；不推测其他玩家的未知位置'
               : '旧版数据仅包含本人及附近玩家；全员回放需重新上传新版 ZIP'
@@ -662,7 +691,9 @@ onUnmounted(() => {
         </div>
         <p>
           实线道具已确认归属，虚线仅展示场内轨迹。底图由比赛坐标固定定位，底图版本
-          {{ asset.version }}。地图只展示已记录的位置；不推断视野、烟雾覆盖范围或缺失的玩家位置。
+          {{
+            asset.version
+          }}。播放时在同一存活玩家的相邻坐标间插值。阵亡、切换楼层或记录中断时停止插值。
         </p>
       </details>
     </template>

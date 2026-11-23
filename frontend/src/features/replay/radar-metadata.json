@@ -152,10 +152,63 @@
     "zoom": null
   },
   "rush_001": {
-    "pos_x": -11240.0,
-    "pos_y": 9944.0,
-    "rotate": null,
-    "scale": 18.910156,
-    "zoom": null
+    "pos_x": 1744,
+    "pos_y": 7836,
+    "scale": 2.484375,
+    "version": "2026-11-19"
+  },
+  "ar_pool_day": {
+    "pos_x": -1088,
+    "pos_y": 1600,
+    "scale": 2.125,
+    "version": "2026-11-19"
+  },
+  "cs_shelter": {
+    "pos_x": -3448.7712,
+    "pos_y": 3805.3228,
+    "scale": 3.311857,
+    "version": "2026-11-19"
+  },
+  "de_boulder": {
+    "pos_x": -3273.4917,
+    "pos_y": 2930.2207,
+    "scale": 2.8491137,
+    "version": "2026-11-19",
+    "verticalsections": {
+      "lower": {
+        "AltitudeMax": 62.757324,
+        "AltitudeMin": -16384
+      }
+    }
+  },
+  "de_cbble": {
+    "pos_x": -3615,
+    "pos_y": 2712,
+    "scale": 4.724792,
+    "version": "2026-11-19"
+  },
+  "de_debris": {
+    "pos_x": -3015.2393,
+    "pos_y": 2919.2393,
+    "scale": 1.9445695,
+    "version": "2026-11-19"
+  },
+  "de_eldorado": {
+    "pos_x": -3548.6814,
+    "pos_y": 2571.1816,
+    "scale": 2.0656068,
+    "version": "2026-11-19"
+  },
+  "de_fachwerk": {
+    "pos_x": -2311.0767,
+    "pos_y": 2874.6204,
+    "scale": 2.5537856,
+    "version": "2026-11-19"
+  },
+  "de_poseidon": {
+    "pos_x": -1046.3943,
+    "pos_y": 1166.3942,
+    "scale": 3.0124886,
+    "version": "2026-11-19"
   }
 }

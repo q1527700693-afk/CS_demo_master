@@ -1,4 +1,8 @@
-# Frontend 1.3.2 handoff
+# 网页版 v1.3.3 交付
+
+将源码包的内容放入 GitHub 仓库现有的 `frontend/` 目录。生产构建使用 `pnpm run build`，版本和改动见 [版本记录](docs/RELEASE.md)。发布网页时使用生成的 `dist/`。
+
+## 历史版本 v1.3.2
 
 Copy the contents of front_end_v1.3.2 into repository frontend/ without nesting the version folder. Exclude dist, node_modules and local environment files from GitHub. No Git commit or push is performed.
 

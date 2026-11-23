@@ -1,5 +1,13 @@
-import { getHistory, listMatches, getReportDetails } from './analysis-api'
-import { cloudKey, getCloudDetails, listCloudDemos } from './cloud-api'
+import {
+  getHistory,
+  listMatches,
+  getReportDetails,
+  getRound,
+  readReportSummary,
+} from './analysis-api'
+import type { ReplayDetails } from './contracts'
+import { completeRoundSides, playerScore, playerRating } from './report-data'
+import { cloudKey, getCloudDetails, listCloudDemos, readCloudRoundEvidence } from './cloud-api'
 import { isDesktopRuntime } from '@/app/runtime'
 import { listLocalResults } from './local-library'
 import { analysisName } from './analysis-name'
@@ -12,6 +20,8 @@ export interface AnalysisEntry {
   sequence: number
   adr: number | null
   rating: number | null
+  ratingEstimated?: boolean
+  scoreFinal?: boolean
   score: [number, number] | null
   updatedAt: string
   title: string
@@ -20,16 +30,7 @@ export interface AnalysisEntry {
   source: 'cloud' | 'package' | 'local'
   message: string
 }
-function matchScore(
-  match: { complete?: boolean; teams?: { team_id: string; score: number | null }[] },
-  team?: string | null,
-): [number, number] | null {
-  if (!match.complete || !team) return null
-  const own = match.teams?.find((t) => t.team_id === team),
-    other = match.teams?.find((t) => t.team_id !== team)
-  return own?.score != null && other?.score != null ? [own.score, other.score] : null
-}
-export async function loadAnalysisEntries() {
+export async function loadAnalysisEntries(withDetails = true) {
   const entries: AnalysisEntry[] = [],
     warnings: string[] = []
   async function packages() {
@@ -56,8 +57,9 @@ export async function loadAnalysisEntries() {
                 : null,
             score:
               run.analysis_id === match.latest_available_analysis_id
-                ? matchScore(match.match, match.summary?.player_team_id)
+                ? playerScore(null, match.match, match.summary?.player_team_id)
                 : null,
+            scoreFinal: match.match.complete,
             updatedAt: run.analyzed_at || run.created_at || match.created_at,
             title: '',
             available: run.report_available,
@@ -82,7 +84,7 @@ export async function loadAnalysisEntries() {
           map: run.map || '',
           sequence: 0,
           adr: run.summary?.adr ?? null,
-          rating: null,
+          rating: run.summary?.rating ?? null,
           score: null,
           updatedAt: run.analyzed_at || run.created_at,
           title: '',
@@ -131,23 +133,54 @@ export async function loadAnalysisEntries() {
     while (next < all.length) {
       const item = all[next++]!
       if (!item.available) continue
+      let details: ReplayDetails | undefined
       try {
-        const details =
+        details =
           item.source === 'cloud' ? await getCloudDetails(item.id) : await getReportDetails(item.id)
+        if (item.target && details.target_player_id !== item.target) continue
         item.player = details.target_player?.name || item.player
         item.target = details.target_player_id
         const basic =
           details.statistics?.modules?.basic_stats?.metrics ||
           details.statistics?.source_player_stats
         if (typeof basic?.adr === 'number' && Number.isFinite(basic.adr)) item.adr = basic.adr
-        if (typeof basic?.rating === 'number' && Number.isFinite(basic.rating))
-          item.rating = basic.rating
+        const rating = playerRating(details)
+        if (rating.value != null && (item.rating == null || !rating.estimated)) {
+          item.rating = rating.value
+          item.ratingEstimated = rating.estimated
+        }
+        let score = playerScore(details)
+        if (!score && !item.score && details.rounds?.length) {
+          const completed = await completeRoundSides(details, (n) =>
+            item.source === 'cloud'
+              ? readCloudRoundEvidence(item.id, n, item.target, false)
+              : getRound(item.id, n),
+          )
+          score = playerScore(completed)
+        }
+        item.score = score ?? item.score
+        item.scoreFinal = details.match?.complete ?? item.scoreFinal
       } catch {
         /* A failed detail read cannot hide another player's record. */
       }
+      if (item.rating == null || !item.score) {
+        try {
+          const report = await readReportSummary(item.id)
+          if (report.target_player_id !== item.target) continue
+          if (item.rating == null) {
+            const rating = playerRating(details, report)
+            item.rating = rating.value
+            item.ratingEstimated = rating.estimated
+          }
+          item.score ??= playerScore(details, report.match, report.perspective.player_team_id)
+          item.scoreFinal ??= report.match.complete
+        } catch {
+          /* The history stays visible when the report is temporarily unavailable. */
+        }
+      }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(4, all.length) }, worker))
+  if (withDetails) await Promise.all(Array.from({ length: Math.min(4, all.length) }, worker))
   all.sort(
     (a, b) =>
       (Date.parse(b.updatedAt) || 0) - (Date.parse(a.updatedAt) || 0) || a.id.localeCompare(b.id),

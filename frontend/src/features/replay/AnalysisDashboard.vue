@@ -18,7 +18,7 @@ import {
   type ReviewFocus,
   type ReviewTab,
 } from './review-presentation'
-import { moduleLabels } from './report-data'
+import { moduleLabels, playerScore, playerRating } from './report-data'
 import type { ReplayEvent } from './contracts'
 import ReviewOverview from './ReviewOverview.vue'
 import ReviewRounds from './ReviewRounds.vue'
@@ -77,7 +77,7 @@ watch(
     reportSequence.value = undefined
     if (!id) return
     try {
-      const { entries } = await loadAnalysisEntries()
+      const { entries } = await loadAnalysisEntries(false)
       if (active) reportSequence.value = entries.find((item) => item.id === id)?.sequence
     } catch {
       /* Reports remain readable if history is temporarily unavailable. */
@@ -112,17 +112,15 @@ async function analyzePlayer() {
 }
 const player = computed(() => details.value?.target_player?.name || '分析对象')
 const basic = computed(() => report.value?.report.modules.basic_stats?.metrics)
-const ownTeam = computed(() =>
-  report.value?.match.teams.find((t) => t.team_id === report.value?.perspective.player_team_id),
+const score = computed(() =>
+  playerScore(details.value, report.value?.match, report.value?.perspective.player_team_id),
 )
-const otherTeam = computed(() =>
-  report.value?.match.teams.find((t) => t.team_id !== report.value?.perspective.player_team_id),
-)
+const rating = computed(() => playerRating(details.value, report.value))
 const overviewCards = computed(() => [
   {
-    label: basic.value?.rating_estimated === 1 ? 'Rating（估算）' : 'Rating',
-    value: valueText(basic.value?.rating, 2),
-    note: basic.value?.rating_estimated === 1 ? 'Awpy 公开近似公式' : '本场个人表现',
+    label: rating.value.estimated ? 'Rating（估算）' : 'Rating',
+    value: valueText(rating.value.value, 2),
+    note: rating.value.estimated ? 'Awpy 公开近似公式' : '本场个人表现',
     description: metricDefinitions.rating,
     progress: null,
   },
@@ -258,22 +256,16 @@ watch(rows, (value) => {
               <p class="match-subline">{{ rows.length || '—' }} 个已记录回合</p>
             </div>
           </div>
-          <div v-if="ownTeam && otherTeam" class="match-score">
+          <div class="match-score">
             <div>
-              <span>{{ /^队伍/.test(ownTeam.name) ? '我方' : ownTeam.name }}</span
-              ><strong>{{ ownTeam.score ?? '—' }}</strong>
+              <span>我方</span><strong>{{ score?.[0] ?? '—' }}</strong>
             </div>
             <span class="score-divider">:</span>
             <div>
-              <span>{{ /^队伍/.test(otherTeam.name) ? '对方' : otherTeam.name }}</span
-              ><strong class="opponent-score">{{ otherTeam.score ?? '—' }}</strong>
+              <span>对手</span><strong class="opponent-score">{{ score?.[1] ?? '—' }}</strong>
             </div>
             <small>{{
-              isCloudAnalysis(report.analysis_id)
-                ? '按阵营记录胜局'
-                : report.match.complete
-                  ? '最终比分'
-                  : '记录比分'
+              score ? (report.match.complete ? '最终比分' : '已记录回合比分') : '队伍胜负数据不足'
             }}</small>
           </div>
         </header>

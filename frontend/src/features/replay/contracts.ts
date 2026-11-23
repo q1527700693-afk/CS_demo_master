@@ -119,6 +119,7 @@ export interface WeaponStatistics {
 }
 export interface DetailedRound {
   round_num: number
+  is_knife_round?: boolean
   winner_side?: string | null
   target_side?: string | null
   target_start_state?: { side?: string | null; steamid?: string | null } | null
@@ -129,7 +130,7 @@ export interface ReplayDetails {
   performance?: PerformanceFacts
   analysis_version?: string
   players?: { player_id: string; name: string }[]
-  match?: { map?: string; tick_rate?: number; started_at?: string | null }
+  match?: Partial<MatchInfo> & { rounds_played?: number }
   export_scope?: { scope: string }
   source: {
     match_id: string

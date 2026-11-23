@@ -1,17 +1,20 @@
 import type { AnalysisReport, ReplayDetails, ReplayEvent } from './contracts'
+import { knownSide } from './report-data'
 
 // Product policy: short residual white flashes remain in raw evidence only.
 export const MIN_EFFECTIVE_BLIND_SECONDS = 0.5
 type RecordData = Record<string, unknown>
 export function combatRelation(r: RecordData): 'enemy' | 'team' | 'self' | 'unknown' {
   if (r.attacker_steamid && r.attacker_steamid === r.victim_steamid) return 'self'
-  const sides = ['terrorist', 'counter-terrorist']
-  if (!sides.includes(String(r.attacker_side)) || !sides.includes(String(r.victim_side)))
-    return 'unknown'
-  return r.attacker_side === r.victim_side ? 'team' : 'enemy'
+  const a = knownSide(r.attacker_side),
+    b = knownSide(r.victim_side)
+  if (!a || !b) return 'unknown'
+  return a === b ? 'team' : 'enemy'
 }
 export function utilityKind(weapon: unknown): 'he' | 'fire' | null {
-  const id = String(weapon || '').replace(/^weapon_/, '')
+  const id = String(weapon || '')
+    .toLowerCase()
+    .replace(/^weapon_/, '')
   return ['hegrenade', 'he'].includes(id)
     ? 'he'
     : ['inferno', 'molotov', 'incgrenade', 'incendiary', 'fire'].includes(id)
@@ -19,20 +22,100 @@ export function utilityKind(weapon: unknown): 'he' | 'fire' | null {
       : null
 }
 export function damageAmount(r: RecordData): number {
-  const value = Number(r.dmg_health_real ?? r.dmg_health)
-  return Number.isFinite(value) ? Math.max(0, value) : 0
+  return measured(r.dmg_health_real) ?? measured(r.dmg_health) ?? 0
 }
-export function utilityDamage(events: ReplayEvent[], target: string) {
-  const totals = { he: 0, fire: 0, team: 0 }
+function measured(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
+}
+function damageEvidence(events: ReplayEvent[], target: string, details?: ReplayDetails | null) {
+  const sides = new Map<string, ReturnType<typeof knownSide>>()
+  function observe(round: number | null, id: unknown, rawSide: unknown) {
+    const side = knownSide(rawSide)
+    if (!side || !id || round == null) return
+    const key = round + ':' + id
+    sides.set(key, !sides.has(key) || sides.get(key) === side ? side : null)
+  }
+  for (const round of details?.rounds || []) {
+    observe(round.round_num, target, round.target_side)
+    observe(round.round_num, round.target_start_state?.steamid, round.target_start_state?.side)
+  }
   for (const e of events) {
     const r = e.data.record
-    if (e.type !== 'damage' || !r || r.attacker_steamid !== target) continue
+    if (!r) continue
+    observe(e.round_num, r.attacker_steamid, r.attacker_side)
+    observe(e.round_num, r.victim_steamid, r.victim_side)
+  }
+  const totals = { he: 0, fire: 0, team: 0, unknown: 0, incomplete: false }
+  for (const e of events) {
+    const r = e.data.record
+    if (
+      e.type !== 'damage' ||
+      !r ||
+      r.attacker_steamid !== target ||
+      (e.live_elapsed_seconds ?? 0) < 0
+    )
+      continue
     const kind = utilityKind(r.weapon)
     if (!kind) continue
-    if (combatRelation(r) === 'enemy') totals[kind] += damageAmount(r)
-    if (combatRelation(r) === 'team') totals.team += damageAmount(r)
+    const relation = combatRelation({
+      ...r,
+      attacker_side: knownSide(r.attacker_side) ?? sides.get(e.round_num + ':' + target),
+      victim_side: knownSide(r.victim_side) ?? sides.get(e.round_num + ':' + r.victim_steamid),
+    })
+    const amount = measured(r.dmg_health_real) ?? measured(r.dmg_health)
+    if (relation === 'self') continue
+    if (amount == null) totals.incomplete = true
+    else totals[relation === 'enemy' ? kind : relation] += amount
   }
   return totals
+}
+export function utilityDamage(events: ReplayEvent[], target: string) {
+  const { he, fire, team } = damageEvidence(events, target)
+  return { he, fire, team }
+}
+export function reportUtilityDamage(
+  report: AnalysisReport,
+  details: ReplayDetails | null,
+  events: ReplayEvent[],
+  completeEvents: boolean,
+) {
+  const facts = [report.performance, details?.performance].find(
+    (f) => f?.modules?.utility && f.target_player_id === report.target_player_id,
+  )
+  const sources = [
+    facts?.modules.utility,
+    details?.statistics.modules?.utility?.metrics,
+    report.report.modules.utility?.metrics,
+    details?.statistics.source_player_stats,
+  ]
+  const metric = (key: string) =>
+    sources.map((s) => measured(s?.[key])).find((n) => n != null) ?? null
+  const raw = damageEvidence(events, report.target_player_id, details)
+  const total = metric('utility_damage')
+  const hasDamageEvents = events.some(
+    (e) =>
+      e.type === 'damage' &&
+      e.data.record?.attacker_steamid === report.target_player_id &&
+      utilityKind(e.data.record.weapon),
+  )
+  const covered =
+    completeEvents &&
+    (hasDamageEvents || !total) &&
+    !details?.data_quality?.warnings?.some((w) => /(?:截断|truncat).*damages/i.test(w))
+  const count = (key: string, n: number) => metric(key) ?? (covered || n > 0 ? n : null)
+  return {
+    he: count('he_damage', raw.he),
+    fire: count('fire_damage', raw.fire),
+    team: count('utility_team_damage', raw.team),
+    unknown: count('utility_unclassified_damage', raw.unknown),
+    total,
+    partial:
+      facts?.complete === false ||
+      raw.incomplete ||
+      (!covered &&
+        ['he_damage', 'fire_damage', 'utility_team_damage'].some((k) => metric(k) == null)),
+    basis: facts?.damage_basis,
+  }
 }
 
 /** Correct legacy aggregates only when the complete target event stream is available. */
