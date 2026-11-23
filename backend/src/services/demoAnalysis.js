@@ -22,7 +22,7 @@ const UTILITY_WEAPONS = new Set([
     'hegrenade', 'flashbang', 'smokegrenade', 'molotov', 'incgrenade', 'decoy'
 ]);
 const MAX_FINDINGS = 400;
-const MAX_SAMPLES_PER_ROUND = 20000;
+const MAX_SAMPLES_PER_ROUND = 80000;
 const MAX_TRAJECTORY_ROUNDS = 64;
 
 function sideLabel(side) {

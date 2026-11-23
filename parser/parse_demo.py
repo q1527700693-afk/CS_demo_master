@@ -14,7 +14,7 @@ Options:
     --output PATH           destination JSON (required)
     --target-player STEAMID focus player; default is the top fragger
     --max-rounds N          keep at most N rounds (default 60)
-    --sample-every N        target sample stride in ticks (default 32 = 0.5s)
+    --sample-every N        target sample stride in ticks (default 8 = 0.125s at 64 tick/s)
     --check                 only verify that awpy is importable, then exit 0
 
 Exit codes:
@@ -50,7 +50,7 @@ MAX_GRENADE_POINTS = 240
 MAX_UTILITY_ROWS = 4000
 MAX_INVENTORY = 400
 DEFAULT_MAX_ROUNDS = 60
-DEFAULT_SAMPLE_EVERY = 32
+DEFAULT_SAMPLE_EVERY = 8
 
 
 class UsageError(Exception):
@@ -362,7 +362,7 @@ def collect_samples(demo: Any, index: RoundIndex, target: str | None, every: int
         warnings.append(f"player samples unavailable: {error}")
         return []
     samples: list[dict[str, Any]] = []
-    for row in frame.to_dicts():
+    for row in frame.iter_rows(named=True):
         sid = steamid(row.get("steamid"))
         if not sid or (target and sid != target) or (known is not None and sid not in known):
             continue
